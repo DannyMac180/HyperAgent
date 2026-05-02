@@ -1,0 +1,27 @@
+# Forge Review
+
+- Review ID:
+- Date/time:
+- Proposals reviewed:
+- Reviewer:
+
+## Workshop Quality
+
+- Are proposals specific and evidence-backed?
+- Are acceptance tests concrete?
+- Are safety risks explicit?
+- Are activation modes appropriate?
+- Are repeated friction patterns being missed?
+
+## Process Upgrade Candidates
+
+- Workshop process friction:
+- Proposed process change:
+- Expected effect:
+- Eval for the process change:
+- Rollback plan:
+
+## Decision
+
+- Recommendation:
+- Human approval needed:

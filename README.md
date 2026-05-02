@@ -78,7 +78,19 @@ flowchart TD
 ## Quick Start
 
 1. Clone this repo.
-2. Install the Codex skill by copying or symlinking `skills/codex-hyperagent/` into your Codex skills directory.
+2. Install the Codex skill:
+
+   ```bash
+   sh scripts/install-codex-skill.sh "$HOME/.codex/skills"
+   ```
+
+   For local development, use `--symlink` instead of copying:
+
+   ```bash
+   sh scripts/install-codex-skill.sh --symlink "$HOME/.codex/skills"
+   ```
+
+   The installer validates `skills/codex-hyperagent/SKILL.md`, refuses to overwrite an existing skill unless `--force` is passed, and supports `--dry-run` for previewing the install.
 3. Start Codex in this repo and ask it to use the `codex-hyperagent` skill.
 4. Use `hyperagent/operating-prompt.md` as the canonical Suit prompt.
 5. After a task, inspect the new mission record in `missions/`.
@@ -92,6 +104,7 @@ The MVP is file-based on purpose. There is no hosted service, no database, and n
 - `docs/concepts.md`: the Suit, Mission, Workshop, and Forge mental model.
 - `docs/article-outline.md`: public essay outline for the Iron Man Suit thesis.
 - `skills/codex-hyperagent/`: Codex skill instructions.
+- `scripts/install-codex-skill.sh`: dependency-free Codex skill installer.
 - `hyperagent/operating-prompt.md`: the operating layer Codex wears during work.
 - `hyperagent/capability-registry.md`: accepted capability registry, empty by default.
 - `templates/mission-record.md`: mission telemetry template.
@@ -113,11 +126,11 @@ Run the local MVP verifier:
 sh scripts/verify-mvp.sh
 ```
 
-The verifier checks that the Codex skill, operating prompt, local memory directories, templates, documentation, capability registry, and safety defaults are present.
+The verifier checks that the Codex skill, installer, operating prompt, local memory directories, templates, documentation, capability registry, and safety defaults are present.
 
 ## Current Limits
 
-HyperAgent Mark I is a prototype. It does not install itself automatically, does not activate upgrades, does not provide a UI, and does not support every agent platform yet. The point of this version is to prove the Mission -> Workshop loop with durable local artifacts.
+HyperAgent Mark I is a prototype. It does not activate upgrades, does not provide a UI, and does not support every agent platform yet. The point of this version is to prove the Mission -> Workshop loop with durable local artifacts.
 
 ## License
 

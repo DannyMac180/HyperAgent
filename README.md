@@ -8,6 +8,73 @@ The category claim is simple:
 
 HyperAgent starts with OpenAI Codex in the Codex Mac app. The first prototype is intentionally markdown-first: Codex wears a Suit prompt while working, writes mission records after real tasks, and uses those records to propose evidence-backed upgrades through the Workshop. The Forge then reviews whether the Workshop itself is producing useful, safe, testable improvements.
 
+## Architecture
+
+HyperAgent is designed to sit at the Codex Mac app level as a user-level operating layer across Codex workspaces. The Global Suit provides shared operating rules, safety defaults, and reusable capabilities. Each workspace gets its own local Suit context for repo-specific rules, workflows, and memory.
+
+Mission records capture evidence from real work. The Workshop turns that evidence into proposed Suit upgrades. The Forge improves the Workshop itself by checking whether proposals are specific, evidence-backed, safe, testable, and worth installing. Human review approves persistent behavior changes before they become part of the Suit.
+
+```mermaid
+flowchart TD
+  User["User"]
+
+  Codex["Codex Mac App<br/>Host environment for Codex work"]
+
+  HyperAgent["HyperAgent<br/>User-level meta layer"]
+
+  Registry["Project Registry<br/>Known workspaces, paths, roles, commands"]
+
+  GlobalSuit["Global Suit<br/>Shared operating rules, safety defaults, reusable skills"]
+
+  WorkspaceA["Workspace A"]
+  WorkspaceB["Workspace B"]
+  WorkspaceC["Workspace C"]
+
+  LocalA["Workspace-local Suit Context<br/>repo rules, commands, workflows, memory"]
+  LocalB["Workspace-local Suit Context"]
+  LocalC["Workspace-local Suit Context"]
+
+  MissionA["Mission Records"]
+  MissionB["Mission Records"]
+  MissionC["Mission Records"]
+
+  Workshop["Workshop<br/>Turns mission evidence into Suit upgrade proposals"]
+
+  Forge["Forge<br/>Improves how the Workshop proposes, tests, and installs upgrades"]
+
+  Review["Human Review<br/>Approves persistent behavior changes"]
+
+  User --> Codex
+  Codex --> HyperAgent
+
+  HyperAgent --> Registry
+  HyperAgent --> GlobalSuit
+  HyperAgent --> Workshop
+  HyperAgent --> Forge
+
+  Registry --> WorkspaceA
+  Registry --> WorkspaceB
+  Registry --> WorkspaceC
+
+  GlobalSuit --> LocalA
+  GlobalSuit --> LocalB
+  GlobalSuit --> LocalC
+
+  WorkspaceA --> LocalA --> MissionA
+  WorkspaceB --> LocalB --> MissionB
+  WorkspaceC --> LocalC --> MissionC
+
+  MissionA --> Workshop
+  MissionB --> Workshop
+  MissionC --> Workshop
+
+  Workshop --> Review
+  Review --> GlobalSuit
+
+  Workshop --> Forge
+  Forge --> Workshop
+```
+
 ## Quick Start
 
 1. Clone this repo.

@@ -17,7 +17,7 @@ require_dir() {
 require_text() {
   file="$1"
   text="$2"
-  grep -F "$text" "$file" >/dev/null || fail "missing text in $file: $text"
+  grep -F -e "$text" "$file" >/dev/null || fail "missing text in $file: $text"
 }
 
 require_file README.md
@@ -26,6 +26,7 @@ require_file docs/iron-man-suit-essence.md
 require_file docs/concepts.md
 require_file docs/article-outline.md
 require_file skills/codex-hyperagent/SKILL.md
+require_file scripts/install-codex-skill.sh
 require_file hyperagent/operating-prompt.md
 require_file hyperagent/capability-registry.md
 require_file templates/mission-record.md
@@ -39,6 +40,12 @@ require_dir forge/reviews
 
 require_text skills/codex-hyperagent/SKILL.md "Workshop Review Prompt"
 require_text skills/codex-hyperagent/SKILL.md "Forge Review Prompt"
+require_text scripts/install-codex-skill.sh "Usage: sh scripts/install-codex-skill.sh"
+require_text scripts/install-codex-skill.sh "--dry-run"
+require_text scripts/install-codex-skill.sh "--force"
+require_text README.md "sh scripts/install-codex-skill.sh"
+require_text README.md "--symlink"
+require_text evals/README.md "Installer Smoke Eval"
 require_text hyperagent/operating-prompt.md "human review required"
 require_text hyperagent/capability-registry.md "human review required"
 require_text templates/mission-record.md "Mission ID"

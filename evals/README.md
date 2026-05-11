@@ -10,6 +10,18 @@ sh scripts/verify-mvp.sh
 
 The verifier checks whether the repo contains the artifacts required by the PRD for the Codex-first prototype.
 
+## Installer Smoke Eval
+
+Run the installer against a temporary skills directory:
+
+```bash
+tmpdir=$(mktemp -d)
+sh scripts/install-codex-skill.sh "$tmpdir"
+test -f "$tmpdir/codex-hyperagent/SKILL.md"
+```
+
+The installed `SKILL.md` should retain the source-of-truth links to the Suit prompt, capability registry, mission template, Workshop proposal template, and Forge review template.
+
 ## Manual Smoke Eval
 
 1. Ask Codex to use the `codex-hyperagent` skill for a small real task in this repo.

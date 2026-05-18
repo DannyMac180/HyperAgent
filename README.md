@@ -8,6 +8,14 @@ The category claim is simple:
 
 HyperAgent starts with OpenAI Codex in the Codex Mac app. The first prototype is intentionally markdown-first: Codex wears a Suit prompt while working, writes mission records after real tasks, and uses those records to propose evidence-backed upgrades through the Workshop. The Forge then reviews whether the Workshop itself is producing useful, safe, testable improvements.
 
+## Alpha Status
+
+HyperAgent is currently `v0.1.0-alpha`: a developer preview for testing the local Mission -> Workshop -> Forge loop.
+
+This alpha is ready for early open-source use by Codex users who are comfortable with local markdown artifacts and shell scripts. It is not a hosted service, does not provide a polished UI, does not support every agent platform, and does not autonomously modify itself.
+
+Release notes: `docs/releases/v0.1.0-alpha.md`
+
 ## Architecture
 
 HyperAgent is designed to sit at the Codex Mac app level as a user-level operating layer across Codex workspaces. The Global Suit provides shared operating rules, safety defaults, and reusable capabilities. Each workspace gets its own local Suit context for repo-specific rules, workflows, and memory.
@@ -107,13 +115,39 @@ The MVP is file-based on purpose. There is no hosted service, no database, and n
 
 For the full first-run path, see `docs/quickstart.md`.
 
+For early release readiness, see `docs/release-checklist.md`.
+
+## Updating
+
+HyperAgent updates use normal Git workflows.
+
+For copy installs:
+
+```bash
+git pull
+sh scripts/update-codex-skill.sh
+sh scripts/verify-mvp.sh
+```
+
+For symlink installs:
+
+```bash
+git pull
+sh scripts/verify-mvp.sh
+```
+
+Restart Codex Desktop or open a fresh thread after updating the installed skill.
+
 ## What Is Included
 
 - `docs/hyperagent-prd.md`: product requirements and milestone plan.
 - `docs/concepts.md`: the Suit, Mission, Workshop, and Forge mental model.
+- `docs/release-checklist.md`: alpha release criteria, clean-clone test, and update model.
+- `docs/releases/v0.1.0-alpha.md`: first alpha release notes.
 - `docs/article-outline.md`: public essay outline for the Iron Man Suit thesis.
 - `skills/codex-hyperagent/`: Codex skill instructions.
 - `scripts/install-codex-skill.sh`: dependency-free Codex skill installer.
+- `scripts/update-codex-skill.sh`: update helper for copy installs.
 - `scripts/hyperagent.sh`: local helper for mission shells, proposals, Forge reviews, approval decisions, and status.
 - `hyperagent/operating-prompt.md`: the operating layer Codex wears during work.
 - `hyperagent/capability-registry.md`: accepted capability registry with reviewed local capabilities.

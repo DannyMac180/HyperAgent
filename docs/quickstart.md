@@ -91,3 +91,21 @@ sh scripts/verify-mvp.sh
 sh evals/smoke-loop.sh
 ```
 
+## 8. Update Later
+
+For copy installs:
+
+```bash
+git pull
+sh scripts/update-codex-skill.sh
+sh scripts/verify-mvp.sh
+```
+
+For symlink installs:
+
+```bash
+git pull
+sh scripts/verify-mvp.sh
+```
+
+Restart Codex Desktop or open a fresh thread after updating the installed skill.

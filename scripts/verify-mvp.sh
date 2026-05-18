@@ -22,14 +22,23 @@ require_text() {
 
 require_file README.md
 require_file AGENTS.md
+require_file CONTRIBUTING.md
+require_file SECURITY.md
+require_file .github/ISSUE_TEMPLATE/bug_report.md
+require_file .github/ISSUE_TEMPLATE/suit_friction.md
+require_file .github/ISSUE_TEMPLATE/upgrade_proposal.md
+require_file .github/ISSUE_TEMPLATE/eval_idea.md
 require_file docs/hyperagent-prd.md
 require_file docs/iron-man-suit-essence.md
 require_file docs/concepts.md
 require_file docs/article-outline.md
 require_file docs/quickstart.md
+require_file docs/release-checklist.md
+require_file docs/releases/v0.1.0-alpha.md
 require_file skills/codex-hyperagent/SKILL.md
 require_file skills/codex-hyperagent/agents/openai.yaml
 require_file scripts/install-codex-skill.sh
+require_file scripts/update-codex-skill.sh
 require_file scripts/hyperagent.sh
 require_file hyperagent/operating-prompt.md
 require_file hyperagent/capability-registry.md
@@ -53,16 +62,35 @@ require_text skills/codex-hyperagent/SKILL.md "Forge Review Prompt"
 require_text skills/codex-hyperagent/SKILL.md "Relevance Triage"
 require_text skills/codex-hyperagent/SKILL.md "workshop/rubric.md"
 require_text skills/codex-hyperagent/SKILL.md "name: codex-hyperagent"
+require_text skills/codex-hyperagent/SKILL.md "version: v0.1.0-alpha"
 require_text skills/codex-hyperagent/agents/openai.yaml "display_name: \"HyperAgent\""
 require_text AGENTS.md "HyperAgent triage on every task"
+require_text CONTRIBUTING.md "How To Propose A Suit Upgrade"
+require_text SECURITY.md "Authority Boundary"
+require_text .github/ISSUE_TEMPLATE/bug_report.md "Bug report"
+require_text .github/ISSUE_TEMPLATE/suit_friction.md "Suit friction report"
+require_text .github/ISSUE_TEMPLATE/upgrade_proposal.md "Upgrade proposal"
+require_text .github/ISSUE_TEMPLATE/eval_idea.md "Eval idea"
 require_text scripts/install-codex-skill.sh "Usage: sh scripts/install-codex-skill.sh"
 require_text scripts/install-codex-skill.sh "--dry-run"
 require_text scripts/install-codex-skill.sh "--force"
+require_text scripts/update-codex-skill.sh "update complete"
 require_text scripts/hyperagent.sh "decide-upgrade"
 require_text scripts/hyperagent.sh "human review required"
+require_text README.md "v0.1.0-alpha"
+require_text README.md "docs/releases/v0.1.0-alpha.md"
 require_text README.md "sh scripts/install-codex-skill.sh"
+require_text README.md "sh scripts/update-codex-skill.sh"
 require_text README.md "sh scripts/hyperagent.sh status"
+require_text README.md "docs/release-checklist.md"
 require_text README.md "--symlink"
+require_text docs/release-checklist.md "Update And Upgrade Model"
+require_text docs/release-checklist.md "Forge Readiness"
+require_text docs/release-checklist.md "Forge review flow"
+require_text docs/release-checklist.md "v0.1.0-alpha"
+require_text docs/release-checklist.md "Clean-Clone Test"
+require_text docs/releases/v0.1.0-alpha.md "Forge Review Flow"
+require_text docs/releases/v0.1.0-alpha.md "Persistent behavior changes require human review."
 require_text evals/README.md "Installer Smoke Eval"
 require_text evals/smoke-loop.sh "HyperAgent smoke loop passed."
 require_text hyperagent/operating-prompt.md "human review required"

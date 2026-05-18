@@ -3,6 +3,7 @@ name: codex-hyperagent
 description: Run Codex with the HyperAgent Suit. Use when the user asks Codex to operate as HyperAgent, run a HyperAgent mission, produce mission telemetry, review mission friction, or propose Suit upgrades.
 metadata:
   short-description: Run Codex with HyperAgent mission, Workshop, and Forge loops
+  version: v0.1.0-alpha
 ---
 
 # codex-hyperagent

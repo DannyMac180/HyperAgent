@@ -29,17 +29,23 @@ Workshop proposals live in `workshop/proposals/` and must link back to mission e
 
 The default activation mode is `human review required`.
 
+`workshop/backlog.md` tracks proposals worth implementing. `workshop/rubric.md` keeps prioritization consistent. Human approval or rejection is recorded in `workshop/decisions/` before an upgrade becomes accepted Suit memory.
+
 ## Forge
 
 The Forge improves the Workshop itself.
 
 Forge reviews live in `forge/reviews/`. They review whether proposals are specific, evidence-backed, safe, testable, and worth installing. If proposals are vague or evals are weak, the Forge proposes process changes instead of new Suit capabilities.
 
+`forge/process/quality-rubric.md` defines the proposal and process quality checks the Forge should apply.
+
 ## Local Memory Flow
 
 1. Mission telemetry is written to `missions/`.
 2. Upgrade proposals are written to `workshop/proposals/`.
-3. Accepted upgrades are recorded in `hyperagent/capability-registry.md`.
-4. Forge reviews are written to `forge/reviews/`.
-5. Durable lessons are promoted into docs or Suit memory only after review.
-6. Proposals link back to mission records as evidence.
+3. Proposals worth acting on are tracked in `workshop/backlog.md`.
+4. Human approval or rejection is recorded in `workshop/decisions/`.
+5. Accepted upgrades are recorded in `hyperagent/capability-registry.md`.
+6. Forge reviews are written to `forge/reviews/`.
+7. Durable lessons are promoted into docs or Suit memory only after review.
+8. Proposals link back to mission records as evidence.

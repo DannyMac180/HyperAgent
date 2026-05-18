@@ -12,6 +12,8 @@
 - Are safety risks explicit?
 - Are activation modes appropriate?
 - Are repeated friction patterns being missed?
+- Proposal quality score:
+- Process reliability score:
 
 ## Process Upgrade Candidates
 
@@ -25,3 +27,4 @@
 
 - Recommendation:
 - Human approval needed:
+- Follow-up proposal path:

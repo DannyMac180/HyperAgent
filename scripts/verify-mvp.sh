@@ -21,33 +21,55 @@ require_text() {
 }
 
 require_file README.md
+require_file AGENTS.md
 require_file docs/hyperagent-prd.md
 require_file docs/iron-man-suit-essence.md
 require_file docs/concepts.md
 require_file docs/article-outline.md
+require_file docs/quickstart.md
 require_file skills/codex-hyperagent/SKILL.md
+require_file skills/codex-hyperagent/agents/openai.yaml
 require_file scripts/install-codex-skill.sh
+require_file scripts/hyperagent.sh
 require_file hyperagent/operating-prompt.md
 require_file hyperagent/capability-registry.md
 require_file templates/mission-record.md
 require_file templates/upgrade-proposal.md
 require_file templates/forge-review.md
+require_file templates/upgrade-decision.md
 require_file evals/README.md
+require_file evals/smoke-loop.sh
+require_file workshop/backlog.md
+require_file workshop/rubric.md
+require_file forge/process/quality-rubric.md
 
 require_dir missions
 require_dir workshop/proposals
+require_dir workshop/decisions
 require_dir forge/reviews
 
 require_text skills/codex-hyperagent/SKILL.md "Workshop Review Prompt"
 require_text skills/codex-hyperagent/SKILL.md "Forge Review Prompt"
+require_text skills/codex-hyperagent/SKILL.md "Relevance Triage"
+require_text skills/codex-hyperagent/SKILL.md "workshop/rubric.md"
+require_text skills/codex-hyperagent/SKILL.md "name: codex-hyperagent"
+require_text skills/codex-hyperagent/agents/openai.yaml "display_name: \"HyperAgent\""
+require_text AGENTS.md "HyperAgent triage on every task"
 require_text scripts/install-codex-skill.sh "Usage: sh scripts/install-codex-skill.sh"
 require_text scripts/install-codex-skill.sh "--dry-run"
 require_text scripts/install-codex-skill.sh "--force"
+require_text scripts/hyperagent.sh "decide-upgrade"
+require_text scripts/hyperagent.sh "human review required"
 require_text README.md "sh scripts/install-codex-skill.sh"
+require_text README.md "sh scripts/hyperagent.sh status"
 require_text README.md "--symlink"
 require_text evals/README.md "Installer Smoke Eval"
+require_text evals/smoke-loop.sh "HyperAgent smoke loop passed."
 require_text hyperagent/operating-prompt.md "human review required"
+require_text hyperagent/operating-prompt.md "relevance triage"
+require_text hyperagent/operating-prompt.md "workshop/decisions"
 require_text hyperagent/capability-registry.md "human review required"
+require_text hyperagent/capability-registry.md "codex-skill-installer"
 require_text templates/mission-record.md "Mission ID"
 require_text templates/mission-record.md "Agent plan"
 require_text templates/mission-record.md "Tools used"
@@ -56,6 +78,13 @@ require_text templates/upgrade-proposal.md "Evidence from mission records"
 require_text templates/upgrade-proposal.md "Eval or acceptance test"
 require_text templates/upgrade-proposal.md "Rollback plan"
 require_text templates/upgrade-proposal.md "Allowed activation modes"
+require_text templates/upgrade-proposal.md "Decision Handoff"
 require_text templates/forge-review.md "Are proposals specific and evidence-backed?"
+require_text templates/upgrade-decision.md "Silent activation allowed: no"
+require_text workshop/backlog.md "This backlog tracks"
+require_text workshop/rubric.md "Decision Bands"
+require_text forge/process/quality-rubric.md "Proposal Quality Metrics"
+
+sh scripts/hyperagent.sh status >/dev/null
 
 printf 'HyperAgent MVP artifact verification passed.\n'

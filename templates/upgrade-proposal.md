@@ -6,6 +6,8 @@
 - Related mission record:
 - Proposed activation mode: human review required
 - Allowed activation modes: suggest only; draft files only; human review required; auto-install low risk
+- Backlog priority:
+- Workshop rubric score:
 
 ## Problem
 
@@ -18,6 +20,7 @@
 - Type of upgrade:
 - Proposed capability:
 - Expected impact:
+- Transferability:
 
 ## Implementation Plan
 
@@ -37,3 +40,9 @@
 - Eval or acceptance test:
 - Rollback plan:
 - Open questions:
+
+## Decision Handoff
+
+- Recommended decision:
+- Decision record path:
+- Capability registry ID if accepted:

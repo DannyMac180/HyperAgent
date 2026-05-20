@@ -26,6 +26,31 @@ The smoke loop copies the repo to a temporary directory, then verifies that the 
 - record a human-review decision in `workshop/decisions/`,
 - append an accepted capability to `hyperagent/capability-registry.md`.
 
+## Reliability Gains Eval
+
+Run:
+
+```bash
+sh evals/reliability-gains.sh
+```
+
+The reliability gains eval scores comparable local run records for the same task,
+including a baseline `without-hyperagent` case and a `with-hyperagent` case. It
+is deterministic, dependency-free, and writes inspectable output to
+`evals/out/reliability-gains/`.
+
+The first rubric scores six dimensions:
+
+- task completion,
+- quality of final reports,
+- missed verification,
+- failure recovery,
+- proposal specificity,
+- time to useful PR or useful artifact.
+
+See `evals/reliability-rubric.md` for the scoring rubric and
+`evals/fixtures/reliability/` for the built-in example cases.
+
 ## Init Smoke Eval
 
 Run:

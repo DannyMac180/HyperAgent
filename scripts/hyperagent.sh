@@ -6,6 +6,9 @@ usage() {
 Usage: sh scripts/hyperagent.sh COMMAND [options]
 
 Commands:
+  init [--target DIR] [--force] [--dry-run]
+      Create or update HyperAgent project setup files in DIR. Defaults to the current directory.
+
   status
       Print HyperAgent local product status.
 
@@ -62,6 +65,433 @@ slugify() {
 
 ensure_dirs() {
   mkdir -p "$mission_dir" "$proposal_dir" "$decision_dir" "$forge_dir"
+}
+
+init_log() {
+  printf '%s\n' "$1"
+}
+
+init_parent_dir() {
+  dirname "$1"
+}
+
+init_same_file() {
+  test -f "$1" && test -f "$2" && cmp -s "$1" "$2"
+}
+
+init_install_file() {
+  src="$1"
+  dest="$2"
+  force="$3"
+  dry_run="$4"
+
+  if [ -e "$dest" ]; then
+    if init_same_file "$src" "$dest"; then
+      init_log "up to date: $dest"
+      return 0
+    fi
+    test "$force" -eq 1 || fail "refusing to overwrite existing file without --force: $dest"
+    if [ "$dry_run" -eq 1 ]; then
+      init_log "would replace: $dest"
+      return 0
+    fi
+    cp "$src" "$dest"
+    init_log "replaced: $dest"
+    return 0
+  fi
+
+  if [ "$dry_run" -eq 1 ]; then
+    init_log "would create: $dest"
+    return 0
+  fi
+
+  mkdir -p "$(init_parent_dir "$dest")"
+  cp "$src" "$dest"
+  init_log "created: $dest"
+}
+
+init_write_generated() {
+  dest="$1"
+  force="$2"
+  dry_run="$3"
+  generator="$4"
+  tmp=$(mktemp)
+  "$generator" >"$tmp"
+
+  if [ -e "$dest" ]; then
+    if cmp -s "$tmp" "$dest"; then
+      init_log "up to date: $dest"
+      rm -f "$tmp"
+      return 0
+    fi
+    test "$force" -eq 1 || {
+      rm -f "$tmp"
+      fail "refusing to overwrite existing file without --force: $dest"
+    }
+    if [ "$dry_run" -eq 1 ]; then
+      init_log "would replace: $dest"
+      rm -f "$tmp"
+      return 0
+    fi
+    cp "$tmp" "$dest"
+    init_log "replaced: $dest"
+    rm -f "$tmp"
+    return 0
+  fi
+
+  if [ "$dry_run" -eq 1 ]; then
+    init_log "would create: $dest"
+    rm -f "$tmp"
+    return 0
+  fi
+
+  mkdir -p "$(init_parent_dir "$dest")"
+  cp "$tmp" "$dest"
+  init_log "created: $dest"
+  rm -f "$tmp"
+}
+
+init_touch_file() {
+  dest="$1"
+  dry_run="$2"
+
+  if [ -e "$dest" ]; then
+    init_log "up to date: $dest"
+    return 0
+  fi
+
+  if [ "$dry_run" -eq 1 ]; then
+    init_log "would create: $dest"
+    return 0
+  fi
+
+  mkdir -p "$(init_parent_dir "$dest")"
+  : >"$dest"
+  init_log "created: $dest"
+}
+
+generate_init_registry() {
+  cat <<'EOF'
+# HyperAgent Capability Registry
+
+This project-local registry records accepted HyperAgent capabilities for this repository.
+
+- Default activation mode: human review required
+- Silent activation allowed: no
+- Permission, deployment, account, or secrets changes require explicit human approval.
+
+## Accepted Capabilities
+
+No project-local capabilities have been accepted yet.
+
+Add accepted capabilities only after a proposal in `workshop/proposals/` has a matching human decision in `workshop/decisions/`.
+EOF
+}
+
+generate_init_backlog() {
+  cat <<'EOF'
+# HyperAgent Project Upgrade Backlog
+
+This project-local backlog tracks proposed HyperAgent, Suit, and workflow upgrades after they have evidence from mission records.
+
+Default activation mode: `human review required`.
+
+## Intake Rules
+
+- Every backlog item must link to a proposal in `workshop/proposals/`.
+- Every proposal must link to at least one mission record or Forge review.
+- The highest-priority item must name its first implementation step and acceptance test.
+- Accepted items require a decision record in `workshop/decisions/`.
+- Accepted local capabilities are recorded in `hyperagent/capability-registry.md`.
+
+## Priority Rubric
+
+Score each item with `workshop/rubric.md`.
+
+- `P0`: Blocks the Mission -> Workshop -> Forge loop or creates a serious safety gap.
+- `P1`: Removes repeated friction from real missions or improves verification quality.
+- `P2`: Improves ergonomics, docs, or contributor onboarding.
+- `P3`: Useful later, but not needed for local reliability.
+
+## Backlog
+
+| Priority | Status | Proposal | Evidence | Next action |
+| --- | --- | --- | --- | --- |
+EOF
+}
+
+generate_init_config() {
+  cat <<'EOF'
+# HyperAgent project config
+
+hyperagent_version = "v0.1.0-alpha"
+config_version = 1
+install_mode = "copy"
+
+[paths]
+project_instructions = "AGENTS.md"
+missions = "missions"
+workshop_proposals = "workshop/proposals"
+workshop_decisions = "workshop/decisions"
+workshop_backlog = "workshop/backlog.md"
+workshop_rubric = "workshop/rubric.md"
+forge_reviews = "forge/reviews"
+forge_quality_rubric = "forge/process/quality-rubric.md"
+templates = "templates"
+operating_prompt = "hyperagent/operating-prompt.md"
+capability_registry = "hyperagent/capability-registry.md"
+project_readme = "hyperagent/README.md"
+local_helper = "scripts/hyperagent.sh"
+
+[adapters]
+codex = true
+
+[verification]
+commands = [
+  "sh scripts/hyperagent.sh status",
+]
+EOF
+}
+
+generate_init_readme() {
+  cat <<'EOF'
+# HyperAgent Project Setup
+
+This repository has local HyperAgent memory and workflow files.
+
+The root `.hyperagent` file is the machine-readable project anchor. Scripts and
+adapters can read it to find the HyperAgent version, install mode, initialized
+paths, enabled adapters, verification commands, and instruction files.
+
+Use these files to keep agent work inspectable:
+
+- `missions/`: mission records from meaningful tasks.
+- `workshop/proposals/`: proposed improvements backed by mission evidence.
+- `workshop/decisions/`: explicit human approvals or rejections.
+- `forge/reviews/`: reviews of Workshop proposal quality.
+- `templates/`: markdown templates for records, proposals, decisions, and Forge reviews.
+- `hyperagent/operating-prompt.md`: local Suit prompt.
+- `hyperagent/capability-registry.md`: accepted local capabilities.
+
+## Local Commands
+
+```bash
+sh scripts/hyperagent.sh status
+sh scripts/hyperagent.sh new-mission --request "Describe the task" --slug task-slug
+sh scripts/hyperagent.sh workshop-prompt
+sh scripts/hyperagent.sh forge-prompt
+```
+
+## Verification
+
+For this project, the lightweight check is:
+
+```bash
+sh scripts/hyperagent.sh status
+```
+
+Add any project-specific build, test, lint, or smoke commands to `AGENTS.md` so future agents know the strongest relevant verification path.
+
+## Copy And Symlink Behavior
+
+`hyperagent init` copies markdown templates, prompt files, and helper scripts into the target repository. It does not symlink project setup files by default, because local project memory should remain portable, reviewable, and safe to edit.
+
+If you installed the global Codex skill with `scripts/install-codex-skill.sh --symlink`, only the Codex skill install is symlinked. Project-local files created by `hyperagent init` are still normal files.
+
+Existing files are left alone when they are identical. Conflicting generated files are not overwritten unless `--force` is passed.
+EOF
+}
+
+generate_init_agents_block() {
+  cat <<'EOF'
+<!-- hyperagent-init:start -->
+
+## HyperAgent Project Instructions
+
+Use HyperAgent triage for substantial work in this repository.
+
+Run the full Mission -> Workshop -> Forge loop when a task:
+
+- changes files, docs, scripts, templates, tests, product behavior, or workflow behavior,
+- requires investigation across multiple files or commands,
+- involves verification, debugging, or failing checks,
+- reveals friction worth turning into a reusable improvement,
+- explicitly asks for HyperAgent.
+
+For full-loop tasks:
+
+1. Complete the task with focused changes and explicit verification.
+2. Write a mission record in `missions/`.
+3. Create a Workshop proposal in `workshop/proposals/` only when there is concrete Suit friction or a worthwhile improvement.
+4. Create a Forge review in `forge/reviews/` only when the Workshop process itself needs review.
+5. Keep persistent behavior changes `human review required`.
+
+Skip the full loop only for clearly isolated one-off tasks such as simple factual answers, trivial commands, small clarifications, or status restatements without new investigation. When skipping, say that HyperAgent triage classified the task as an isolated one-off and no mission record was written.
+
+Local verification guidance:
+
+```bash
+sh scripts/hyperagent.sh status
+```
+
+Add project-specific build, test, lint, or smoke commands here as they become known.
+
+<!-- hyperagent-init:end -->
+EOF
+}
+
+init_update_agents() {
+  target_root="$1"
+  force="$2"
+  dry_run="$3"
+  agents="$target_root/AGENTS.md"
+  block=$(mktemp)
+  existing=$(mktemp)
+  merged=$(mktemp)
+  generate_init_agents_block >"$block"
+
+  if [ ! -e "$agents" ]; then
+    if [ "$dry_run" -eq 1 ]; then
+      init_log "would create: $agents"
+    else
+      cp "$block" "$agents"
+      init_log "created: $agents"
+    fi
+    rm -f "$block" "$existing" "$merged"
+    return 0
+  fi
+
+  if grep -F '<!-- hyperagent-init:start -->' "$agents" >/dev/null; then
+    awk '/<!-- hyperagent-init:start -->/{capture=1} capture{print} /<!-- hyperagent-init:end -->/{capture=0}' "$agents" >"$existing"
+    if cmp -s "$block" "$existing"; then
+      init_log "up to date: $agents"
+      rm -f "$block" "$existing" "$merged"
+      return 0
+    fi
+    test "$force" -eq 1 || {
+      rm -f "$block" "$existing" "$merged"
+      fail "refusing to replace existing HyperAgent block without --force: $agents"
+    }
+    if [ "$dry_run" -eq 1 ]; then
+      init_log "would update HyperAgent block: $agents"
+      rm -f "$block" "$existing" "$merged"
+      return 0
+    fi
+    awk -v block_file="$block" '
+      BEGIN {
+        while ((getline line < block_file) > 0) {
+          block = block line "\n"
+        }
+      }
+      /<!-- hyperagent-init:start -->/ {
+        if (!printed) {
+          printf "%s", block
+          printed = 1
+        }
+        skip = 1
+        next
+      }
+      /<!-- hyperagent-init:end -->/ {
+        skip = 0
+        next
+      }
+      !skip { print }
+    ' "$agents" >"$merged"
+    cp "$merged" "$agents"
+    init_log "updated HyperAgent block: $agents"
+    rm -f "$block" "$existing" "$merged"
+    return 0
+  fi
+
+  if [ "$dry_run" -eq 1 ]; then
+    init_log "would append HyperAgent block: $agents"
+  else
+    {
+      printf '\n\n'
+      cat "$block"
+    } >>"$agents"
+    init_log "appended HyperAgent block: $agents"
+  fi
+  rm -f "$block" "$existing" "$merged"
+}
+
+init_project() {
+  target=.
+  force=0
+  dry_run=0
+
+  while [ "$#" -gt 0 ]; do
+    case "$1" in
+      --target)
+        shift
+        test "$#" -gt 0 || fail "--target requires a directory"
+        target=$1
+        ;;
+      --force)
+        force=1
+        ;;
+      --dry-run)
+        dry_run=1
+        ;;
+      *)
+        fail "unknown init option: $1"
+        ;;
+    esac
+    shift
+  done
+
+  test -d "$target" || fail "target directory does not exist: $target"
+  target_root=$(CDPATH= cd "$target" && pwd)
+
+  init_log "HyperAgent init target: $target_root"
+  if [ "$dry_run" -eq 1 ]; then
+    init_log "Dry run: no files will be changed."
+  fi
+
+  for dir in \
+    "$target_root/missions" \
+    "$target_root/workshop/proposals" \
+    "$target_root/workshop/decisions" \
+    "$target_root/forge/reviews" \
+    "$target_root/forge/process" \
+    "$target_root/templates" \
+    "$target_root/hyperagent" \
+    "$target_root/scripts"
+  do
+    if [ "$dry_run" -eq 1 ]; then
+      if [ -d "$dir" ]; then
+        init_log "up to date: $dir"
+      else
+        init_log "would create: $dir"
+      fi
+    else
+      mkdir -p "$dir"
+      init_log "ensured directory: $dir"
+    fi
+  done
+
+  init_touch_file "$target_root/missions/.gitkeep" "$dry_run"
+  init_touch_file "$target_root/workshop/proposals/.gitkeep" "$dry_run"
+  init_touch_file "$target_root/workshop/decisions/.gitkeep" "$dry_run"
+  init_touch_file "$target_root/forge/reviews/.gitkeep" "$dry_run"
+
+  init_install_file "$repo_root/templates/mission-record.md" "$target_root/templates/mission-record.md" "$force" "$dry_run"
+  init_install_file "$repo_root/templates/upgrade-proposal.md" "$target_root/templates/upgrade-proposal.md" "$force" "$dry_run"
+  init_install_file "$repo_root/templates/upgrade-decision.md" "$target_root/templates/upgrade-decision.md" "$force" "$dry_run"
+  init_install_file "$repo_root/templates/forge-review.md" "$target_root/templates/forge-review.md" "$force" "$dry_run"
+  init_install_file "$repo_root/workshop/rubric.md" "$target_root/workshop/rubric.md" "$force" "$dry_run"
+  init_install_file "$repo_root/forge/process/quality-rubric.md" "$target_root/forge/process/quality-rubric.md" "$force" "$dry_run"
+  init_install_file "$repo_root/hyperagent/operating-prompt.md" "$target_root/hyperagent/operating-prompt.md" "$force" "$dry_run"
+  init_install_file "$repo_root/scripts/hyperagent.sh" "$target_root/scripts/hyperagent.sh" "$force" "$dry_run"
+
+  init_write_generated "$target_root/.hyperagent" "$force" "$dry_run" generate_init_config
+  init_write_generated "$target_root/workshop/backlog.md" "$force" "$dry_run" generate_init_backlog
+  init_write_generated "$target_root/hyperagent/capability-registry.md" "$force" "$dry_run" generate_init_registry
+  init_write_generated "$target_root/hyperagent/README.md" "$force" "$dry_run" generate_init_readme
+  init_update_agents "$target_root" "$force" "$dry_run"
+
+  init_log "HyperAgent init complete."
+  init_log "Next: inspect AGENTS.md, add project-specific verification commands, then run: sh scripts/hyperagent.sh status"
 }
 
 count_markdown_files() {
@@ -435,6 +865,9 @@ if [ "$#" -gt 0 ]; then
 fi
 
 case "$command" in
+  init)
+    init_project "$@"
+    ;;
   status)
     print_status "$@"
     ;;

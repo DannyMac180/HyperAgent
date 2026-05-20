@@ -26,6 +26,24 @@ The smoke loop copies the repo to a temporary directory, then verifies that the 
 - record a human-review decision in `workshop/decisions/`,
 - append an accepted capability to `hyperagent/capability-registry.md`.
 
+## Init Smoke Eval
+
+Run:
+
+```bash
+sh evals/init-smoke.sh
+```
+
+The init smoke test creates a temporary repo, runs `sh scripts/hyperagent.sh init --target`, and verifies that setup:
+
+- creates `missions/`, `workshop/proposals/`, `workshop/decisions/`, and `forge/reviews/`,
+- creates `.hyperagent` as the machine-readable project anchor for version, install mode, paths, adapters, verification commands, and instruction links,
+- copies templates, rubrics, the local prompt, a blank project backlog, a project capability registry, and `scripts/hyperagent.sh`,
+- adds project instructions to `AGENTS.md`,
+- documents copy vs symlink behavior in `hyperagent/README.md`,
+- refuses conflicting overwrites unless `--force` is passed,
+- leaves the target untouched during `--dry-run`.
+
 ## Installer Smoke Eval
 
 Run the installer against a temporary skills directory:

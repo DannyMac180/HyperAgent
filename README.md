@@ -86,7 +86,22 @@ flowchart TD
 ## Quick Start
 
 1. Clone this repo.
-2. Install the Codex skill:
+2. Initialize HyperAgent in a project repo:
+
+   ```bash
+   sh scripts/hyperagent.sh init --target /path/to/project
+   ```
+
+   The repo also includes a wrapper:
+
+   ```bash
+   bin/hyperagent init --target /path/to/project
+   ```
+
+   Add `bin/` to your `PATH` if you want to run it as plain `hyperagent init`.
+
+   The init command creates the markdown-first project structure: `.hyperagent`, `missions/`, `workshop/proposals/`, `workshop/decisions/`, `forge/reviews/`, `templates/`, `hyperagent/`, `scripts/hyperagent.sh`, and a HyperAgent block in `AGENTS.md`. The root `.hyperagent` file is the machine-readable project anchor for version, install mode, initialized paths, enabled adapters, verification commands, and instruction files. Init copies files by default so project memory stays inspectable and portable. It refuses conflicting overwrites unless `--force` is passed, and supports `--dry-run` for previewing setup.
+3. Install the Codex skill:
 
    ```bash
    sh scripts/install-codex-skill.sh "$HOME/.codex/skills"
@@ -99,17 +114,17 @@ flowchart TD
    ```
 
    The installer validates `skills/codex-hyperagent/SKILL.md`, refuses to overwrite an existing skill unless `--force` is passed, and supports `--dry-run` for previewing the install.
-3. Check local product status:
+4. Check local product status:
 
    ```bash
    sh scripts/hyperagent.sh status
    ```
 
-4. Start Codex in this repo and ask it to use the `codex-hyperagent` skill.
-5. Use `hyperagent/operating-prompt.md` as the canonical Suit prompt.
-6. After a task, inspect the new mission record in `missions/`.
-7. Inspect any evidence-backed upgrade proposals in `workshop/proposals/`.
-8. Record explicit human approval or rejection in `workshop/decisions/` before a proposal becomes accepted Suit memory.
+5. Start Codex in this repo and ask it to use the `codex-hyperagent` skill.
+6. Use `hyperagent/operating-prompt.md` as the canonical Suit prompt.
+7. After a task, inspect the new mission record in `missions/`.
+8. Inspect any evidence-backed upgrade proposals in `workshop/proposals/`.
+9. Record explicit human approval or rejection in `workshop/decisions/` before a proposal becomes accepted Suit memory.
 
 The MVP is file-based on purpose. There is no hosted service, no database, and no autonomous self-modification.
 
@@ -146,9 +161,11 @@ Restart Codex Desktop or open a fresh thread after updating the installed skill.
 - `docs/releases/v0.1.0-alpha.md`: first alpha release notes.
 - `docs/article-outline.md`: public essay outline for the Iron Man Suit thesis.
 - `skills/codex-hyperagent/`: Codex skill instructions.
+- `bin/hyperagent`: small command wrapper for `scripts/hyperagent.sh`.
+- `.hyperagent`: machine-readable project config for initialized paths, adapters, and verification commands.
 - `scripts/install-codex-skill.sh`: dependency-free Codex skill installer.
 - `scripts/update-codex-skill.sh`: update helper for copy installs.
-- `scripts/hyperagent.sh`: local helper for mission shells, proposals, Forge reviews, approval decisions, and status.
+- `scripts/hyperagent.sh`: local helper for project init, mission shells, proposals, Forge reviews, approval decisions, and status.
 - `hyperagent/operating-prompt.md`: the operating layer Codex wears during work.
 - `hyperagent/capability-registry.md`: accepted capability registry with reviewed local capabilities.
 - `templates/mission-record.md`: mission telemetry template.
@@ -183,6 +200,14 @@ sh evals/smoke-loop.sh
 ```
 
 The smoke loop copies the repo to a temporary directory, creates a mission record, creates a proposal linked to that mission, creates a Forge review, records a human-review decision, and verifies the accepted capability appears in the registry.
+
+Run the project init smoke test:
+
+```bash
+sh evals/init-smoke.sh
+```
+
+The init smoke test creates a temporary repo, runs `hyperagent init`, checks the generated markdown-first structure and `.hyperagent` config, verifies overwrite refusal, verifies `--force`, and confirms `--dry-run` leaves the target untouched.
 
 ## Current Limits
 

@@ -1,0 +1,31 @@
+# HyperAgent project config
+
+hyperagent_version = "v0.1.0-alpha"
+config_version = 1
+install_mode = "copy"
+
+[paths]
+project_instructions = "AGENTS.md"
+missions = "missions"
+workshop_proposals = "workshop/proposals"
+workshop_decisions = "workshop/decisions"
+workshop_backlog = "workshop/backlog.md"
+workshop_rubric = "workshop/rubric.md"
+forge_reviews = "forge/reviews"
+forge_quality_rubric = "forge/process/quality-rubric.md"
+templates = "templates"
+operating_prompt = "hyperagent/operating-prompt.md"
+capability_registry = "hyperagent/capability-registry.md"
+project_readme = "hyperagent/README.md"
+local_helper = "scripts/hyperagent.sh"
+
+[adapters]
+codex = true
+
+[verification]
+commands = [
+  "sh scripts/hyperagent.sh status",
+  "sh scripts/verify-mvp.sh",
+  "sh evals/init-smoke.sh",
+  "sh evals/smoke-loop.sh",
+]

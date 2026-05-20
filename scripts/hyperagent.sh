@@ -12,6 +12,12 @@ Commands:
   status
       Print HyperAgent local product status.
 
+  sense [--format markdown|json] [--command-log PATH] [--trace-url URL] [--pr auto|off]
+      Print a compact local sensing summary for mission records.
+
+  record-check --command TEXT --status passed|failed|retried|skipped [--note TEXT]
+      Append an opt-in check or command result to the local evidence log.
+
   new-mission --request TEXT [--slug SLUG]
       Create a mission record in missions/.
 
@@ -48,6 +54,8 @@ proposal_dir="$repo_root/workshop/proposals"
 decision_dir="$repo_root/workshop/decisions"
 forge_dir="$repo_root/forge/reviews"
 registry_file="$repo_root/hyperagent/capability-registry.md"
+default_evidence_dir="$repo_root/.hyperagent-evidence"
+default_command_log="$default_evidence_dir/commands.log"
 
 now_stamp() {
   date '+%Y-%m-%d-%H%M'
@@ -61,6 +69,54 @@ slugify() {
   printf '%s' "$1" \
     | tr '[:upper:]' '[:lower:]' \
     | sed 's/[^a-z0-9][^a-z0-9]*/-/g; s/^-//; s/-$//'
+}
+
+redact_stream() {
+  awk '
+    {
+      redact_next = 0
+      for (i = 1; i <= NF; i++) {
+        lower = tolower($i)
+        if (redact_next == 1) {
+          $i = "[REDACTED]"
+          redact_next = 0
+          continue
+        }
+        if (lower ~ /(token|secret|password|passwd|api_key|access_key|private_key|bearer)/) {
+          if ($i ~ /=/) {
+            sub(/=.*/, "=[REDACTED]", $i)
+          } else {
+            $i = "[REDACTED]"
+          }
+          if (lower ~ /bearer/) {
+            redact_next = 1
+          }
+        }
+      }
+      print
+    }
+  '
+}
+
+redact_text() {
+  printf '%s\n' "$1" | redact_stream
+}
+
+json_escape() {
+  awk '
+    BEGIN { ORS = "" }
+    {
+      gsub(/\\/, "\\\\")
+      gsub(/"/, "\\\"")
+      gsub(/\t/, "\\t")
+      gsub(/\r/, "\\r")
+      if (line_seen) {
+        printf "\\n"
+      }
+      printf "%s", $0
+      line_seen = 1
+    }
+  '
 }
 
 ensure_dirs() {
@@ -242,6 +298,7 @@ operating_prompt = "hyperagent/operating-prompt.md"
 capability_registry = "hyperagent/capability-registry.md"
 project_readme = "hyperagent/README.md"
 local_helper = "scripts/hyperagent.sh"
+evidence_log = ".hyperagent-evidence/commands.log"
 
 [adapters]
 codex = true
@@ -277,6 +334,8 @@ Use these files to keep agent work inspectable:
 
 ```bash
 sh scripts/hyperagent.sh status
+sh scripts/hyperagent.sh sense
+sh scripts/hyperagent.sh record-check --status passed --command "sh scripts/verify-mvp.sh"
 sh scripts/hyperagent.sh new-mission --request "Describe the task" --slug task-slug
 sh scripts/hyperagent.sh workshop-prompt
 sh scripts/hyperagent.sh forge-prompt
@@ -289,6 +348,15 @@ For this project, the lightweight check is:
 ```bash
 sh scripts/hyperagent.sh status
 ```
+
+To capture local task evidence for mission records:
+
+```bash
+sh scripts/hyperagent.sh record-check --status passed --command "sh scripts/verify-mvp.sh"
+sh scripts/hyperagent.sh sense
+```
+
+The sensing summary reads Git metadata and the opt-in local command log. It does not inspect file contents or environment values, and command text is redacted for secret-like tokens before storage and output.
 
 Add any project-specific build, test, lint, or smoke commands to `AGENTS.md` so future agents know the strongest relevant verification path.
 
@@ -510,6 +578,283 @@ print_status() {
   printf 'Forge reviews: %s\n' "$(count_markdown_files "$forge_dir")"
   test -f "$registry_file" || fail "missing capability registry: $registry_file"
   printf 'Capability registry: %s\n' "$registry_file"
+}
+
+record_check() {
+  command_text=
+  status=
+  note=
+  log_file="$default_command_log"
+
+  while [ "$#" -gt 0 ]; do
+    case "$1" in
+      --command)
+        shift
+        test "$#" -gt 0 || fail "--command requires text"
+        command_text=$1
+        ;;
+      --status)
+        shift
+        test "$#" -gt 0 || fail "--status requires passed, failed, retried, or skipped"
+        status=$1
+        ;;
+      --note)
+        shift
+        test "$#" -gt 0 || fail "--note requires text"
+        note=$1
+        ;;
+      --command-log)
+        shift
+        test "$#" -gt 0 || fail "--command-log requires a path"
+        log_file=$1
+        ;;
+      *)
+        fail "unknown record-check option: $1"
+        ;;
+    esac
+    shift
+  done
+
+  test -n "$command_text" || fail "record-check requires --command"
+  case "$status" in
+    passed|failed|retried|skipped) ;;
+    *) fail "--status must be passed, failed, retried, or skipped" ;;
+  esac
+
+  mkdir -p "$(dirname "$log_file")"
+  safe_command=$(redact_text "$command_text")
+  safe_note=$(redact_text "$note")
+  printf '%s\t%s\t%s\t%s\n' "$(now_readable)" "$status" "$safe_command" "$safe_note" >>"$log_file"
+  printf '%s\n' "$log_file"
+}
+
+git_value() {
+  if git -C "$repo_root" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+    git -C "$repo_root" "$@" 2>/dev/null || true
+  fi
+}
+
+git_changed_files() {
+  if git -C "$repo_root" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+    git -C "$repo_root" status --porcelain=v1 2>/dev/null | awk '{ print substr($0, 4) }'
+  fi
+}
+
+git_status_counts() {
+  if git -C "$repo_root" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+    git -C "$repo_root" status --porcelain=v1 2>/dev/null | awk '
+      BEGIN { modified = 0; added = 0; deleted = 0; renamed = 0; untracked = 0 }
+      {
+        code = substr($0, 1, 2)
+        if (code == "??") {
+          untracked++
+        }
+        if (code ~ /M/) {
+          modified++
+        }
+        if (code ~ /A/) {
+          added++
+        }
+        if (code ~ /D/) {
+          deleted++
+        }
+        if (code ~ /R/) {
+          renamed++
+        }
+      }
+      END {
+        printf "modified=%d added=%d deleted=%d renamed=%d untracked=%d", modified, added, deleted, renamed, untracked
+      }
+    '
+  else
+    printf 'not a git repository'
+  fi
+}
+
+read_recent_commands() {
+  log_file="$1"
+  if [ -f "$log_file" ]; then
+    tail -n 12 "$log_file" | redact_stream
+  fi
+}
+
+read_failure_commands() {
+  log_file="$1"
+  if [ -f "$log_file" ]; then
+    tail -n 50 "$log_file" | awk -F '\t' '$2 == "failed" || $2 == "retried" { print }' | tail -n 8 | redact_stream
+  fi
+}
+
+pr_summary() {
+  pr_mode="$1"
+  test "$pr_mode" = auto || return 0
+  command -v gh >/dev/null 2>&1 || return 0
+
+  pr_line=$(cd "$repo_root" && gh pr view --json number,url,state,headRefName,baseRefName --jq '"#\(.number) \(.state) \(.headRefName)->\(.baseRefName) \(.url)"' 2>/dev/null || true)
+  test -n "$pr_line" || return 0
+  printf '%s\n' "$pr_line"
+
+  checks_line=$(cd "$repo_root" && gh pr checks --json name,state,conclusion --jq 'group_by(.state) | map("\(.[0].state)=\(length)") | join(", ")' 2>/dev/null || true)
+  if [ -n "$checks_line" ]; then
+    printf 'checks: %s\n' "$checks_line"
+  fi
+}
+
+print_sense_markdown() {
+  command_log="$1"
+  trace_url="$2"
+  pr_mode="$3"
+  branch=$(git_value rev-parse --abbrev-ref HEAD)
+  upstream=$(git_value rev-parse --abbrev-ref --symbolic-full-name '@{u}')
+  head_sha=$(git_value rev-parse --short HEAD)
+  status_counts=$(git_status_counts)
+  changed_files=$(git_changed_files)
+  recent_commands=$(read_recent_commands "$command_log")
+  failure_commands=$(read_failure_commands "$command_log")
+  pr_info=$(pr_summary "$pr_mode")
+
+  printf '# HyperAgent Sense Summary\n\n'
+  printf '%s\n' "- Generated: $(now_readable)"
+  printf '%s\n' "- Repo: \`$repo_root\`"
+  printf '%s\n' "- Branch: \`${branch:-unavailable}\`"
+  printf '%s\n' "- Upstream: \`${upstream:-none}\`"
+  printf '%s\n' "- HEAD: \`${head_sha:-unavailable}\`"
+  printf '%s\n' "- Git status counts: \`$status_counts\`"
+  printf '%s\n' "- Command log: \`$command_log\`"
+  if [ -n "$trace_url" ]; then
+    printf '%s\n' "- Trace: $(redact_text "$trace_url")"
+  else
+    printf '%s\n' "- Trace: not provided"
+  fi
+  printf '\n## Changed Files\n\n'
+  if [ -n "$changed_files" ]; then
+    printf '%s\n' "$changed_files" | sed 's/^/- `/' | sed 's/$/`/'
+  else
+    printf '%s\n' "- none"
+  fi
+  printf '\n## Recent Commands And Checks\n\n'
+  if [ -n "$recent_commands" ]; then
+    printf '%s\n' "$recent_commands" | awk -F '\t' '{ printf "- %s `%s` %s", $2, $3, $1; if ($4 != "") { printf " - %s", $4 } printf "\n" }'
+  else
+    printf '%s\n' "- no command log entries found"
+  fi
+  printf '\n## Failures And Retries\n\n'
+  if [ -n "$failure_commands" ]; then
+    printf '%s\n' "$failure_commands" | awk -F '\t' '{ printf "- %s `%s` %s", $2, $3, $1; if ($4 != "") { printf " - %s", $4 } printf "\n" }'
+  else
+    printf '%s\n' "- none recorded"
+  fi
+  printf '\n## PR And CI\n\n'
+  if [ -n "$pr_info" ]; then
+    printf '%s\n' "$pr_info" | sed 's/^/- /'
+  else
+    printf '%s\n' "- not available locally"
+  fi
+  printf '\n## Safety\n\n'
+  printf '%s\n' "- Does not inspect file contents, environment variables, shell history, credentials, or hosted services unless optional PR lookup is enabled and available."
+  printf '%s\n' "- Command evidence is opt-in and redacted for secret-like tokens before storage and output."
+}
+
+print_json_array_from_lines() {
+  lines="$1"
+  if [ -z "$lines" ]; then
+    printf '[]'
+    return 0
+  fi
+  printf '%s\n' "$lines" | awk '
+    BEGIN { printf "[" }
+    {
+      gsub(/\\/, "\\\\")
+      gsub(/"/, "\\\"")
+      gsub(/\t/, "\\t")
+      gsub(/\r/, "\\r")
+      if (NR > 1) {
+        printf ","
+      }
+      printf "\"%s\"", $0
+    }
+    END { printf "]" }
+  '
+}
+
+print_sense_json() {
+  command_log="$1"
+  trace_url="$2"
+  pr_mode="$3"
+  branch=$(git_value rev-parse --abbrev-ref HEAD)
+  upstream=$(git_value rev-parse --abbrev-ref --symbolic-full-name '@{u}')
+  head_sha=$(git_value rev-parse --short HEAD)
+  status_counts=$(git_status_counts)
+  changed_files=$(git_changed_files)
+  recent_commands=$(read_recent_commands "$command_log")
+  failure_commands=$(read_failure_commands "$command_log")
+  pr_info=$(pr_summary "$pr_mode")
+
+  printf '{\n'
+  printf '  "generated": "%s",\n' "$(now_readable | json_escape)"
+  printf '  "repo": "%s",\n' "$(printf '%s' "$repo_root" | json_escape)"
+  printf '  "branch": "%s",\n' "$(printf '%s' "${branch:-unavailable}" | json_escape)"
+  printf '  "upstream": "%s",\n' "$(printf '%s' "${upstream:-none}" | json_escape)"
+  printf '  "head": "%s",\n' "$(printf '%s' "${head_sha:-unavailable}" | json_escape)"
+  printf '  "git_status_counts": "%s",\n' "$(printf '%s' "$status_counts" | json_escape)"
+  printf '  "changed_files": '
+  print_json_array_from_lines "$changed_files"
+  printf ',\n'
+  printf '  "command_log": "%s",\n' "$(printf '%s' "$command_log" | json_escape)"
+  printf '  "recent_commands": '
+  print_json_array_from_lines "$recent_commands"
+  printf ',\n'
+  printf '  "failures_and_retries": '
+  print_json_array_from_lines "$failure_commands"
+  printf ',\n'
+  printf '  "pr_and_ci": '
+  print_json_array_from_lines "$pr_info"
+  printf ',\n'
+  printf '  "trace": "%s",\n' "$(redact_text "$trace_url" | json_escape)"
+  printf '  "safety": "Does not inspect file contents, environment variables, shell history, credentials, or hosted services unless optional PR lookup is enabled and available. Command evidence is opt-in and redacted for secret-like tokens before storage and output."\n'
+  printf '}\n'
+}
+
+print_sense() {
+  format=markdown
+  command_log="$default_command_log"
+  trace_url=
+  pr_mode=auto
+
+  while [ "$#" -gt 0 ]; do
+    case "$1" in
+      --format)
+        shift
+        test "$#" -gt 0 || fail "--format requires markdown or json"
+        format=$1
+        ;;
+      --command-log)
+        shift
+        test "$#" -gt 0 || fail "--command-log requires a path"
+        command_log=$1
+        ;;
+      --trace-url)
+        shift
+        test "$#" -gt 0 || fail "--trace-url requires a URL or local trace reference"
+        trace_url=$1
+        ;;
+      --pr)
+        shift
+        test "$#" -gt 0 || fail "--pr requires auto or off"
+        pr_mode=$1
+        ;;
+      *)
+        fail "unknown sense option: $1"
+        ;;
+    esac
+    shift
+  done
+
+  case "$format" in
+    markdown) print_sense_markdown "$command_log" "$trace_url" "$pr_mode" ;;
+    json) print_sense_json "$command_log" "$trace_url" "$pr_mode" ;;
+    *) fail "--format must be markdown or json" ;;
+  esac
 }
 
 create_mission() {
@@ -870,6 +1215,12 @@ case "$command" in
     ;;
   status)
     print_status "$@"
+    ;;
+  sense)
+    print_sense "$@"
+    ;;
+  record-check)
+    record_check "$@"
     ;;
   new-mission)
     create_mission "$@"

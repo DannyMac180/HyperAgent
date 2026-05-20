@@ -51,6 +51,7 @@ require_file templates/upgrade-decision.md
 require_file evals/README.md
 require_file evals/smoke-loop.sh
 require_file evals/init-smoke.sh
+require_file evals/sense-smoke.sh
 require_file workshop/backlog.md
 require_file workshop/rubric.md
 require_file forge/process/quality-rubric.md
@@ -83,11 +84,16 @@ require_text scripts/hyperagent.sh "init [--target DIR] [--force] [--dry-run]"
 require_text scripts/hyperagent.sh "generate_init_config"
 require_text scripts/hyperagent.sh "HyperAgent Project Upgrade Backlog"
 require_text scripts/hyperagent.sh "decide-upgrade"
+require_text scripts/hyperagent.sh "sense [--format markdown|json]"
+require_text scripts/hyperagent.sh "record-check --command TEXT"
+require_text scripts/hyperagent.sh "Does not inspect file contents"
+require_text scripts/hyperagent.sh ".hyperagent-evidence/commands.log"
 require_text scripts/hyperagent.sh "human review required"
 require_text scripts/hyperagent.sh "Copy And Symlink Behavior"
 require_text .hyperagent 'hyperagent_version = "v0.1.0-alpha"'
 require_text .hyperagent 'install_mode = "copy"'
 require_text .hyperagent 'project_instructions = "AGENTS.md"'
+require_text .hyperagent 'evidence_log = ".hyperagent-evidence/commands.log"'
 require_text .hyperagent 'codex = true'
 require_text README.md "sh scripts/hyperagent.sh init --target"
 require_text README.md "v0.1.0-alpha"
@@ -95,8 +101,12 @@ require_text README.md "docs/releases/v0.1.0-alpha.md"
 require_text README.md "sh scripts/install-codex-skill.sh"
 require_text README.md "sh scripts/update-codex-skill.sh"
 require_text README.md "sh scripts/hyperagent.sh status"
+require_text README.md "sh scripts/hyperagent.sh sense"
+require_text README.md ".hyperagent-evidence/"
 require_text README.md "docs/release-checklist.md"
 require_text README.md "--symlink"
+require_text docs/quickstart.md "Capture Local Senses"
+require_text docs/quickstart.md "sh scripts/hyperagent.sh sense --format json --pr off"
 require_text docs/release-checklist.md "Update And Upgrade Model"
 require_text docs/release-checklist.md "Forge Readiness"
 require_text docs/release-checklist.md "Forge review flow"
@@ -106,8 +116,10 @@ require_text docs/releases/v0.1.0-alpha.md "Forge Review Flow"
 require_text docs/releases/v0.1.0-alpha.md "Persistent behavior changes require human review."
 require_text evals/README.md "Installer Smoke Eval"
 require_text evals/README.md "Init Smoke Eval"
+require_text evals/README.md "Sense Smoke Eval"
 require_text evals/smoke-loop.sh "HyperAgent smoke loop passed."
 require_text evals/init-smoke.sh "HyperAgent init smoke passed."
+require_text evals/sense-smoke.sh "HyperAgent sense smoke passed."
 require_text hyperagent/operating-prompt.md "human review required"
 require_text hyperagent/operating-prompt.md "relevance triage"
 require_text hyperagent/operating-prompt.md "workshop/decisions"

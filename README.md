@@ -120,11 +120,19 @@ flowchart TD
    sh scripts/hyperagent.sh status
    ```
 
-5. Start Codex in this repo and ask it to use the `codex-hyperagent` skill.
-6. Use `hyperagent/operating-prompt.md` as the canonical Suit prompt.
-7. After a task, inspect the new mission record in `missions/`.
-8. Inspect any evidence-backed upgrade proposals in `workshop/proposals/`.
-9. Record explicit human approval or rejection in `workshop/decisions/` before a proposal becomes accepted Suit memory.
+5. Capture local task evidence when useful:
+
+   ```bash
+   sh scripts/hyperagent.sh record-check --status passed --command "sh scripts/verify-mvp.sh"
+   sh scripts/hyperagent.sh sense
+   ```
+
+   The sensing summary reports branch, git status, changed files, opt-in command/check evidence, failures and retries, optional PR/CI status when locally available through `gh`, and optional trace links. It does not inspect file contents, environment variables, shell history, or secrets.
+6. Start Codex in this repo and ask it to use the `codex-hyperagent` skill.
+7. Use `hyperagent/operating-prompt.md` as the canonical Suit prompt.
+8. After a task, inspect the new mission record in `missions/`.
+9. Inspect any evidence-backed upgrade proposals in `workshop/proposals/`.
+10. Record explicit human approval or rejection in `workshop/decisions/` before a proposal becomes accepted Suit memory.
 
 The MVP is file-based on purpose. There is no hosted service, no database, and no autonomous self-modification.
 
@@ -165,7 +173,8 @@ Restart Codex Desktop or open a fresh thread after updating the installed skill.
 - `.hyperagent`: machine-readable project config for initialized paths, adapters, and verification commands.
 - `scripts/install-codex-skill.sh`: dependency-free Codex skill installer.
 - `scripts/update-codex-skill.sh`: update helper for copy installs.
-- `scripts/hyperagent.sh`: local helper for project init, mission shells, proposals, Forge reviews, approval decisions, and status.
+- `scripts/hyperagent.sh`: local helper for project init, local sensing, command/check evidence, mission shells, proposals, Forge reviews, approval decisions, and status.
+- `.hyperagent-evidence/`: ignored local runtime evidence, including the opt-in command/check log used by `sense`.
 - `hyperagent/operating-prompt.md`: the operating layer Codex wears during work.
 - `hyperagent/capability-registry.md`: accepted capability registry with reviewed local capabilities.
 - `templates/mission-record.md`: mission telemetry template.
@@ -208,6 +217,14 @@ sh evals/init-smoke.sh
 ```
 
 The init smoke test creates a temporary repo, runs `hyperagent init`, checks the generated markdown-first structure and `.hyperagent` config, verifies overwrite refusal, verifies `--force`, and confirms `--dry-run` leaves the target untouched.
+
+Run the sensing smoke test:
+
+```bash
+sh evals/sense-smoke.sh
+```
+
+The sensing smoke test records passed and failed checks, verifies changed-file detection, checks Markdown and JSON summaries, and confirms secret-like command fragments are redacted.
 
 ## Current Limits
 

@@ -36,6 +36,10 @@ require_file docs/article-outline.md
 require_file docs/quickstart.md
 require_file docs/release-checklist.md
 require_file docs/releases/v0.1.0-alpha.md
+require_file examples/agents-sdk-demo/README.md
+require_file examples/agents-sdk-demo/demo.py
+require_file examples/agents-sdk-demo/requirements.txt
+require_file examples/agents-sdk-demo/verify.sh
 require_file skills/codex-hyperagent/SKILL.md
 require_file skills/codex-hyperagent/agents/openai.yaml
 require_file bin/hyperagent
@@ -96,7 +100,17 @@ require_text README.md "sh scripts/install-codex-skill.sh"
 require_text README.md "sh scripts/update-codex-skill.sh"
 require_text README.md "sh scripts/hyperagent.sh status"
 require_text README.md "docs/release-checklist.md"
+require_text README.md "examples/agents-sdk-demo/"
 require_text README.md "--symlink"
+require_text docs/quickstart.md "Run The Agents SDK Demo"
+require_text docs/quickstart.md "examples/agents-sdk-demo/verify.sh"
+require_text examples/agents-sdk-demo/README.md "human review required"
+require_text examples/agents-sdk-demo/README.md "OpenAI Agents SDK"
+require_text examples/agents-sdk-demo/demo.py "Runner.run_sync"
+require_text examples/agents-sdk-demo/demo.py "function_tool"
+require_text examples/agents-sdk-demo/demo.py "trace("
+require_text examples/agents-sdk-demo/demo.py "human review required"
+require_text examples/agents-sdk-demo/verify.sh "HyperAgent Agents SDK demo verification passed."
 require_text docs/release-checklist.md "Update And Upgrade Model"
 require_text docs/release-checklist.md "Forge Readiness"
 require_text docs/release-checklist.md "Forge review flow"

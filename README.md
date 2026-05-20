@@ -130,6 +130,8 @@ The MVP is file-based on purpose. There is no hosted service, no database, and n
 
 For the full first-run path, see `docs/quickstart.md`.
 
+For a runnable OpenAI Agents SDK reference implementation, see `examples/agents-sdk-demo/`.
+
 For early release readiness, see `docs/release-checklist.md`.
 
 ## Updating
@@ -160,6 +162,7 @@ Restart Codex Desktop or open a fresh thread after updating the installed skill.
 - `docs/release-checklist.md`: alpha release criteria, clean-clone test, and update model.
 - `docs/releases/v0.1.0-alpha.md`: first alpha release notes.
 - `docs/article-outline.md`: public essay outline for the Iron Man Suit thesis.
+- `examples/agents-sdk-demo/`: runnable OpenAI Agents SDK demo agent with local tools, SDK tracing, mission generation, Workshop proposal generation, Forge review generation, and a no-network verifier.
 - `skills/codex-hyperagent/`: Codex skill instructions.
 - `bin/hyperagent`: small command wrapper for `scripts/hyperagent.sh`.
 - `.hyperagent`: machine-readable project config for initialized paths, adapters, and verification commands.
@@ -208,6 +211,14 @@ sh evals/init-smoke.sh
 ```
 
 The init smoke test creates a temporary repo, runs `hyperagent init`, checks the generated markdown-first structure and `.hyperagent` config, verifies overwrite refusal, verifies `--force`, and confirms `--dry-run` leaves the target untouched.
+
+Run the Agents SDK demo verifier:
+
+```bash
+sh examples/agents-sdk-demo/verify.sh
+```
+
+The demo verifier compiles the example and runs dry-run artifact generation without requiring an OpenAI API key.
 
 ## Current Limits
 

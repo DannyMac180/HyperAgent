@@ -133,7 +133,35 @@ sh evals/init-smoke.sh
 sh evals/smoke-loop.sh
 ```
 
-## 9. Update Later
+## 9. Run The Agents SDK Demo
+
+HyperAgent also includes a runnable OpenAI Agents SDK reference implementation in `examples/agents-sdk-demo/`.
+
+Set up the demo from a fresh clone:
+
+```bash
+python3.10 -m venv .venv
+source .venv/bin/activate
+python3 -m pip install -r examples/agents-sdk-demo/requirements.txt
+export OPENAI_API_KEY="sk-..."
+```
+
+Run the live model/tool loop:
+
+```bash
+python3 examples/agents-sdk-demo/demo.py \
+  --friction "The markdown-first Suit needs a runnable Agents SDK reference body."
+```
+
+The live demo uses SDK tracing, writes a mission record, and writes a Workshop proposal plus Forge review when `--friction` is present. It keeps generated proposals `human review required` and does not create accepted capability registry entries.
+
+Verify the demo without network access:
+
+```bash
+sh examples/agents-sdk-demo/verify.sh
+```
+
+## 10. Update Later
 
 For copy installs:
 

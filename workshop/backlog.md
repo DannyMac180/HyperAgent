@@ -27,3 +27,4 @@ Score each item with `workshop/rubric.md`.
 | --- | --- | --- | --- | --- |
 | P0 | Accepted | `workshop/proposals/2026-05-16-1216-local-loop-helper-and-smoke-eval.md` | `missions/2026-05-16-1216-prd-fulfillment-working-product.md` | Loop helper and smoke eval implemented; keep covered by `scripts/verify-mvp.sh` and `evals/smoke-loop.sh`. |
 | P1 | Accepted | `workshop/proposals/2026-05-01-2108-codex-skill-installer.md` | `missions/2026-05-01-2108-mark-i-build.md` | Installer implemented; keep covered by smoke evals. |
+| P2 | Proposed | `workshop/proposals/2026-05-20-1959-python-verifier-cache-safety.md` | `missions/2026-05-20-1959-agents-sdk-demo.md` | Human review whether to document a standard Python verifier bytecode-cache convention. |

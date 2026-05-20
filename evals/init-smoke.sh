@@ -79,6 +79,7 @@ require_text "$target/.hyperagent" '"sh scripts/hyperagent.sh status"'
 require_text "$target/hyperagent/README.md" "Copy And Symlink Behavior"
 require_text "$target/hyperagent/README.md" "machine-readable project anchor"
 require_text "$target/hyperagent/README.md" "does not symlink project setup files by default"
+require_text "$target/hyperagent/README.md" "--forge-review"
 require_text "$target/hyperagent/capability-registry.md" "human review required"
 require_text "$target/workshop/backlog.md" "HyperAgent Project Upgrade Backlog"
 if grep -F "2026-05-16-1216-local-loop-helper-and-smoke-eval" "$target/workshop/backlog.md" >/dev/null; then

@@ -71,9 +71,11 @@ Use `workshop/rubric.md` and update `workshop/backlog.md` when the proposal shou
 
 ## Forge Review Prompt
 
-Review the recent upgrade proposals in `workshop/proposals/`. Judge whether the Workshop process is producing proposals that are specific, evidence-backed, testable, and safe. If the process itself needs improvement, create a Forge review in `forge/reviews/` using `templates/forge-review.md`.
+Review recent upgrade proposals in `workshop/proposals/`, decisions in `workshop/decisions/`, accepted capabilities in `hyperagent/capability-registry.md`, and evals in `evals/` plus `scripts/verify-mvp.sh`.
 
-Use `forge/process/quality-rubric.md` to score the Workshop process and identify process upgrades.
+Run Forge reviews after proposals are accepted or rejected, evals change, release-readiness checks, or repeated missions where Workshop output looks vague, unsafe, untested, or too heavy. Judge outcome quality, proposal quality, eval quality, safety quality, and process bloat. If the process itself needs improvement, create a Forge review in `forge/reviews/` using `templates/forge-review.md`.
+
+Use `forge/process/quality-rubric.md` to score the Workshop process and identify process upgrades. When a process upgrade is warranted, generate a Workshop proposal from the Forge review with `sh scripts/hyperagent.sh propose-upgrade --forge-review PATH --title "..." --problem "..."`. Keep the proposal in `human review required` mode.
 
 ## Safety Defaults
 

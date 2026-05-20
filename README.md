@@ -20,7 +20,7 @@ Release notes: `docs/releases/v0.1.0-alpha.md`
 
 HyperAgent is designed to sit at the Codex Mac app level as a user-level operating layer across Codex workspaces. The Global Suit provides shared operating rules, safety defaults, and reusable capabilities. Each workspace gets its own local Suit context for repo-specific rules, workflows, and memory.
 
-Mission records capture evidence from real work. The Workshop turns that evidence into proposed Suit upgrades. The Forge improves the Workshop itself by checking whether proposals are specific, evidence-backed, safe, testable, and worth installing. Human review approves persistent behavior changes before they become part of the Suit.
+Mission records capture evidence from real work. The Workshop turns that evidence into proposed Suit upgrades. The Forge improves the Workshop itself by checking whether proposals are specific, evidence-backed, safe, testable, worth installing, and actually improving behavior after acceptance. Human review approves persistent behavior changes before they become part of the Suit.
 
 ```mermaid
 flowchart TD
@@ -125,6 +125,7 @@ flowchart TD
 7. After a task, inspect the new mission record in `missions/`.
 8. Inspect any evidence-backed upgrade proposals in `workshop/proposals/`.
 9. Record explicit human approval or rejection in `workshop/decisions/` before a proposal becomes accepted Suit memory.
+10. Run a Forge review after proposal decisions, eval changes, release-readiness checks, or repeated vague Workshop output.
 
 The MVP is file-based on purpose. There is no hosted service, no database, and no autonomous self-modification.
 
@@ -170,7 +171,7 @@ Restart Codex Desktop or open a fresh thread after updating the installed skill.
 - `hyperagent/capability-registry.md`: accepted capability registry with reviewed local capabilities.
 - `templates/mission-record.md`: mission telemetry template.
 - `templates/upgrade-proposal.md`: Workshop proposal template.
-- `templates/forge-review.md`: Forge review template.
+- `templates/forge-review.md`: Forge review template for outcome, proposal, eval, safety, and process quality.
 - `templates/upgrade-decision.md`: human approval or rejection template.
 - `workshop/backlog.md`: first-class upgrade backlog.
 - `workshop/rubric.md`: proposal prioritization rubric.
@@ -199,7 +200,7 @@ Run the end-to-end local smoke loop:
 sh evals/smoke-loop.sh
 ```
 
-The smoke loop copies the repo to a temporary directory, creates a mission record, creates a proposal linked to that mission, creates a Forge review, records a human-review decision, and verifies the accepted capability appears in the registry.
+The smoke loop copies the repo to a temporary directory, creates a mission record, creates a proposal linked to that mission, creates a Forge review, creates a process-improvement proposal linked to that Forge review, records a human-review decision, and verifies the accepted capability appears in the registry.
 
 Run the project init smoke test:
 

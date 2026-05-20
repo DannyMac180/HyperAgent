@@ -23,6 +23,7 @@ The smoke loop copies the repo to a temporary directory, then verifies that the 
 - create a mission record in `missions/`,
 - create a proposal linked to that mission in `workshop/proposals/`,
 - create a Forge review in `forge/reviews/`,
+- create a process-improvement proposal linked to that Forge review,
 - record a human-review decision in `workshop/decisions/`,
 - append an accepted capability to `hyperagent/capability-registry.md`.
 
@@ -65,3 +66,4 @@ The installed `SKILL.md` should retain the source-of-truth links to the Suit pro
 5. Confirm the proposal links to the mission record and uses `human review required`.
 6. Confirm a human approval or rejection can be recorded in `workshop/decisions/`.
 7. Confirm Forge can review recent proposal quality and write a review in `forge/reviews/`.
+8. Confirm Forge can generate a process-improvement proposal with `propose-upgrade --forge-review`.

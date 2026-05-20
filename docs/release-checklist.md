@@ -54,9 +54,13 @@ For `v0.1.0-alpha`, the Forge should be able to:
 
 - review recent Workshop proposals,
 - judge whether proposals are specific, evidence-backed, testable, safe, and worth installing,
+- judge whether accepted upgrades improved behavior and paid off,
+- identify process bloat created by low-value ceremony,
 - identify weak evals, vague upgrade ideas, missing safety notes, or repeated friction patterns,
 - write Forge reviews in `forge/reviews/`,
 - propose process improvements to the Workshop without silently activating them.
+
+Run Forge reviews after proposal approvals or rejections, eval changes, release-readiness checks, and repeated missions that show vague or low-value Workshop output.
 
 The Forge should not yet:
 
@@ -68,9 +72,10 @@ The Forge should not yet:
 Before release, verify:
 
 - [x] `forge/process/quality-rubric.md` defines proposal quality metrics.
-- [x] `templates/forge-review.md` includes proposal quality and process reliability fields.
+- [x] `templates/forge-review.md` includes outcome, proposal, eval, safety, and process reliability fields.
 - [x] At least one real Forge review exists in `forge/reviews/`.
 - [x] `scripts/verify-mvp.sh` fails if the Forge rubric or review template is missing.
+- [x] `evals/smoke-loop.sh` verifies process-improvement proposals can link to Forge reviews.
 - [x] `docs/quickstart.md` shows how to run a Forge review prompt.
 - [x] README and release notes describe the Forge as "improves the Workshop."
 

@@ -123,7 +123,16 @@ Ask Codex:
 sh scripts/hyperagent.sh forge-prompt
 ```
 
-Forge reviews belong in `forge/reviews/`. The Forge should improve the Workshop process, not silently activate new capabilities.
+Forge reviews belong in `forge/reviews/`. Run one after proposals are accepted or rejected, after evals change, before release-readiness decisions, or when repeated missions show the Workshop producing vague, unsafe, untested, or low-value proposals.
+
+The Forge should improve the Workshop process, not silently activate new capabilities. If the review finds a concrete process improvement, create a normal Workshop proposal linked to the Forge review:
+
+```bash
+sh scripts/hyperagent.sh propose-upgrade \
+  --forge-review forge/reviews/2026-05-16-1216-workshop-quality-review.md \
+  --title "Improve Workshop proposal quality" \
+  --problem "Recent proposals are too vague to evaluate safely"
+```
 
 ## 8. Verify
 

@@ -34,6 +34,18 @@ grep -F "human review required" "$proposal" >/dev/null || fail "proposal missing
 forge_review=$(sh scripts/hyperagent.sh new-forge-review --slug smoke-loop-forge-review)
 test -f "$forge_review" || fail "forge review was not created"
 grep -F "Proposal quality score" "$forge_review" >/dev/null || fail "forge review missing quality score"
+grep -F "Outcome quality score" "$forge_review" >/dev/null || fail "forge review missing outcome quality score"
+grep -F "Eval quality score" "$forge_review" >/dev/null || fail "forge review missing eval quality score"
+grep -F "Safety quality score" "$forge_review" >/dev/null || fail "forge review missing safety quality score"
+grep -F "Suggested proposal command" "$forge_review" >/dev/null || fail "forge review missing process proposal command"
+
+process_proposal=$(sh scripts/hyperagent.sh propose-upgrade \
+  --forge-review "$forge_review" \
+  --title "Smoke-test Forge process proposal" \
+  --problem "The loop needs proof that Forge reviews can generate process-improvement proposals")
+test -f "$process_proposal" || fail "process proposal was not created"
+grep -F "Evidence source type: forge review" "$process_proposal" >/dev/null || fail "process proposal missing Forge evidence type"
+grep -F "Related Forge review:" "$process_proposal" >/dev/null || fail "process proposal missing related Forge review"
 
 decision=$(sh scripts/hyperagent.sh decide-upgrade \
   --proposal "$proposal" \

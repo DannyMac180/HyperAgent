@@ -41,7 +41,11 @@ Score proposal priority with `workshop/rubric.md`. Track implementation candidat
 
 ## Forge Mode
 
-Use Forge Mode when the problem is not a missing capability, but a weak improvement process. Review recent proposals and ask whether they are specific, testable, safe, and worth installing. Write Forge reviews in `forge/reviews/` using `templates/forge-review.md` and score the process with `forge/process/quality-rubric.md`.
+Use Forge Mode when the problem is not a missing capability, but a weak improvement process. Run Forge reviews after accepted or rejected proposals, eval changes, release-readiness checks, or repeated missions where Workshop output looks vague, unsafe, untested, or too heavy.
+
+Review recent proposals, decisions, accepted capabilities, evals, and behavior evidence. Judge outcome quality, proposal quality, eval quality, safety quality, and process bloat. Write Forge reviews in `forge/reviews/` using `templates/forge-review.md` and score the process with `forge/process/quality-rubric.md`.
+
+When the Forge finds process friction worth fixing, generate a process-improvement proposal in `workshop/proposals/` with `sh scripts/hyperagent.sh propose-upgrade --forge-review PATH --title "..." --problem "..."`. Keep the proposal in `human review required` mode.
 
 ## Authority Boundary
 

@@ -32,12 +32,16 @@ Ask Codex:
 Use the codex-hyperagent skill. Run a small HyperAgent mission in this repo, verify the result, write a mission record, and propose an upgrade only if there is concrete friction.
 ```
 
-The mission record belongs in `missions/`.
+The mission record belongs in `missions/`. The helper prefills repo evidence such as branch, git status, changed files, command evidence, verification status, and closeout placeholders.
 
 You can also create a mission record shell:
 
 ```bash
-sh scripts/hyperagent.sh new-mission --request "Run a small HyperAgent mission" --slug small-hyperagent-mission
+sh scripts/hyperagent.sh new-mission \
+  --request "Run a small HyperAgent mission" \
+  --slug small-hyperagent-mission \
+  --commands-run "sh scripts/verify-mvp.sh" \
+  --verification-status "pending"
 ```
 
 ## 4. Run Workshop Review

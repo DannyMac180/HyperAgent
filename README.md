@@ -107,7 +107,7 @@ flowchart TD
 
 4. Start Codex in this repo and ask it to use the `codex-hyperagent` skill.
 5. Use `hyperagent/operating-prompt.md` as the canonical Suit prompt.
-6. After a task, inspect the new mission record in `missions/`.
+6. After a task, inspect the new mission record in `missions/`. New records prefill repo path, branch, git status, changed files, command evidence, verification status, and closeout placeholders.
 7. Inspect any evidence-backed upgrade proposals in `workshop/proposals/`.
 8. Record explicit human approval or rejection in `workshop/decisions/` before a proposal becomes accepted Suit memory.
 

@@ -12,8 +12,11 @@ Commands:
   status
       Print HyperAgent local product status.
 
-  sense [--format markdown|json] [--command-log PATH] [--trace-url URL] [--pr auto|off]
+  sense [--format markdown|json] [--command-log PATH] [--trace-url URL] [--workbench-trace-log PATH] [--pr auto|off]
       Print a compact local sensing summary for mission records.
+
+  doctor [--workbench-trace-log PATH]
+      Print local diagnostics for HyperAgent sensing and Workbench trace enrichment.
 
   record-check --command TEXT --status passed|failed|retried|skipped [--note TEXT]
       Append an opt-in check or command result to the local evidence log.
@@ -56,6 +59,7 @@ forge_dir="$repo_root/forge/reviews"
 registry_file="$repo_root/hyperagent/capability-registry.md"
 default_evidence_dir="$repo_root/.hyperagent-evidence"
 default_command_log="$default_evidence_dir/commands.log"
+default_workbench_trace_log="$default_evidence_dir/workbench/traces.jsonl"
 
 now_stamp() {
   date '+%Y-%m-%d-%H%M'
@@ -299,6 +303,7 @@ capability_registry = "hyperagent/capability-registry.md"
 project_readme = "hyperagent/README.md"
 local_helper = "scripts/hyperagent.sh"
 evidence_log = ".hyperagent-evidence/commands.log"
+workbench_trace_log = ".hyperagent-evidence/workbench/traces.jsonl"
 
 [adapters]
 codex = true
@@ -336,6 +341,7 @@ Use these files to keep agent work inspectable:
 sh scripts/hyperagent.sh status
 sh scripts/hyperagent.sh sense
 sh scripts/hyperagent.sh record-check --status passed --command "sh scripts/verify-mvp.sh"
+sh scripts/hyperagent.sh doctor
 sh scripts/hyperagent.sh new-mission --request "Describe the task" --slug task-slug
 sh scripts/hyperagent.sh workshop-prompt
 sh scripts/hyperagent.sh forge-prompt
@@ -356,7 +362,7 @@ sh scripts/hyperagent.sh record-check --status passed --command "sh scripts/veri
 sh scripts/hyperagent.sh sense
 ```
 
-The sensing summary reads Git metadata and the opt-in local command log. It does not inspect file contents or environment values, and command text is redacted for secret-like tokens before storage and output.
+The sensing summary reads Git metadata, the opt-in local command log, and local Workbench trace metadata when the default ignored trace log exists. It does not inspect repository file contents or environment values, and command text is redacted for secret-like tokens before storage and output.
 
 Add any project-specific build, test, lint, or smoke commands to `AGENTS.md` so future agents know the strongest relevant verification path.
 
@@ -685,6 +691,48 @@ read_failure_commands() {
   fi
 }
 
+workbench_trace_log_path() {
+  override="$1"
+  if [ -n "$override" ]; then
+    printf '%s\n' "$override"
+    return 0
+  fi
+  if [ -n "${HYPERAGENT_WORKBENCH_TRACE_LOG:-}" ]; then
+    printf '%s\n' "$HYPERAGENT_WORKBENCH_TRACE_LOG"
+    return 0
+  fi
+  printf '%s\n' "$default_workbench_trace_log"
+}
+
+workbench_trace_status() {
+  trace_log="$1"
+  if [ ! -e "$trace_log" ]; then
+    printf 'unavailable: trace log not found'
+    return 0
+  fi
+  if [ ! -r "$trace_log" ]; then
+    printf 'unhealthy: trace log is not readable'
+    return 0
+  fi
+  trace_count=$(wc -l <"$trace_log" 2>/dev/null | tr -d ' ' || true)
+  test -n "$trace_count" || trace_count=0
+  if [ "$trace_count" -eq 0 ] 2>/dev/null; then
+    printf 'healthy: trace log readable, no trace entries yet'
+    return 0
+  fi
+  printf 'healthy: %s local trace entries available' "$trace_count"
+}
+
+read_workbench_traces() {
+  trace_log="$1"
+  if [ -r "$trace_log" ]; then
+    tail -n 8 "$trace_log" | redact_stream | awk '
+      length($0) > 240 { print substr($0, 1, 237) "..."; next }
+      { print }
+    '
+  fi
+}
+
 pr_summary() {
   pr_mode="$1"
   test "$pr_mode" = auto || return 0
@@ -704,6 +752,7 @@ print_sense_markdown() {
   command_log="$1"
   trace_url="$2"
   pr_mode="$3"
+  workbench_trace_log="$4"
   branch=$(git_value rev-parse --abbrev-ref HEAD)
   upstream=$(git_value rev-parse --abbrev-ref --symbolic-full-name '@{u}')
   head_sha=$(git_value rev-parse --short HEAD)
@@ -712,6 +761,8 @@ print_sense_markdown() {
   recent_commands=$(read_recent_commands "$command_log")
   failure_commands=$(read_failure_commands "$command_log")
   pr_info=$(pr_summary "$pr_mode")
+  workbench_status=$(workbench_trace_status "$workbench_trace_log")
+  workbench_traces=$(read_workbench_traces "$workbench_trace_log")
 
   printf '# HyperAgent Sense Summary\n\n'
   printf '%s\n' "- Generated: $(now_readable)"
@@ -726,6 +777,8 @@ print_sense_markdown() {
   else
     printf '%s\n' "- Trace: not provided"
   fi
+  printf '%s\n' "- Workbench trace log: \`$workbench_trace_log\`"
+  printf '%s\n' "- Workbench trace status: \`$workbench_status\`"
   printf '\n## Changed Files\n\n'
   if [ -n "$changed_files" ]; then
     printf '%s\n' "$changed_files" | sed 's/^/- `/' | sed 's/$/`/'
@@ -750,9 +803,15 @@ print_sense_markdown() {
   else
     printf '%s\n' "- not available locally"
   fi
+  printf '\n## Workbench Traces\n\n'
+  if [ -n "$workbench_traces" ]; then
+    printf '%s\n' "$workbench_traces" | sed 's/^/- `/' | sed 's/$/`/'
+  else
+    printf '%s\n' "- no local Workbench traces available"
+  fi
   printf '\n## Safety\n\n'
   printf '%s\n' "- Does not inspect file contents, environment variables, shell history, credentials, or hosted services unless optional PR lookup is enabled and available."
-  printf '%s\n' "- Command evidence is opt-in and redacted for secret-like tokens before storage and output."
+  printf '%s\n' "- Command and Workbench evidence is local, redacted for secret-like tokens before output, and safe to omit when unavailable."
 }
 
 print_json_array_from_lines() {
@@ -781,6 +840,7 @@ print_sense_json() {
   command_log="$1"
   trace_url="$2"
   pr_mode="$3"
+  workbench_trace_log="$4"
   branch=$(git_value rev-parse --abbrev-ref HEAD)
   upstream=$(git_value rev-parse --abbrev-ref --symbolic-full-name '@{u}')
   head_sha=$(git_value rev-parse --short HEAD)
@@ -789,6 +849,8 @@ print_sense_json() {
   recent_commands=$(read_recent_commands "$command_log")
   failure_commands=$(read_failure_commands "$command_log")
   pr_info=$(pr_summary "$pr_mode")
+  workbench_status=$(workbench_trace_status "$workbench_trace_log")
+  workbench_traces=$(read_workbench_traces "$workbench_trace_log")
 
   printf '{\n'
   printf '  "generated": "%s",\n' "$(now_readable | json_escape)"
@@ -811,7 +873,14 @@ print_sense_json() {
   print_json_array_from_lines "$pr_info"
   printf ',\n'
   printf '  "trace": "%s",\n' "$(redact_text "$trace_url" | json_escape)"
-  printf '  "safety": "Does not inspect file contents, environment variables, shell history, credentials, or hosted services unless optional PR lookup is enabled and available. Command evidence is opt-in and redacted for secret-like tokens before storage and output."\n'
+  printf '  "workbench": {\n'
+  printf '    "trace_log": "%s",\n' "$(printf '%s' "$workbench_trace_log" | json_escape)"
+  printf '    "status": "%s",\n' "$(printf '%s' "$workbench_status" | json_escape)"
+  printf '    "recent_traces": '
+  print_json_array_from_lines "$workbench_traces"
+  printf '\n'
+  printf '  },\n'
+  printf '  "safety": "Does not inspect file contents, environment variables, shell history, credentials, or hosted services unless optional PR lookup is enabled and available. Command and Workbench evidence is local, redacted for secret-like tokens before output, and safe to omit when unavailable."\n'
   printf '}\n'
 }
 
@@ -820,6 +889,7 @@ print_sense() {
   command_log="$default_command_log"
   trace_url=
   pr_mode=auto
+  workbench_trace_log_override=
 
   while [ "$#" -gt 0 ]; do
     case "$1" in
@@ -838,6 +908,11 @@ print_sense() {
         test "$#" -gt 0 || fail "--trace-url requires a URL or local trace reference"
         trace_url=$1
         ;;
+      --workbench-trace-log)
+        shift
+        test "$#" -gt 0 || fail "--workbench-trace-log requires a path"
+        workbench_trace_log_override=$1
+        ;;
       --pr)
         shift
         test "$#" -gt 0 || fail "--pr requires auto or off"
@@ -850,11 +925,51 @@ print_sense() {
     shift
   done
 
+  workbench_trace_log=$(workbench_trace_log_path "$workbench_trace_log_override")
+
   case "$format" in
-    markdown) print_sense_markdown "$command_log" "$trace_url" "$pr_mode" ;;
-    json) print_sense_json "$command_log" "$trace_url" "$pr_mode" ;;
+    markdown) print_sense_markdown "$command_log" "$trace_url" "$pr_mode" "$workbench_trace_log" ;;
+    json) print_sense_json "$command_log" "$trace_url" "$pr_mode" "$workbench_trace_log" ;;
     *) fail "--format must be markdown or json" ;;
   esac
+}
+
+print_doctor() {
+  workbench_trace_log_override=
+
+  while [ "$#" -gt 0 ]; do
+    case "$1" in
+      --workbench-trace-log)
+        shift
+        test "$#" -gt 0 || fail "--workbench-trace-log requires a path"
+        workbench_trace_log_override=$1
+        ;;
+      *)
+        fail "unknown doctor option: $1"
+        ;;
+    esac
+    shift
+  done
+
+  workbench_trace_log=$(workbench_trace_log_path "$workbench_trace_log_override")
+
+  printf 'HyperAgent doctor\n'
+  printf 'Repo: %s\n' "$repo_root"
+  if git -C "$repo_root" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+    printf 'Git: healthy\n'
+  else
+    printf 'Git: unavailable\n'
+  fi
+  if [ -e "$default_command_log" ]; then
+    printf 'Command log: %s\n' "$default_command_log"
+  else
+    printf 'Command log: not initialized yet (%s)\n' "$default_command_log"
+  fi
+  printf 'Workbench trace log: %s\n' "$workbench_trace_log"
+  printf 'Workbench trace status: %s\n' "$(workbench_trace_status "$workbench_trace_log")"
+  printf 'Workbench retention: local ignored evidence; keep only recent mission-relevant traces and prune manually or with your local Workbench policy.\n'
+  printf 'Workbench redaction: HyperAgent redacts secret-like tokens before sense output; Workbench may still store local prompts, tool payloads, file paths, and command outputs.\n'
+  printf 'Fallback: sense remains usable without Workbench traces.\n'
 }
 
 create_mission() {
@@ -1218,6 +1333,9 @@ case "$command" in
     ;;
   sense)
     print_sense "$@"
+    ;;
+  doctor)
+    print_doctor "$@"
     ;;
   record-check)
     record_check "$@"

@@ -34,20 +34,27 @@ sh scripts/hyperagent.sh record-check \
   --command "SECRET_TOKEN=super-secret sh evals/smoke-loop.sh" \
   --note "Intentional smoke failure with API_KEY=hidden" >/dev/null
 
+mkdir -p .hyperagent-evidence/workbench
+printf '%s\n' '{"trace_id":"trace-secret-token=visible","url":"local-trace://sense-smoke","status":"ok"}' >.hyperagent-evidence/workbench/traces.jsonl
+
 markdown="$tmpdir/sense.md"
 json="$tmpdir/sense.json"
+doctor="$tmpdir/doctor.txt"
 
 sh scripts/hyperagent.sh sense --pr off >"$markdown"
 sh scripts/hyperagent.sh sense --format json --pr off --trace-url "local-trace://sense-smoke" >"$json"
+sh scripts/hyperagent.sh doctor >"$doctor"
 
 require_text "$markdown" "HyperAgent Sense Summary"
 require_text "$markdown" "Branch:"
 require_text "$markdown" 'README.md'
 require_text "$markdown" "Recent Commands And Checks"
 require_text "$markdown" "Failures And Retries"
+require_text "$markdown" "Workbench Traces"
+require_text "$markdown" "healthy: 1 local trace entries available"
 require_text "$markdown" "SECRET_TOKEN=[REDACTED]"
 require_text "$markdown" "API_KEY=[REDACTED]"
-require_text "$markdown" "not available locally"
+require_text "$markdown" "trace-secret-token=[REDACTED]"
 
 if grep -F "super-secret" "$markdown" >/dev/null; then
   fail "markdown summary leaked a secret-like token value"
@@ -60,11 +67,21 @@ require_text "$json" '"branch"'
 require_text "$json" '"changed_files"'
 require_text "$json" '"recent_commands"'
 require_text "$json" '"failures_and_retries"'
+require_text "$json" '"workbench"'
+require_text "$json" 'healthy: 1 local trace entries available'
 require_text "$json" 'local-trace://sense-smoke'
 require_text "$json" 'SECRET_TOKEN=[REDACTED]'
+require_text "$json" 'trace-secret-token=[REDACTED]'
+
+require_text "$doctor" "HyperAgent doctor"
+require_text "$doctor" "Workbench trace status: healthy: 1 local trace entries available"
+require_text "$doctor" "Fallback: sense remains usable without Workbench traces."
 
 if grep -F "super-secret" "$json" >/dev/null; then
   fail "json summary leaked a secret-like token value"
+fi
+if grep -F "visible" "$json" >/dev/null; then
+  fail "json summary leaked a Workbench secret-like token value"
 fi
 
 printf 'HyperAgent sense smoke passed.\n'

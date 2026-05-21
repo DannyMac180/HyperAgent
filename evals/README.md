@@ -59,7 +59,9 @@ The sense smoke test copies the repo to a temporary directory, then verifies tha
 - report recent commands plus failures and retries,
 - produce both Markdown and JSON summaries for mission records,
 - include an optional local trace reference,
-- redact secret-like command and note fragments before storage and output.
+- enrich the summary from a local Workbench trace fixture by default,
+- report Workbench trace health through `doctor`,
+- redact secret-like command, note, and trace fragments before storage and output.
 
 ## Installer Smoke Eval
 

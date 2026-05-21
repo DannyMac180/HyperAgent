@@ -1,0 +1,43 @@
+flowchart LR
+  User["User intent"]
+  Codex["Codex Mac app"]
+  Core["HyperAgent core<br/>local operating layer"]
+
+  Registry["Project registry<br/>workspaces, commands, roles"]
+  Suit["Global Suit<br/>rules, safety defaults, skills"]
+  Workspace["Workspace-local context<br/>repo rules, workflows, memory"]
+
+  Missions["Mission records<br/>evidence from real work"]
+  Workshop["Workshop<br/>proposes Suit upgrades"]
+  Forge["Forge<br/>improves the Workshop"]
+  Review["Human review<br/>approves persistent changes"]
+
+  User --> Codex --> Core
+
+  Core --> Registry
+  Core --> Suit
+  Core --> Workspace
+
+  Registry --> Workspace
+  Suit --> Workspace
+
+  Workspace --> Missions
+  Missions --> Workshop
+  Workshop --> Review
+  Review --> Suit
+  Workshop --> Forge
+  Forge --> Workshop
+
+  classDef entry fill:#f8fafc,stroke:#475569,color:#111827,stroke-width:1px;
+  classDef core fill:#111827,stroke:#111827,color:#ffffff,stroke-width:1px;
+  classDef support fill:#e0f2fe,stroke:#0284c7,color:#0f172a,stroke-width:1px;
+  classDef evidence fill:#dcfce7,stroke:#16a34a,color:#052e16,stroke-width:1px;
+  classDef upgrade fill:#fef3c7,stroke:#d97706,color:#451a03,stroke-width:1px;
+  classDef review fill:#ffe4e6,stroke:#e11d48,color:#4c0519,stroke-width:1px;
+
+  class User,Codex entry;
+  class Core core;
+  class Registry,Suit,Workspace support;
+  class Missions evidence;
+  class Workshop,Forge upgrade;
+  class Review review;

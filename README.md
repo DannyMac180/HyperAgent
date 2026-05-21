@@ -22,66 +22,13 @@ HyperAgent is designed to sit at the Codex Mac app level as a user-level operati
 
 Mission records capture evidence from real work. The Workshop turns that evidence into proposed Suit upgrades. The Forge improves the Workshop itself by checking whether proposals are specific, evidence-backed, safe, testable, and worth installing. Human review approves persistent behavior changes before they become part of the Suit.
 
-```mermaid
-flowchart TD
-  User["User"]
+<p align="center">
+  <img src="docs/assets/hyperagent-architecture.svg" alt="HyperAgent high-level architecture diagram">
+</p>
 
-  Codex["Codex Mac App<br/>Host environment for Codex work"]
-
-  HyperAgent["HyperAgent<br/>User-level meta layer"]
-
-  Registry["Project Registry<br/>Known workspaces, paths, roles, commands"]
-
-  GlobalSuit["Global Suit<br/>Shared operating rules, safety defaults, reusable skills"]
-
-  WorkspaceA["Workspace A"]
-  WorkspaceB["Workspace B"]
-  WorkspaceC["Workspace C"]
-
-  LocalA["Workspace-local Suit Context<br/>repo rules, commands, workflows, memory"]
-  LocalB["Workspace-local Suit Context"]
-  LocalC["Workspace-local Suit Context"]
-
-  MissionA["Mission Records"]
-  MissionB["Mission Records"]
-  MissionC["Mission Records"]
-
-  Workshop["Workshop<br/>Turns mission evidence into Suit upgrade proposals"]
-
-  Forge["Forge<br/>Improves how the Workshop proposes, tests, and installs upgrades"]
-
-  Review["Human Review<br/>Approves persistent behavior changes"]
-
-  User --> Codex
-  Codex --> HyperAgent
-
-  HyperAgent --> Registry
-  HyperAgent --> GlobalSuit
-  HyperAgent --> Workshop
-  HyperAgent --> Forge
-
-  Registry --> WorkspaceA
-  Registry --> WorkspaceB
-  Registry --> WorkspaceC
-
-  GlobalSuit --> LocalA
-  GlobalSuit --> LocalB
-  GlobalSuit --> LocalC
-
-  WorkspaceA --> LocalA --> MissionA
-  WorkspaceB --> LocalB --> MissionB
-  WorkspaceC --> LocalC --> MissionC
-
-  MissionA --> Workshop
-  MissionB --> Workshop
-  MissionC --> Workshop
-
-  Workshop --> Review
-  Review --> GlobalSuit
-
-  Workshop --> Forge
-  Forge --> Workshop
-```
+<p align="center">
+  <sub>Editable diagram source: <a href="docs/architecture/hyperagent.mmd">docs/architecture/hyperagent.mmd</a></sub>
+</p>
 
 ## Quick Start
 

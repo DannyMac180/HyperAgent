@@ -24,10 +24,13 @@ require_file README.md
 require_file AGENTS.md
 require_file CONTRIBUTING.md
 require_file SECURITY.md
+require_file .github/pull_request_template.md
 require_file .github/ISSUE_TEMPLATE/bug_report.md
 require_file .github/ISSUE_TEMPLATE/suit_friction.md
 require_file .github/ISSUE_TEMPLATE/upgrade_proposal.md
 require_file .github/ISSUE_TEMPLATE/eval_idea.md
+require_file docs/architecture/hyperagent.mmd
+require_file docs/assets/hyperagent-architecture.svg
 require_file docs/hyperagent-prd.md
 require_file docs/iron-man-suit-essence.md
 require_file docs/concepts.md
@@ -65,12 +68,17 @@ require_text skills/codex-hyperagent/SKILL.md "name: codex-hyperagent"
 require_text skills/codex-hyperagent/SKILL.md "version: v0.1.0-alpha"
 require_text skills/codex-hyperagent/agents/openai.yaml "display_name: \"HyperAgent\""
 require_text AGENTS.md "HyperAgent triage on every task"
+require_text AGENTS.md "README Architecture Diagram"
 require_text CONTRIBUTING.md "How To Propose A Suit Upgrade"
+require_text CONTRIBUTING.md "architecture diagram update"
 require_text SECURITY.md "Authority Boundary"
+require_text .github/pull_request_template.md "README architecture diagram was reviewed or updated"
 require_text .github/ISSUE_TEMPLATE/bug_report.md "Bug report"
 require_text .github/ISSUE_TEMPLATE/suit_friction.md "Suit friction report"
 require_text .github/ISSUE_TEMPLATE/upgrade_proposal.md "Upgrade proposal"
 require_text .github/ISSUE_TEMPLATE/eval_idea.md "Eval idea"
+require_text docs/architecture/hyperagent.mmd "flowchart LR"
+require_text docs/assets/hyperagent-architecture.svg "HyperAgent high-level architecture"
 require_text scripts/install-codex-skill.sh "Usage: sh scripts/install-codex-skill.sh"
 require_text scripts/install-codex-skill.sh "--dry-run"
 require_text scripts/install-codex-skill.sh "--force"
@@ -83,6 +91,8 @@ require_text README.md "sh scripts/install-codex-skill.sh"
 require_text README.md "sh scripts/update-codex-skill.sh"
 require_text README.md "sh scripts/hyperagent.sh status"
 require_text README.md "docs/release-checklist.md"
+require_text README.md "docs/assets/hyperagent-architecture.svg"
+require_text README.md "docs/architecture/hyperagent.mmd"
 require_text README.md "--symlink"
 require_text docs/release-checklist.md "Update And Upgrade Model"
 require_text docs/release-checklist.md "Forge Readiness"

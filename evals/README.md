@@ -44,6 +44,25 @@ The init smoke test creates a temporary repo, runs `sh scripts/hyperagent.sh ini
 - refuses conflicting overwrites unless `--force` is passed,
 - leaves the target untouched during `--dry-run`.
 
+## Sense Smoke Eval
+
+Run:
+
+```bash
+sh evals/sense-smoke.sh
+```
+
+The sense smoke test copies the repo to a temporary directory, then verifies that the local helper can:
+
+- record passed and failed command/check evidence in the ignored local evidence log,
+- summarize branch, status counts, and changed files,
+- report recent commands plus failures and retries,
+- produce both Markdown and JSON summaries for mission records,
+- include an optional local trace reference,
+- enrich the summary from a local Workbench trace fixture by default,
+- report Workbench trace health through `doctor`,
+- redact secret-like command, note, and trace fragments before storage and output.
+
 ## Installer Smoke Eval
 
 Run the installer against a temporary skills directory:

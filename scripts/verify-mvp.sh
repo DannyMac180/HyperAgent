@@ -51,6 +51,10 @@ require_file templates/upgrade-decision.md
 require_file evals/README.md
 require_file evals/smoke-loop.sh
 require_file evals/init-smoke.sh
+require_file evals/reliability-gains.sh
+require_file evals/reliability-rubric.md
+require_file evals/fixtures/reliability/baseline-no-suit.md
+require_file evals/fixtures/reliability/hyperagent-suit.md
 require_file evals/sense-smoke.sh
 require_file workshop/backlog.md
 require_file workshop/rubric.md
@@ -121,6 +125,12 @@ require_text docs/releases/v0.1.0-alpha.md "Forge Review Flow"
 require_text docs/releases/v0.1.0-alpha.md "Persistent behavior changes require human review."
 require_text evals/README.md "Installer Smoke Eval"
 require_text evals/README.md "Init Smoke Eval"
+require_text evals/README.md "Reliability Gains Eval"
+require_text evals/smoke-loop.sh "HyperAgent smoke loop passed."
+require_text evals/init-smoke.sh "HyperAgent init smoke passed."
+require_text evals/reliability-gains.sh "HyperAgent reliability gains eval passed."
+require_text evals/reliability-rubric.md "Missed Verification"
+require_text evals/fixtures/reliability/hyperagent-suit.md "Condition: with-hyperagent"
 require_text evals/README.md "Sense Smoke Eval"
 require_text evals/smoke-loop.sh "HyperAgent smoke loop passed."
 require_text evals/init-smoke.sh "HyperAgent init smoke passed."

@@ -30,61 +30,44 @@ Mission records capture evidence from real work. The Workshop turns that evidenc
   <sub>Editable diagram source: <a href="docs/architecture/hyperagent.mmd">docs/architecture/hyperagent.mmd</a></sub>
 </p>
 
-## Quick Start
+## Try HyperAgent In Codex Mac
 
-1. Clone this repo.
-2. Initialize HyperAgent in a project repo:
+Copy this prompt into the Codex Mac app:
 
-   ```bash
-   sh scripts/hyperagent.sh init --target /path/to/project
-   ```
+```text
+I want to try HyperAgent with Codex.
 
-   The repo also includes a wrapper:
+Use this GitHub repo as the source of truth:
+https://github.com/DannyMac180/HyperAgent
 
-   ```bash
-   bin/hyperagent init --target /path/to/project
-   ```
+Please set HyperAgent up on this machine.
 
-   Add `bin/` to your `PATH` if you want to run it as plain `hyperagent init`.
+Use `~/HyperAgent` as the default local install location. If that path already exists and is not a HyperAgent repo, stop and ask me before changing anything.
 
-   The init command creates the markdown-first project structure: `.hyperagent`, `missions/`, `workshop/proposals/`, `workshop/decisions/`, `forge/reviews/`, `templates/`, `hyperagent/`, `scripts/hyperagent.sh`, and a HyperAgent block in `AGENTS.md`. The root `.hyperagent` file is the machine-readable project anchor for version, install mode, initialized paths, enabled adapters, verification commands, and instruction files. Init copies files by default so project memory stays inspectable and portable. It refuses conflicting overwrites unless `--force` is passed, and supports `--dry-run` for previewing setup.
-3. Install the Codex skill:
+Do the following:
 
-   ```bash
-   sh scripts/install-codex-skill.sh "$HOME/.codex/skills"
-   ```
+1. Check whether `git` and `sh` are available, and create `~/.codex/skills` if needed.
+2. Clone HyperAgent into `~/HyperAgent` if it is not already there.
+3. If HyperAgent is already cloned there, update it with `git pull --ff-only`.
+4. Run `sh scripts/verify-mvp.sh` from the HyperAgent repo. If the repo is healthy and the checks are relevant, also run the local smoke tests.
+5. Install or update the `codex-hyperagent` skill in my local Codex skills directory. If an existing skill is present, inspect it before replacing it.
+6. If I am currently inside a project repo, ask me whether to initialize HyperAgent in that repo.
+7. If I confirm, run the HyperAgent project init flow for that repo.
+8. Verify that the skill exists after installation.
+9. Tell me exactly what changed, what passed, and whether I need to restart Codex Desktop or open a fresh thread before the skill appears.
 
-   For local development, use `--symlink` instead of copying:
+Do not modify my global Codex custom instructions. If you think a manual custom-instructions change is required, tell me exactly what to add and wait for me.
 
-   ```bash
-   sh scripts/install-codex-skill.sh --symlink "$HOME/.codex/skills"
-   ```
+If there is any step Codex cannot complete automatically, stop and tell me the exact manual step I need to take.
+```
 
-   The installer validates `skills/codex-hyperagent/SKILL.md`, refuses to overwrite an existing skill unless `--force` is passed, and supports `--dry-run` for previewing the install.
-4. Check local product status:
-
-   ```bash
-   sh scripts/hyperagent.sh status
-   ```
-
-5. Capture local task evidence when useful:
-
-   ```bash
-   sh scripts/hyperagent.sh record-check --status passed --command "sh scripts/verify-mvp.sh"
-   sh scripts/hyperagent.sh sense
-   sh scripts/hyperagent.sh doctor
-   ```
-
-   The sensing summary reports branch, git status, changed files, opt-in command/check evidence, failures and retries, optional PR/CI status when locally available through `gh`, optional trace links, and local Workbench trace metadata when the default ignored trace log is present. Workbench enriches the default senses but is not required; `doctor` reports whether local trace enrichment is healthy. The fallback does not inspect file contents, environment variables, shell history, or secrets.
-6. Start Codex in this repo and ask it to use the `codex-hyperagent` skill.
-7. Use `hyperagent/operating-prompt.md` as the canonical Suit prompt.
-8. After a task, inspect the new mission record in `missions/`. New records prefill repo path, branch, git status, changed files, command evidence, verification status, and closeout placeholders.
-9. Inspect any evidence-backed upgrade proposals in `workshop/proposals/`.
-10. Record explicit human approval or rejection in `workshop/decisions/` before a proposal becomes accepted Suit memory.
+Codex should do the setup work for you. It will clone or update this repo, run local verification, install the Codex skill, and ask before initializing HyperAgent inside another project.
 
 The MVP is file-based on purpose. There is no hosted service, no database, and no autonomous self-modification.
 
-For the full first-run path, see `docs/quickstart.md`.
+For the manual command path, see `docs/quickstart.md`.
+
+For clean-install acceptance testing, see `docs/clean-install-uat.md`.
 
 For early release readiness, see `docs/release-checklist.md`.
 
@@ -113,6 +96,7 @@ Restart Codex Desktop or open a fresh thread after updating the installed skill.
 
 - `docs/hyperagent-prd.md`: product requirements and milestone plan.
 - `docs/concepts.md`: the Suit, Mission, Workshop, and Forge mental model.
+- `docs/clean-install-uat.md`: repeatable clean-install acceptance test for the README prompt.
 - `docs/release-checklist.md`: alpha release criteria, clean-clone test, and update model.
 - `docs/releases/v0.1.0-alpha.md`: first alpha release notes.
 - `docs/article-outline.md`: public essay outline for the Iron Man Suit thesis.

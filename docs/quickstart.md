@@ -1,6 +1,10 @@
-# HyperAgent Quickstart
+# HyperAgent Manual Quickstart
 
-This guide proves the Mark I loop locally: install the Codex skill, run a mission, write telemetry, propose an upgrade, and record an explicit human decision.
+This guide is the manual command path for developers and contributors.
+
+If you only want to try HyperAgent in the Codex Mac app, start with the copy-paste prompt in the root `README.md`. That prompt asks Codex to run the setup for you and to report any manual step it cannot complete.
+
+Use this guide when you want to inspect or run the setup commands yourself. It proves the Mark I loop locally: install the Codex skill, run a mission, write telemetry, propose an upgrade, and record an explicit human decision.
 
 ## 1. Initialize A Project
 

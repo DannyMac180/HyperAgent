@@ -20,9 +20,21 @@ cd "$tmpdir/HyperAgent"
 
 sh scripts/verify-mvp.sh >/dev/null
 
-mission=$(sh scripts/hyperagent.sh new-mission --request "Smoke test the HyperAgent loop" --slug smoke-loop)
+mission=$(sh scripts/hyperagent.sh new-mission \
+  --request "Smoke test the HyperAgent loop" \
+  --slug smoke-loop \
+  --commands-run "sh scripts/verify-mvp.sh" \
+  --verification-status "Smoke verification pending")
 test -f "$mission" || fail "mission was not created"
 grep -F "Smoke test the HyperAgent loop" "$mission" >/dev/null || fail "mission missing request"
+grep -F "Repo path:" "$mission" >/dev/null || fail "mission missing repo path"
+grep -F "Branch:" "$mission" >/dev/null || fail "mission missing branch"
+grep -F "Git status:" "$mission" >/dev/null || fail "mission missing git status"
+grep -F "Changed files:" "$mission" >/dev/null || fail "mission missing changed files"
+grep -F "Commands run: sh scripts/verify-mvp.sh" "$mission" >/dev/null || fail "mission missing commands run"
+grep -F "Verification status: Smoke verification pending" "$mission" >/dev/null || fail "mission missing verification status"
+grep -F "Final outcome: Pending final outcome." "$mission" >/dev/null || fail "mission missing final outcome placeholder"
+grep -F "Unresolved risks: Pending unresolved risk review." "$mission" >/dev/null || fail "mission missing unresolved risk placeholder"
 
 proposal=$(sh scripts/hyperagent.sh propose-upgrade \
   --mission "$mission" \

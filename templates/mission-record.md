@@ -6,6 +6,25 @@
 - Environment:
 - User request:
 
+## Repository Evidence
+
+- Repo path:
+- Branch:
+- Git status:
+
+~~~text
+~~~
+
+- Changed files:
+
+~~~text
+~~~
+
+## Execution Evidence
+
+- Commands run:
+- Verification status:
+
 ## Outcome
 
 - Final outcome:

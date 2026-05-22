@@ -39,6 +39,18 @@ When skipping the full loop, mention briefly that HyperAgent triage classified t
 
 Because this repo is the HyperAgent testbed, prefer recording mission telemetry for borderline cases. The goal is to learn which tasks deserve the loop and where the loop feels too heavy.
 
+## README Architecture Diagram
+
+The GitHub README is the initial user-facing landing page. Keep its high-level architecture diagram current when user-visible HyperAgent modules are added, removed, renamed, or materially changed.
+
+When a task changes user-visible modules, review and update these files as needed:
+
+- `docs/architecture/hyperagent.mmd`: editable diagram source.
+- `docs/assets/hyperagent-architecture.svg`: rendered README asset.
+- `README.md`: surrounding architecture copy if the public story changes.
+
+For PRs that change user-visible modules, confirm that the architecture diagram was reviewed or updated.
+
 Run the strongest relevant local verification before final response:
 
 ```bash
@@ -47,4 +59,3 @@ sh evals/smoke-loop.sh
 ```
 
 Use narrower checks when the change is documentation-only or when the full smoke loop is not relevant.
-

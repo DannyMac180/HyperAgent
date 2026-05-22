@@ -1,0 +1,91 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="680" viewBox="0 0 1200 680" role="img" aria-labelledby="title desc">
+  <title id="title">HyperAgent high-level architecture</title>
+  <desc id="desc">A 30,000 foot diagram showing user intent flowing through Codex into HyperAgent, which coordinates project registry, global suit, workspace context, mission records, Workshop, Forge, and Human Review.</desc>
+  <defs>
+    <filter id="shadow" x="-12%" y="-18%" width="124%" height="136%">
+      <feDropShadow dx="0" dy="10" stdDeviation="12" flood-color="#0f172a" flood-opacity="0.13"/>
+    </filter>
+    <marker id="arrow" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto" markerUnits="strokeWidth">
+      <path d="M2,2 L10,6 L2,10 Z" fill="#64748b"/>
+    </marker>
+    <style>
+      .bg { fill: #f8fafc; }
+      .panel { fill: #ffffff; stroke: #e2e8f0; stroke-width: 1; filter: url(#shadow); }
+      .title { font: 700 28px ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; fill: #111827; }
+      .subtitle { font: 500 15px ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; fill: #64748b; }
+      .label { font: 700 17px ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; fill: #111827; }
+      .small { font: 500 13px ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; fill: #475569; }
+      .tiny { font: 600 11px ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; fill: #64748b; letter-spacing: .06em; }
+      .core-label { font: 800 22px ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; fill: #ffffff; }
+      .core-small { font: 500 14px ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; fill: #cbd5e1; }
+      .line { fill: none; stroke: #64748b; stroke-width: 2.4; marker-end: url(#arrow); }
+      .soft-line { fill: none; stroke: #94a3b8; stroke-width: 2; marker-end: url(#arrow); }
+    </style>
+  </defs>
+
+  <rect class="bg" width="1200" height="680" rx="0"/>
+  <rect class="panel" x="48" y="42" width="1104" height="596" rx="18"/>
+
+  <text class="title" x="92" y="94">HyperAgent architecture</text>
+  <text class="subtitle" x="92" y="124">A local operating layer that turns agent work into inspectable evidence and reviewed capability upgrades.</text>
+
+  <rect x="92" y="212" width="150" height="82" rx="14" fill="#f8fafc" stroke="#cbd5e1"/>
+  <text class="label" x="122" y="248">User intent</text>
+  <text class="small" x="119" y="271">goals and tasks</text>
+
+  <rect x="300" y="212" width="170" height="82" rx="14" fill="#eff6ff" stroke="#60a5fa"/>
+  <text class="label" x="334" y="248">Codex app</text>
+  <text class="small" x="326" y="271">host environment</text>
+
+  <rect x="540" y="192" width="220" height="122" rx="18" fill="#111827" stroke="#111827"/>
+  <text class="core-label" x="581" y="246">HyperAgent</text>
+  <text class="core-small" x="587" y="272">local operating layer</text>
+
+  <path class="line" d="M242 253 H290"/>
+  <path class="line" d="M470 253 H528"/>
+
+  <rect x="504" y="382" width="160" height="92" rx="14" fill="#e0f2fe" stroke="#0284c7"/>
+  <text class="label" x="529" y="419">Project</text>
+  <text class="label" x="526" y="441">registry</text>
+  <text class="small" x="531" y="463">paths and roles</text>
+
+  <rect x="716" y="382" width="160" height="92" rx="14" fill="#e0f2fe" stroke="#0284c7"/>
+  <text class="label" x="751" y="419">Global</text>
+  <text class="label" x="763" y="441">Suit</text>
+  <text class="small" x="747" y="463">rules and skills</text>
+
+  <rect x="610" y="512" width="160" height="82" rx="14" fill="#e0f2fe" stroke="#0284c7"/>
+  <text class="label" x="641" y="548">Workspace</text>
+  <text class="small" x="634" y="571">local context</text>
+
+  <path class="soft-line" d="M619 314 L588 370"/>
+  <path class="soft-line" d="M697 314 L779 371"/>
+  <path class="soft-line" d="M584 474 L662 506"/>
+  <path class="soft-line" d="M796 474 L720 506"/>
+
+  <rect x="858" y="176" width="188" height="90" rx="14" fill="#dcfce7" stroke="#16a34a"/>
+  <text class="label" x="895" y="213">Mission</text>
+  <text class="label" x="897" y="235">records</text>
+  <text class="small" x="890" y="257">evidence from work</text>
+
+  <rect x="858" y="312" width="188" height="90" rx="14" fill="#fef3c7" stroke="#d97706"/>
+  <text class="label" x="910" y="349">Workshop</text>
+  <text class="small" x="894" y="373">proposes upgrades</text>
+
+  <rect x="858" y="448" width="188" height="90" rx="14" fill="#fef3c7" stroke="#d97706"/>
+  <text class="label" x="929" y="486">Forge</text>
+  <text class="small" x="902" y="510">improves Workshop</text>
+
+  <rect x="152" y="448" width="188" height="90" rx="14" fill="#ffe4e6" stroke="#e11d48"/>
+  <text class="label" x="197" y="486">Human review</text>
+  <text class="small" x="190" y="510">approves persistence</text>
+
+  <path class="line" d="M760 246 C806 226 814 221 846 221"/>
+  <path class="line" d="M952 266 V300"/>
+  <path class="line" d="M952 402 V436"/>
+  <path class="line" d="M858 357 C694 356 535 460 353 487"/>
+  <path class="line" d="M246 448 C321 381 448 392 496 417"/>
+
+  <text class="tiny" x="92" y="592">README VIEW</text>
+  <text class="small" x="176" y="592">Update this diagram when user-visible HyperAgent modules are added, removed, or materially changed.</text>
+</svg>

@@ -82,5 +82,5 @@ PRs should explain:
 - files changed,
 - verification run,
 - any safety or authority-boundary implications,
+- whether user-visible module changes required an architecture diagram update,
 - rollback path when behavior changes persist.
-

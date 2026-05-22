@@ -1,6 +1,10 @@
-# HyperAgent Quickstart
+# HyperAgent Manual Quickstart
 
-This guide proves the Mark I loop locally: install the Codex skill, run a mission, write telemetry, propose an upgrade, and record an explicit human decision.
+This guide is the manual command path for developers and contributors.
+
+If you only want to try HyperAgent in the Codex Mac app, start with the copy-paste prompt in the root `README.md`. That prompt asks Codex to run the setup for you and to report any manual step it cannot complete.
+
+Use this guide when you want to inspect or run the setup commands yourself. It proves the Mark I loop locally: install the Codex skill, run a mission, write telemetry, propose an upgrade, and record an explicit human decision.
 
 ## 1. Initialize A Project
 
@@ -65,7 +69,28 @@ sh scripts/hyperagent.sh status
 
 You should see counts for missions, Workshop proposals, Workshop decisions, Forge reviews, and the capability registry path.
 
-## 4. Run A Mission In Codex
+## 4. Capture Local Senses
+
+Record commands and checks explicitly when they matter for a mission:
+
+```bash
+sh scripts/hyperagent.sh record-check --status passed --command "sh scripts/verify-mvp.sh"
+sh scripts/hyperagent.sh record-check --status failed --command "sh evals/smoke-loop.sh" --note "example failure note"
+```
+
+Then generate a compact mission-ready summary:
+
+```bash
+sh scripts/hyperagent.sh sense
+sh scripts/hyperagent.sh sense --format json --pr off
+sh scripts/hyperagent.sh doctor
+```
+
+The sensing layer summarizes the current branch, upstream, HEAD, git status counts, changed files, recent opt-in commands/checks, failures and retries, optional PR/CI status when `gh` can find a pull request, and an optional trace link passed with `--trace-url`. By default, it also checks `.hyperagent-evidence/workbench/traces.jsonl` or `HYPERAGENT_WORKBENCH_TRACE_LOG` for local Workbench/Raindrop trace entries. It is local-first and does not require hosted services. It does not inspect file contents, environment variables, shell history, credentials, or secrets, and it redacts secret-like command and trace fragments before output.
+
+Workbench trace enrichment is a background sensing subsystem. If Workbench is unavailable, unhealthy, or not initialized yet, `sense` reports that state and continues with the lightweight fallback. Use `doctor` for local diagnostics and retention/redaction reminders before adding trace evidence to a mission record.
+
+## 5. Run A Mission In Codex
 
 Ask Codex:
 
@@ -73,15 +98,19 @@ Ask Codex:
 Use the codex-hyperagent skill. Run a small HyperAgent mission in this repo, verify the result, write a mission record, and propose an upgrade only if there is concrete friction.
 ```
 
-The mission record belongs in `missions/`.
+The mission record belongs in `missions/`. The helper prefills repo evidence such as branch, git status, changed files, command evidence, verification status, and closeout placeholders.
 
 You can also create a mission record shell:
 
 ```bash
-sh scripts/hyperagent.sh new-mission --request "Run a small HyperAgent mission" --slug small-hyperagent-mission
+sh scripts/hyperagent.sh new-mission \
+  --request "Run a small HyperAgent mission" \
+  --slug small-hyperagent-mission \
+  --commands-run "sh scripts/verify-mvp.sh" \
+  --verification-status "pending"
 ```
 
-## 5. Run Workshop Review
+## 6. Run Workshop Review
 
 Ask Codex:
 
@@ -100,7 +129,7 @@ sh scripts/hyperagent.sh propose-upgrade \
   --problem "The install step needs a concrete smoke test"
 ```
 
-## 6. Record Human Approval Or Rejection
+## 7. Record Human Approval Or Rejection
 
 Persistent behavior changes are not activated silently.
 
@@ -115,7 +144,7 @@ sh scripts/hyperagent.sh decide-upgrade \
 
 Accepted decisions are recorded in `workshop/decisions/` and appended to `hyperagent/capability-registry.md`.
 
-## 7. Run Forge Review
+## 8. Run Forge Review
 
 Ask Codex:
 
@@ -142,15 +171,16 @@ sh scripts/hyperagent.sh propose-upgrade \
   --problem "Recent proposals are too vague to evaluate safely"
 ```
 
-## 8. Verify
+## 9. Verify
 
 ```bash
 sh scripts/verify-mvp.sh
 sh evals/init-smoke.sh
+sh evals/sense-smoke.sh
 sh evals/smoke-loop.sh
 ```
 
-## 9. Update Later
+## 10. Update Later
 
 For copy installs:
 

@@ -20,12 +20,37 @@ sh evals/smoke-loop.sh
 
 The smoke loop copies the repo to a temporary directory, then verifies that the local helper can:
 
-- create a mission record in `missions/`,
+- create a mission record in `missions/` with repo evidence, command evidence, verification status, and closeout placeholders,
 - create a proposal linked to that mission in `workshop/proposals/`,
 - create a Forge review in `forge/reviews/`,
 - create a process-improvement proposal linked to that Forge review,
 - record a human-review decision in `workshop/decisions/`,
 - append an accepted capability to `hyperagent/capability-registry.md`.
+
+## Reliability Gains Eval
+
+Run:
+
+```bash
+sh evals/reliability-gains.sh
+```
+
+The reliability gains eval scores comparable local run records for the same task,
+including a baseline `without-hyperagent` case and a `with-hyperagent` case. It
+is deterministic, dependency-free, and writes inspectable output to
+`evals/out/reliability-gains/`.
+
+The first rubric scores six dimensions:
+
+- task completion,
+- quality of final reports,
+- missed verification,
+- failure recovery,
+- proposal specificity,
+- time to useful PR or useful artifact.
+
+See `evals/reliability-rubric.md` for the scoring rubric and
+`evals/fixtures/reliability/` for the built-in example cases.
 
 ## Init Smoke Eval
 
@@ -44,6 +69,25 @@ The init smoke test creates a temporary repo, runs `sh scripts/hyperagent.sh ini
 - documents copy vs symlink behavior in `hyperagent/README.md`,
 - refuses conflicting overwrites unless `--force` is passed,
 - leaves the target untouched during `--dry-run`.
+
+## Sense Smoke Eval
+
+Run:
+
+```bash
+sh evals/sense-smoke.sh
+```
+
+The sense smoke test copies the repo to a temporary directory, then verifies that the local helper can:
+
+- record passed and failed command/check evidence in the ignored local evidence log,
+- summarize branch, status counts, and changed files,
+- report recent commands plus failures and retries,
+- produce both Markdown and JSON summaries for mission records,
+- include an optional local trace reference,
+- enrich the summary from a local Workbench trace fixture by default,
+- report Workbench trace health through `doctor`,
+- redact secret-like command, note, and trace fragments before storage and output.
 
 ## Installer Smoke Eval
 

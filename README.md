@@ -22,114 +22,52 @@ HyperAgent is designed to sit at the Codex Mac app level as a user-level operati
 
 Mission records capture evidence from real work. The Workshop turns that evidence into proposed Suit upgrades. The Forge improves the Workshop itself by checking whether proposals are specific, evidence-backed, safe, testable, worth installing, and actually improving behavior after acceptance. Forge reviews use anchored 0-5 scores, evidence references, deterministic gates, and small payoff counters so the process can be inspected over time. Human review approves persistent behavior changes before they become part of the Suit.
 
-```mermaid
-flowchart TD
-  User["User"]
+<p align="center">
+  <img src="docs/assets/hyperagent-architecture.svg" alt="HyperAgent high-level architecture diagram">
+</p>
 
-  Codex["Codex Mac App<br/>Host environment for Codex work"]
+<p align="center">
+  <sub>Editable diagram source: <a href="docs/architecture/hyperagent.mmd">docs/architecture/hyperagent.mmd</a></sub>
+</p>
 
-  HyperAgent["HyperAgent<br/>User-level meta layer"]
+## Try HyperAgent In Codex Mac
 
-  Registry["Project Registry<br/>Known workspaces, paths, roles, commands"]
+Copy this prompt into the Codex Mac app:
 
-  GlobalSuit["Global Suit<br/>Shared operating rules, safety defaults, reusable skills"]
+```text
+I want to try HyperAgent with Codex.
 
-  WorkspaceA["Workspace A"]
-  WorkspaceB["Workspace B"]
-  WorkspaceC["Workspace C"]
+Use this GitHub repo as the source of truth:
+https://github.com/DannyMac180/HyperAgent
 
-  LocalA["Workspace-local Suit Context<br/>repo rules, commands, workflows, memory"]
-  LocalB["Workspace-local Suit Context"]
-  LocalC["Workspace-local Suit Context"]
+Please set HyperAgent up on this machine.
 
-  MissionA["Mission Records"]
-  MissionB["Mission Records"]
-  MissionC["Mission Records"]
+Use `~/HyperAgent` as the default local install location. If that path already exists and is not a HyperAgent repo, stop and ask me before changing anything.
 
-  Workshop["Workshop<br/>Turns mission evidence into Suit upgrade proposals"]
+Do the following:
 
-  Forge["Forge<br/>Improves how the Workshop proposes, tests, and installs upgrades"]
+1. Check whether `git` and `sh` are available, and create `~/.codex/skills` if needed.
+2. Clone HyperAgent into `~/HyperAgent` if it is not already there.
+3. If HyperAgent is already cloned there, update it with `git pull --ff-only`.
+4. Run `sh scripts/verify-mvp.sh` from the HyperAgent repo. If the repo is healthy and the checks are relevant, also run the local smoke tests.
+5. Install or update the `codex-hyperagent` skill in my local Codex skills directory. If an existing skill is present, inspect it before replacing it.
+6. If I am currently inside a project repo, ask me whether to initialize HyperAgent in that repo.
+7. If I confirm, run the HyperAgent project init flow for that repo.
+8. Verify that the skill exists after installation.
+9. Tell me exactly what changed, what passed, and whether I need to restart Codex Desktop or open a fresh thread before the skill appears.
 
-  Review["Human Review<br/>Approves persistent behavior changes"]
+Do not modify my global Codex custom instructions. If you think a manual custom-instructions change is required, tell me exactly what to add and wait for me.
 
-  User --> Codex
-  Codex --> HyperAgent
-
-  HyperAgent --> Registry
-  HyperAgent --> GlobalSuit
-  HyperAgent --> Workshop
-  HyperAgent --> Forge
-
-  Registry --> WorkspaceA
-  Registry --> WorkspaceB
-  Registry --> WorkspaceC
-
-  GlobalSuit --> LocalA
-  GlobalSuit --> LocalB
-  GlobalSuit --> LocalC
-
-  WorkspaceA --> LocalA --> MissionA
-  WorkspaceB --> LocalB --> MissionB
-  WorkspaceC --> LocalC --> MissionC
-
-  MissionA --> Workshop
-  MissionB --> Workshop
-  MissionC --> Workshop
-
-  Workshop --> Review
-  Review --> GlobalSuit
-
-  Workshop --> Forge
-  Forge --> Workshop
+If there is any step Codex cannot complete automatically, stop and tell me the exact manual step I need to take.
 ```
 
-## Quick Start
-
-1. Clone this repo.
-2. Initialize HyperAgent in a project repo:
-
-   ```bash
-   sh scripts/hyperagent.sh init --target /path/to/project
-   ```
-
-   The repo also includes a wrapper:
-
-   ```bash
-   bin/hyperagent init --target /path/to/project
-   ```
-
-   Add `bin/` to your `PATH` if you want to run it as plain `hyperagent init`.
-
-   The init command creates the markdown-first project structure: `.hyperagent`, `missions/`, `workshop/proposals/`, `workshop/decisions/`, `forge/reviews/`, `templates/`, `hyperagent/`, `scripts/hyperagent.sh`, and a HyperAgent block in `AGENTS.md`. The root `.hyperagent` file is the machine-readable project anchor for version, install mode, initialized paths, enabled adapters, verification commands, and instruction files. Init copies files by default so project memory stays inspectable and portable. It refuses conflicting overwrites unless `--force` is passed, and supports `--dry-run` for previewing setup.
-3. Install the Codex skill:
-
-   ```bash
-   sh scripts/install-codex-skill.sh "$HOME/.codex/skills"
-   ```
-
-   For local development, use `--symlink` instead of copying:
-
-   ```bash
-   sh scripts/install-codex-skill.sh --symlink "$HOME/.codex/skills"
-   ```
-
-   The installer validates `skills/codex-hyperagent/SKILL.md`, refuses to overwrite an existing skill unless `--force` is passed, and supports `--dry-run` for previewing the install.
-4. Check local product status:
-
-   ```bash
-   sh scripts/hyperagent.sh status
-   ```
-
-5. Start Codex in this repo and ask it to use the `codex-hyperagent` skill.
-6. Use `hyperagent/operating-prompt.md` as the canonical Suit prompt.
-7. After a task, inspect the new mission record in `missions/`.
-8. Inspect any evidence-backed upgrade proposals in `workshop/proposals/`.
-9. Record explicit human approval or rejection in `workshop/decisions/` before a proposal becomes accepted Suit memory.
-10. Run a Forge review after proposal decisions, eval changes, release-readiness checks, or repeated vague Workshop output.
+Codex should do the setup work for you. It will clone or update this repo, run local verification, install the Codex skill, and ask before initializing HyperAgent inside another project.
 
 The MVP is file-based on purpose. There is no hosted service, no database, and no autonomous self-modification.
 
-For the full first-run path, see `docs/quickstart.md`.
+For the manual command path, see `docs/quickstart.md`.
+
+For clean-install acceptance testing, see `docs/clean-install-uat.md`.
 
 For early release readiness, see `docs/release-checklist.md`.
 
@@ -158,6 +96,7 @@ Restart Codex Desktop or open a fresh thread after updating the installed skill.
 
 - `docs/hyperagent-prd.md`: product requirements and milestone plan.
 - `docs/concepts.md`: the Suit, Mission, Workshop, and Forge mental model.
+- `docs/clean-install-uat.md`: repeatable clean-install acceptance test for the README prompt.
 - `docs/release-checklist.md`: alpha release criteria, clean-clone test, and update model.
 - `docs/releases/v0.1.0-alpha.md`: first alpha release notes.
 - `docs/article-outline.md`: public essay outline for the Iron Man Suit thesis.
@@ -166,7 +105,8 @@ Restart Codex Desktop or open a fresh thread after updating the installed skill.
 - `.hyperagent`: machine-readable project config for initialized paths, adapters, and verification commands.
 - `scripts/install-codex-skill.sh`: dependency-free Codex skill installer.
 - `scripts/update-codex-skill.sh`: update helper for copy installs.
-- `scripts/hyperagent.sh`: local helper for project init, mission shells, proposals, Forge reviews, approval decisions, and status.
+- `scripts/hyperagent.sh`: local helper for project init, local sensing, command/check evidence, mission shells, proposals, Forge reviews, approval decisions, and status.
+- `.hyperagent-evidence/`: ignored local runtime evidence, including the opt-in command/check log used by `sense`.
 - `hyperagent/operating-prompt.md`: the operating layer Codex wears during work.
 - `hyperagent/capability-registry.md`: accepted capability registry with reviewed local capabilities.
 - `templates/mission-record.md`: mission telemetry template.
@@ -209,6 +149,14 @@ sh evals/init-smoke.sh
 ```
 
 The init smoke test creates a temporary repo, runs `hyperagent init`, checks the generated markdown-first structure and `.hyperagent` config, verifies overwrite refusal, verifies `--force`, and confirms `--dry-run` leaves the target untouched.
+
+Run the sensing smoke test:
+
+```bash
+sh evals/sense-smoke.sh
+```
+
+The sensing smoke test records passed and failed checks, verifies changed-file detection, checks Markdown and JSON summaries, and confirms secret-like command fragments are redacted.
 
 ## Current Limits
 

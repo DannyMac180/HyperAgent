@@ -74,10 +74,13 @@ require_text "$target/AGENTS.md" "sh scripts/hyperagent.sh status"
 require_text "$target/.hyperagent" 'hyperagent_version = "v0.1.0-alpha"'
 require_text "$target/.hyperagent" 'install_mode = "copy"'
 require_text "$target/.hyperagent" 'project_instructions = "AGENTS.md"'
+require_text "$target/.hyperagent" 'evidence_log = ".hyperagent-evidence/commands.log"'
 require_text "$target/.hyperagent" 'codex = true'
 require_text "$target/.hyperagent" '"sh scripts/hyperagent.sh status"'
 require_text "$target/hyperagent/README.md" "Copy And Symlink Behavior"
 require_text "$target/hyperagent/README.md" "machine-readable project anchor"
+require_text "$target/hyperagent/README.md" "sh scripts/hyperagent.sh sense"
+require_text "$target/hyperagent/README.md" "opt-in local command log"
 require_text "$target/hyperagent/README.md" "does not symlink project setup files by default"
 require_text "$target/hyperagent/README.md" "--forge-review"
 require_text "$target/hyperagent/capability-registry.md" "human review required"

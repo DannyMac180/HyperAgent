@@ -12,7 +12,16 @@ Commands:
   status
       Print HyperAgent local product status.
 
-  new-mission --request TEXT [--slug SLUG]
+  sense [--format markdown|json] [--command-log PATH] [--trace-url URL] [--workbench-trace-log PATH] [--pr auto|off]
+      Print a compact local sensing summary for mission records.
+
+  doctor [--workbench-trace-log PATH]
+      Print local diagnostics for HyperAgent sensing and Workbench trace enrichment.
+
+  record-check --command TEXT --status passed|failed|retried|skipped [--note TEXT]
+      Append an opt-in check or command result to the local evidence log.
+
+  new-mission --request TEXT [--slug SLUG] [--commands-run TEXT] [--verification-status TEXT]
       Create a mission record in missions/.
 
   propose-upgrade (--mission PATH | --forge-review PATH) --title TEXT --problem TEXT [--slug SLUG]
@@ -48,6 +57,9 @@ proposal_dir="$repo_root/workshop/proposals"
 decision_dir="$repo_root/workshop/decisions"
 forge_dir="$repo_root/forge/reviews"
 registry_file="$repo_root/hyperagent/capability-registry.md"
+default_evidence_dir="$repo_root/.hyperagent-evidence"
+default_command_log="$default_evidence_dir/commands.log"
+default_workbench_trace_log="$default_evidence_dir/workbench/traces.jsonl"
 
 now_stamp() {
   date '+%Y-%m-%d-%H%M'
@@ -61,6 +73,54 @@ slugify() {
   printf '%s' "$1" \
     | tr '[:upper:]' '[:lower:]' \
     | sed 's/[^a-z0-9][^a-z0-9]*/-/g; s/^-//; s/-$//'
+}
+
+redact_stream() {
+  awk '
+    {
+      redact_next = 0
+      for (i = 1; i <= NF; i++) {
+        lower = tolower($i)
+        if (redact_next == 1) {
+          $i = "[REDACTED]"
+          redact_next = 0
+          continue
+        }
+        if (lower ~ /(token|secret|password|passwd|api_key|access_key|private_key|bearer)/) {
+          if ($i ~ /=/) {
+            sub(/=.*/, "=[REDACTED]", $i)
+          } else {
+            $i = "[REDACTED]"
+          }
+          if (lower ~ /bearer/) {
+            redact_next = 1
+          }
+        }
+      }
+      print
+    }
+  '
+}
+
+redact_text() {
+  printf '%s\n' "$1" | redact_stream
+}
+
+json_escape() {
+  awk '
+    BEGIN { ORS = "" }
+    {
+      gsub(/\\/, "\\\\")
+      gsub(/"/, "\\\"")
+      gsub(/\t/, "\\t")
+      gsub(/\r/, "\\r")
+      if (line_seen) {
+        printf "\\n"
+      }
+      printf "%s", $0
+      line_seen = 1
+    }
+  '
 }
 
 ensure_dirs() {
@@ -242,6 +302,8 @@ operating_prompt = "hyperagent/operating-prompt.md"
 capability_registry = "hyperagent/capability-registry.md"
 project_readme = "hyperagent/README.md"
 local_helper = "scripts/hyperagent.sh"
+evidence_log = ".hyperagent-evidence/commands.log"
+workbench_trace_log = ".hyperagent-evidence/workbench/traces.jsonl"
 
 [adapters]
 codex = true
@@ -277,6 +339,9 @@ Use these files to keep agent work inspectable:
 
 ```bash
 sh scripts/hyperagent.sh status
+sh scripts/hyperagent.sh sense
+sh scripts/hyperagent.sh record-check --status passed --command "sh scripts/verify-mvp.sh"
+sh scripts/hyperagent.sh doctor
 sh scripts/hyperagent.sh new-mission --request "Describe the task" --slug task-slug
 sh scripts/hyperagent.sh workshop-prompt
 sh scripts/hyperagent.sh forge-prompt
@@ -292,6 +357,15 @@ For this project, the lightweight check is:
 ```bash
 sh scripts/hyperagent.sh status
 ```
+
+To capture local task evidence for mission records:
+
+```bash
+sh scripts/hyperagent.sh record-check --status passed --command "sh scripts/verify-mvp.sh"
+sh scripts/hyperagent.sh sense
+```
+
+The sensing summary reads Git metadata, the opt-in local command log, and local Workbench trace metadata when the default ignored trace log exists. It does not inspect repository file contents or environment values, and command text is redacted for secret-like tokens before storage and output.
 
 Add any project-specific build, test, lint, or smoke commands to `AGENTS.md` so future agents know the strongest relevant verification path.
 
@@ -502,6 +576,46 @@ count_markdown_files() {
   find "$dir" -maxdepth 1 -type f -name '*.md' 2>/dev/null | wc -l | tr -d ' '
 }
 
+is_git_repo() {
+  command -v git >/dev/null 2>&1 && git -C "$repo_root" rev-parse --is-inside-work-tree >/dev/null 2>&1
+}
+
+git_branch() {
+  if is_git_repo; then
+    git -C "$repo_root" symbolic-ref --short HEAD 2>/dev/null \
+      || git -C "$repo_root" rev-parse --short HEAD 2>/dev/null \
+      || printf 'unknown'
+  else
+    printf 'not a git repository'
+  fi
+}
+
+git_status_short() {
+  if is_git_repo; then
+    status=$(git -C "$repo_root" status --short 2>/dev/null || true)
+    if [ -n "$status" ]; then
+      printf '%s\n' "$status"
+    else
+      printf 'clean\n'
+    fi
+  else
+    printf 'not a git repository\n'
+  fi
+}
+
+git_changed_files() {
+  if is_git_repo; then
+    status=$(git -C "$repo_root" status --short 2>/dev/null || true)
+    if [ -n "$status" ]; then
+      printf '%s\n' "$status" | sed 's/^...//'
+    else
+      printf 'none\n'
+    fi
+  else
+    printf 'not a git repository\n'
+  fi
+}
+
 print_status() {
   ensure_dirs
   printf 'HyperAgent status\n'
@@ -515,9 +629,397 @@ print_status() {
   printf 'Capability registry: %s\n' "$registry_file"
 }
 
+record_check() {
+  command_text=
+  status=
+  note=
+  log_file="$default_command_log"
+
+  while [ "$#" -gt 0 ]; do
+    case "$1" in
+      --command)
+        shift
+        test "$#" -gt 0 || fail "--command requires text"
+        command_text=$1
+        ;;
+      --status)
+        shift
+        test "$#" -gt 0 || fail "--status requires passed, failed, retried, or skipped"
+        status=$1
+        ;;
+      --note)
+        shift
+        test "$#" -gt 0 || fail "--note requires text"
+        note=$1
+        ;;
+      --command-log)
+        shift
+        test "$#" -gt 0 || fail "--command-log requires a path"
+        log_file=$1
+        ;;
+      *)
+        fail "unknown record-check option: $1"
+        ;;
+    esac
+    shift
+  done
+
+  test -n "$command_text" || fail "record-check requires --command"
+  case "$status" in
+    passed|failed|retried|skipped) ;;
+    *) fail "--status must be passed, failed, retried, or skipped" ;;
+  esac
+
+  mkdir -p "$(dirname "$log_file")"
+  safe_command=$(redact_text "$command_text")
+  safe_note=$(redact_text "$note")
+  printf '%s\t%s\t%s\t%s\n' "$(now_readable)" "$status" "$safe_command" "$safe_note" >>"$log_file"
+  printf '%s\n' "$log_file"
+}
+
+git_value() {
+  if git -C "$repo_root" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+    git -C "$repo_root" "$@" 2>/dev/null || true
+  fi
+}
+
+git_changed_files() {
+  if git -C "$repo_root" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+    git -C "$repo_root" status --porcelain=v1 2>/dev/null | awk '{ print substr($0, 4) }'
+  fi
+}
+
+git_status_counts() {
+  if git -C "$repo_root" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+    git -C "$repo_root" status --porcelain=v1 2>/dev/null | awk '
+      BEGIN { modified = 0; added = 0; deleted = 0; renamed = 0; untracked = 0 }
+      {
+        code = substr($0, 1, 2)
+        if (code == "??") {
+          untracked++
+        }
+        if (code ~ /M/) {
+          modified++
+        }
+        if (code ~ /A/) {
+          added++
+        }
+        if (code ~ /D/) {
+          deleted++
+        }
+        if (code ~ /R/) {
+          renamed++
+        }
+      }
+      END {
+        printf "modified=%d added=%d deleted=%d renamed=%d untracked=%d", modified, added, deleted, renamed, untracked
+      }
+    '
+  else
+    printf 'not a git repository'
+  fi
+}
+
+read_recent_commands() {
+  log_file="$1"
+  if [ -f "$log_file" ]; then
+    tail -n 12 "$log_file" | redact_stream
+  fi
+}
+
+read_failure_commands() {
+  log_file="$1"
+  if [ -f "$log_file" ]; then
+    tail -n 50 "$log_file" | awk -F '\t' '$2 == "failed" || $2 == "retried" { print }' | tail -n 8 | redact_stream
+  fi
+}
+
+workbench_trace_log_path() {
+  override="$1"
+  if [ -n "$override" ]; then
+    printf '%s\n' "$override"
+    return 0
+  fi
+  if [ -n "${HYPERAGENT_WORKBENCH_TRACE_LOG:-}" ]; then
+    printf '%s\n' "$HYPERAGENT_WORKBENCH_TRACE_LOG"
+    return 0
+  fi
+  printf '%s\n' "$default_workbench_trace_log"
+}
+
+workbench_trace_status() {
+  trace_log="$1"
+  if [ ! -e "$trace_log" ]; then
+    printf 'unavailable: trace log not found'
+    return 0
+  fi
+  if [ ! -r "$trace_log" ]; then
+    printf 'unhealthy: trace log is not readable'
+    return 0
+  fi
+  trace_count=$(wc -l <"$trace_log" 2>/dev/null | tr -d ' ' || true)
+  test -n "$trace_count" || trace_count=0
+  if [ "$trace_count" -eq 0 ] 2>/dev/null; then
+    printf 'healthy: trace log readable, no trace entries yet'
+    return 0
+  fi
+  printf 'healthy: %s local trace entries available' "$trace_count"
+}
+
+read_workbench_traces() {
+  trace_log="$1"
+  if [ -r "$trace_log" ]; then
+    tail -n 8 "$trace_log" | redact_stream | awk '
+      length($0) > 240 { print substr($0, 1, 237) "..."; next }
+      { print }
+    '
+  fi
+}
+
+pr_summary() {
+  pr_mode="$1"
+  test "$pr_mode" = auto || return 0
+  command -v gh >/dev/null 2>&1 || return 0
+
+  pr_line=$(cd "$repo_root" && gh pr view --json number,url,state,headRefName,baseRefName --jq '"#\(.number) \(.state) \(.headRefName)->\(.baseRefName) \(.url)"' 2>/dev/null || true)
+  test -n "$pr_line" || return 0
+  printf '%s\n' "$pr_line"
+
+  checks_line=$(cd "$repo_root" && gh pr checks --json name,state,conclusion --jq 'group_by(.state) | map("\(.[0].state)=\(length)") | join(", ")' 2>/dev/null || true)
+  if [ -n "$checks_line" ]; then
+    printf 'checks: %s\n' "$checks_line"
+  fi
+}
+
+print_sense_markdown() {
+  command_log="$1"
+  trace_url="$2"
+  pr_mode="$3"
+  workbench_trace_log="$4"
+  branch=$(git_value rev-parse --abbrev-ref HEAD)
+  upstream=$(git_value rev-parse --abbrev-ref --symbolic-full-name '@{u}')
+  head_sha=$(git_value rev-parse --short HEAD)
+  status_counts=$(git_status_counts)
+  changed_files=$(git_changed_files)
+  recent_commands=$(read_recent_commands "$command_log")
+  failure_commands=$(read_failure_commands "$command_log")
+  pr_info=$(pr_summary "$pr_mode")
+  workbench_status=$(workbench_trace_status "$workbench_trace_log")
+  workbench_traces=$(read_workbench_traces "$workbench_trace_log")
+
+  printf '# HyperAgent Sense Summary\n\n'
+  printf '%s\n' "- Generated: $(now_readable)"
+  printf '%s\n' "- Repo: \`$repo_root\`"
+  printf '%s\n' "- Branch: \`${branch:-unavailable}\`"
+  printf '%s\n' "- Upstream: \`${upstream:-none}\`"
+  printf '%s\n' "- HEAD: \`${head_sha:-unavailable}\`"
+  printf '%s\n' "- Git status counts: \`$status_counts\`"
+  printf '%s\n' "- Command log: \`$command_log\`"
+  if [ -n "$trace_url" ]; then
+    printf '%s\n' "- Trace: $(redact_text "$trace_url")"
+  else
+    printf '%s\n' "- Trace: not provided"
+  fi
+  printf '%s\n' "- Workbench trace log: \`$workbench_trace_log\`"
+  printf '%s\n' "- Workbench trace status: \`$workbench_status\`"
+  printf '\n## Changed Files\n\n'
+  if [ -n "$changed_files" ]; then
+    printf '%s\n' "$changed_files" | sed 's/^/- `/' | sed 's/$/`/'
+  else
+    printf '%s\n' "- none"
+  fi
+  printf '\n## Recent Commands And Checks\n\n'
+  if [ -n "$recent_commands" ]; then
+    printf '%s\n' "$recent_commands" | awk -F '\t' '{ printf "- %s `%s` %s", $2, $3, $1; if ($4 != "") { printf " - %s", $4 } printf "\n" }'
+  else
+    printf '%s\n' "- no command log entries found"
+  fi
+  printf '\n## Failures And Retries\n\n'
+  if [ -n "$failure_commands" ]; then
+    printf '%s\n' "$failure_commands" | awk -F '\t' '{ printf "- %s `%s` %s", $2, $3, $1; if ($4 != "") { printf " - %s", $4 } printf "\n" }'
+  else
+    printf '%s\n' "- none recorded"
+  fi
+  printf '\n## PR And CI\n\n'
+  if [ -n "$pr_info" ]; then
+    printf '%s\n' "$pr_info" | sed 's/^/- /'
+  else
+    printf '%s\n' "- not available locally"
+  fi
+  printf '\n## Workbench Traces\n\n'
+  if [ -n "$workbench_traces" ]; then
+    printf '%s\n' "$workbench_traces" | sed 's/^/- `/' | sed 's/$/`/'
+  else
+    printf '%s\n' "- no local Workbench traces available"
+  fi
+  printf '\n## Safety\n\n'
+  printf '%s\n' "- Does not inspect file contents, environment variables, shell history, credentials, or hosted services unless optional PR lookup is enabled and available."
+  printf '%s\n' "- Command and Workbench evidence is local, redacted for secret-like tokens before output, and safe to omit when unavailable."
+}
+
+print_json_array_from_lines() {
+  lines="$1"
+  if [ -z "$lines" ]; then
+    printf '[]'
+    return 0
+  fi
+  printf '%s\n' "$lines" | awk '
+    BEGIN { printf "[" }
+    {
+      gsub(/\\/, "\\\\")
+      gsub(/"/, "\\\"")
+      gsub(/\t/, "\\t")
+      gsub(/\r/, "\\r")
+      if (NR > 1) {
+        printf ","
+      }
+      printf "\"%s\"", $0
+    }
+    END { printf "]" }
+  '
+}
+
+print_sense_json() {
+  command_log="$1"
+  trace_url="$2"
+  pr_mode="$3"
+  workbench_trace_log="$4"
+  branch=$(git_value rev-parse --abbrev-ref HEAD)
+  upstream=$(git_value rev-parse --abbrev-ref --symbolic-full-name '@{u}')
+  head_sha=$(git_value rev-parse --short HEAD)
+  status_counts=$(git_status_counts)
+  changed_files=$(git_changed_files)
+  recent_commands=$(read_recent_commands "$command_log")
+  failure_commands=$(read_failure_commands "$command_log")
+  pr_info=$(pr_summary "$pr_mode")
+  workbench_status=$(workbench_trace_status "$workbench_trace_log")
+  workbench_traces=$(read_workbench_traces "$workbench_trace_log")
+
+  printf '{\n'
+  printf '  "generated": "%s",\n' "$(now_readable | json_escape)"
+  printf '  "repo": "%s",\n' "$(printf '%s' "$repo_root" | json_escape)"
+  printf '  "branch": "%s",\n' "$(printf '%s' "${branch:-unavailable}" | json_escape)"
+  printf '  "upstream": "%s",\n' "$(printf '%s' "${upstream:-none}" | json_escape)"
+  printf '  "head": "%s",\n' "$(printf '%s' "${head_sha:-unavailable}" | json_escape)"
+  printf '  "git_status_counts": "%s",\n' "$(printf '%s' "$status_counts" | json_escape)"
+  printf '  "changed_files": '
+  print_json_array_from_lines "$changed_files"
+  printf ',\n'
+  printf '  "command_log": "%s",\n' "$(printf '%s' "$command_log" | json_escape)"
+  printf '  "recent_commands": '
+  print_json_array_from_lines "$recent_commands"
+  printf ',\n'
+  printf '  "failures_and_retries": '
+  print_json_array_from_lines "$failure_commands"
+  printf ',\n'
+  printf '  "pr_and_ci": '
+  print_json_array_from_lines "$pr_info"
+  printf ',\n'
+  printf '  "trace": "%s",\n' "$(redact_text "$trace_url" | json_escape)"
+  printf '  "workbench": {\n'
+  printf '    "trace_log": "%s",\n' "$(printf '%s' "$workbench_trace_log" | json_escape)"
+  printf '    "status": "%s",\n' "$(printf '%s' "$workbench_status" | json_escape)"
+  printf '    "recent_traces": '
+  print_json_array_from_lines "$workbench_traces"
+  printf '\n'
+  printf '  },\n'
+  printf '  "safety": "Does not inspect file contents, environment variables, shell history, credentials, or hosted services unless optional PR lookup is enabled and available. Command and Workbench evidence is local, redacted for secret-like tokens before output, and safe to omit when unavailable."\n'
+  printf '}\n'
+}
+
+print_sense() {
+  format=markdown
+  command_log="$default_command_log"
+  trace_url=
+  pr_mode=auto
+  workbench_trace_log_override=
+
+  while [ "$#" -gt 0 ]; do
+    case "$1" in
+      --format)
+        shift
+        test "$#" -gt 0 || fail "--format requires markdown or json"
+        format=$1
+        ;;
+      --command-log)
+        shift
+        test "$#" -gt 0 || fail "--command-log requires a path"
+        command_log=$1
+        ;;
+      --trace-url)
+        shift
+        test "$#" -gt 0 || fail "--trace-url requires a URL or local trace reference"
+        trace_url=$1
+        ;;
+      --workbench-trace-log)
+        shift
+        test "$#" -gt 0 || fail "--workbench-trace-log requires a path"
+        workbench_trace_log_override=$1
+        ;;
+      --pr)
+        shift
+        test "$#" -gt 0 || fail "--pr requires auto or off"
+        pr_mode=$1
+        ;;
+      *)
+        fail "unknown sense option: $1"
+        ;;
+    esac
+    shift
+  done
+
+  workbench_trace_log=$(workbench_trace_log_path "$workbench_trace_log_override")
+
+  case "$format" in
+    markdown) print_sense_markdown "$command_log" "$trace_url" "$pr_mode" "$workbench_trace_log" ;;
+    json) print_sense_json "$command_log" "$trace_url" "$pr_mode" "$workbench_trace_log" ;;
+    *) fail "--format must be markdown or json" ;;
+  esac
+}
+
+print_doctor() {
+  workbench_trace_log_override=
+
+  while [ "$#" -gt 0 ]; do
+    case "$1" in
+      --workbench-trace-log)
+        shift
+        test "$#" -gt 0 || fail "--workbench-trace-log requires a path"
+        workbench_trace_log_override=$1
+        ;;
+      *)
+        fail "unknown doctor option: $1"
+        ;;
+    esac
+    shift
+  done
+
+  workbench_trace_log=$(workbench_trace_log_path "$workbench_trace_log_override")
+
+  printf 'HyperAgent doctor\n'
+  printf 'Repo: %s\n' "$repo_root"
+  if git -C "$repo_root" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+    printf 'Git: healthy\n'
+  else
+    printf 'Git: unavailable\n'
+  fi
+  if [ -e "$default_command_log" ]; then
+    printf 'Command log: %s\n' "$default_command_log"
+  else
+    printf 'Command log: not initialized yet (%s)\n' "$default_command_log"
+  fi
+  printf 'Workbench trace log: %s\n' "$workbench_trace_log"
+  printf 'Workbench trace status: %s\n' "$(workbench_trace_status "$workbench_trace_log")"
+  printf 'Workbench retention: local ignored evidence; keep only recent mission-relevant traces and prune manually or with your local Workbench policy.\n'
+  printf 'Workbench redaction: HyperAgent redacts secret-like tokens before sense output; Workbench may still store local prompts, tool payloads, file paths, and command outputs.\n'
+  printf 'Fallback: sense remains usable without Workbench traces.\n'
+}
+
 create_mission() {
   request=
   slug=
+  commands_run='Not captured by helper. Add commands manually during mission closeout.'
+  verification_status='Pending verification. Replace with the final verification result during mission closeout.'
 
   while [ "$#" -gt 0 ]; do
     case "$1" in
@@ -530,6 +1032,16 @@ create_mission() {
         shift
         test "$#" -gt 0 || fail "--slug requires text"
         slug=$(slugify "$1")
+        ;;
+      --commands-run)
+        shift
+        test "$#" -gt 0 || fail "--commands-run requires text"
+        commands_run=$1
+        ;;
+      --verification-status)
+        shift
+        test "$#" -gt 0 || fail "--verification-status requires text"
+        verification_status=$1
         ;;
       *)
         fail "unknown new-mission option: $1"
@@ -546,6 +1058,9 @@ create_mission() {
   stamp=$(now_stamp)
   file="$mission_dir/$stamp-$slug.md"
   test ! -e "$file" || fail "mission already exists: $file"
+  branch=$(git_branch)
+  git_status=$(git_status_short)
+  changed_files=$(git_changed_files)
 
   cat >"$file" <<EOF
 # Mission Record
@@ -556,11 +1071,32 @@ create_mission() {
 - Environment: \`$repo_root\`
 - User request: $request
 
+## Repository Evidence
+
+- Repo path: \`$repo_root\`
+- Branch: \`$branch\`
+- Git status:
+
+~~~text
+$git_status
+~~~
+
+- Changed files:
+
+~~~text
+$changed_files
+~~~
+
+## Execution Evidence
+
+- Commands run: $commands_run
+- Verification status: $verification_status
+
 ## Outcome
 
-- Final outcome:
+- Final outcome: Pending final outcome. Replace during mission closeout.
 - Completion evidence:
-- Unresolved risks:
+- Unresolved risks: Pending unresolved risk review. Replace during mission closeout.
 
 ## Actions
 
@@ -989,6 +1525,15 @@ case "$command" in
     ;;
   status)
     print_status "$@"
+    ;;
+  sense)
+    print_sense "$@"
+    ;;
+  doctor)
+    print_doctor "$@"
+    ;;
+  record-check)
+    record_check "$@"
     ;;
   new-mission)
     create_mission "$@"

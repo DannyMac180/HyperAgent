@@ -65,7 +65,28 @@ sh scripts/hyperagent.sh status
 
 You should see counts for missions, Workshop proposals, Workshop decisions, Forge reviews, and the capability registry path.
 
-## 4. Run A Mission In Codex
+## 4. Capture Local Senses
+
+Record commands and checks explicitly when they matter for a mission:
+
+```bash
+sh scripts/hyperagent.sh record-check --status passed --command "sh scripts/verify-mvp.sh"
+sh scripts/hyperagent.sh record-check --status failed --command "sh evals/smoke-loop.sh" --note "example failure note"
+```
+
+Then generate a compact mission-ready summary:
+
+```bash
+sh scripts/hyperagent.sh sense
+sh scripts/hyperagent.sh sense --format json --pr off
+sh scripts/hyperagent.sh doctor
+```
+
+The sensing layer summarizes the current branch, upstream, HEAD, git status counts, changed files, recent opt-in commands/checks, failures and retries, optional PR/CI status when `gh` can find a pull request, and an optional trace link passed with `--trace-url`. By default, it also checks `.hyperagent-evidence/workbench/traces.jsonl` or `HYPERAGENT_WORKBENCH_TRACE_LOG` for local Workbench/Raindrop trace entries. It is local-first and does not require hosted services. It does not inspect file contents, environment variables, shell history, credentials, or secrets, and it redacts secret-like command and trace fragments before output.
+
+Workbench trace enrichment is a background sensing subsystem. If Workbench is unavailable, unhealthy, or not initialized yet, `sense` reports that state and continues with the lightweight fallback. Use `doctor` for local diagnostics and retention/redaction reminders before adding trace evidence to a mission record.
+
+## 5. Run A Mission In Codex
 
 Ask Codex:
 
@@ -81,7 +102,7 @@ You can also create a mission record shell:
 sh scripts/hyperagent.sh new-mission --request "Run a small HyperAgent mission" --slug small-hyperagent-mission
 ```
 
-## 5. Run Workshop Review
+## 6. Run Workshop Review
 
 Ask Codex:
 
@@ -100,7 +121,7 @@ sh scripts/hyperagent.sh propose-upgrade \
   --problem "The install step needs a concrete smoke test"
 ```
 
-## 6. Record Human Approval Or Rejection
+## 7. Record Human Approval Or Rejection
 
 Persistent behavior changes are not activated silently.
 
@@ -115,7 +136,7 @@ sh scripts/hyperagent.sh decide-upgrade \
 
 Accepted decisions are recorded in `workshop/decisions/` and appended to `hyperagent/capability-registry.md`.
 
-## 7. Run Forge Review
+## 8. Run Forge Review
 
 Ask Codex:
 
@@ -125,15 +146,16 @@ sh scripts/hyperagent.sh forge-prompt
 
 Forge reviews belong in `forge/reviews/`. The Forge should improve the Workshop process, not silently activate new capabilities.
 
-## 8. Verify
+## 9. Verify
 
 ```bash
 sh scripts/verify-mvp.sh
 sh evals/init-smoke.sh
+sh evals/sense-smoke.sh
 sh evals/smoke-loop.sh
 ```
 
-## 9. Update Later
+## 10. Update Later
 
 For copy installs:
 

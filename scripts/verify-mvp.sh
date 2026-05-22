@@ -37,6 +37,7 @@ require_file docs/iron-man-suit-essence.md
 require_file docs/concepts.md
 require_file docs/article-outline.md
 require_file docs/quickstart.md
+require_file docs/clean-install-uat.md
 require_file docs/release-checklist.md
 require_file docs/releases/v0.1.0-alpha.md
 require_file skills/codex-hyperagent/SKILL.md
@@ -112,22 +113,33 @@ require_text .hyperagent 'project_instructions = "AGENTS.md"'
 require_text .hyperagent 'evidence_log = ".hyperagent-evidence/commands.log"'
 require_text .hyperagent 'workbench_trace_log = ".hyperagent-evidence/workbench/traces.jsonl"'
 require_text .hyperagent 'codex = true'
-require_text README.md "sh scripts/hyperagent.sh init --target"
 require_text README.md "v0.1.0-alpha"
 require_text README.md "docs/releases/v0.1.0-alpha.md"
-require_text README.md "sh scripts/install-codex-skill.sh"
+require_text README.md "Try HyperAgent In Codex Mac"
+require_text README.md "https://github.com/DannyMac180/HyperAgent"
+require_text README.md "~/HyperAgent"
+require_text README.md "Do not modify my global Codex custom instructions"
+require_text README.md "docs/quickstart.md"
+require_text README.md "docs/clean-install-uat.md"
 require_text README.md "sh scripts/update-codex-skill.sh"
-require_text README.md "sh scripts/hyperagent.sh status"
-require_text README.md "sh scripts/hyperagent.sh sense"
-require_text README.md "sh scripts/hyperagent.sh doctor"
-require_text README.md ".hyperagent-evidence/"
 require_text README.md "docs/release-checklist.md"
 require_text README.md "docs/assets/hyperagent-architecture.svg"
 require_text README.md "docs/architecture/hyperagent.mmd"
-require_text README.md "--symlink"
+require_text docs/quickstart.md "Manual Quickstart"
+require_text docs/quickstart.md "sh scripts/hyperagent.sh init --target"
+require_text docs/quickstart.md "sh scripts/install-codex-skill.sh"
+require_text docs/quickstart.md "sh scripts/hyperagent.sh status"
+require_text docs/quickstart.md "sh scripts/hyperagent.sh sense"
+require_text docs/quickstart.md "sh scripts/hyperagent.sh doctor"
+require_text docs/quickstart.md ".hyperagent-evidence/"
+require_text docs/quickstart.md "--symlink"
 require_text docs/quickstart.md "Capture Local Senses"
 require_text docs/quickstart.md "sh scripts/hyperagent.sh sense --format json --pr off"
 require_text docs/quickstart.md "Workbench trace"
+require_text docs/clean-install-uat.md "Clean-Install UAT"
+require_text docs/clean-install-uat.md "Try HyperAgent In Codex Mac"
+require_text docs/clean-install-uat.md "~/.codex/skills/codex-hyperagent/SKILL.md"
+require_text docs/clean-install-uat.md "Codex does not edit global Codex custom instructions"
 require_text docs/release-checklist.md "Update And Upgrade Model"
 require_text docs/release-checklist.md "Forge Readiness"
 require_text docs/release-checklist.md "Forge review flow"

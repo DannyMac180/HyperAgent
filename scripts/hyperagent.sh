@@ -24,8 +24,8 @@ Commands:
   new-mission --request TEXT [--slug SLUG] [--commands-run TEXT] [--verification-status TEXT]
       Create a mission record in missions/.
 
-  propose-upgrade --mission PATH --title TEXT --problem TEXT [--slug SLUG]
-      Create a Workshop proposal in workshop/proposals/.
+  propose-upgrade (--mission PATH | --forge-review PATH) --title TEXT --problem TEXT [--slug SLUG]
+      Create a Workshop proposal in workshop/proposals/ from mission evidence or Forge review evidence.
 
   workshop-prompt
       Print the repeatable Workshop review prompt.
@@ -328,7 +328,7 @@ paths, enabled adapters, verification commands, and instruction files.
 Use these files to keep agent work inspectable:
 
 - `missions/`: mission records from meaningful tasks.
-- `workshop/proposals/`: proposed improvements backed by mission evidence.
+- `workshop/proposals/`: proposed improvements backed by mission or Forge review evidence.
 - `workshop/decisions/`: explicit human approvals or rejections.
 - `forge/reviews/`: reviews of Workshop proposal quality.
 - `templates/`: markdown templates for records, proposals, decisions, and Forge reviews.
@@ -345,9 +345,12 @@ sh scripts/hyperagent.sh doctor
 sh scripts/hyperagent.sh new-mission --request "Describe the task" --slug task-slug
 sh scripts/hyperagent.sh workshop-prompt
 sh scripts/hyperagent.sh forge-prompt
+sh scripts/hyperagent.sh propose-upgrade --forge-review forge/reviews/REVIEW.md --title "Improve Workshop quality" --problem "The Workshop process needs a concrete fix"
 ```
 
 ## Verification
+
+Run Forge reviews after proposal decisions, eval changes, release-readiness checks, or repeated vague Workshop output. Forge process improvements should become normal Workshop proposals linked to the Forge review and remain `human review required`.
 
 For this project, the lightweight check is:
 
@@ -396,7 +399,7 @@ For full-loop tasks:
 
 1. Complete the task with focused changes and explicit verification.
 2. Write a mission record in `missions/`.
-3. Create a Workshop proposal in `workshop/proposals/` only when there is concrete Suit friction or a worthwhile improvement.
+3. Create a Workshop proposal in `workshop/proposals/` only when there is concrete Suit friction, Forge review evidence, or a worthwhile improvement.
 4. Create a Forge review in `forge/reviews/` only when the Workshop process itself needs review.
 5. Keep persistent behavior changes `human review required`.
 
@@ -1121,6 +1124,7 @@ EOF
 
 create_proposal() {
   mission=
+  forge_review=
   title=
   problem=
   slug=
@@ -1131,6 +1135,11 @@ create_proposal() {
         shift
         test "$#" -gt 0 || fail "--mission requires a path"
         mission=$1
+        ;;
+      --forge-review)
+        shift
+        test "$#" -gt 0 || fail "--forge-review requires a path"
+        forge_review=$1
         ;;
       --title)
         shift
@@ -1154,8 +1163,25 @@ create_proposal() {
     shift
   done
 
-  test -n "$mission" || fail "propose-upgrade requires --mission"
-  test -f "$mission" || fail "mission record not found: $mission"
+  test -n "$mission$forge_review" || fail "propose-upgrade requires --mission or --forge-review"
+  if [ -n "$mission" ] && [ -n "$forge_review" ]; then
+    fail "propose-upgrade accepts only one evidence source: --mission or --forge-review"
+  fi
+  if [ -n "$mission" ]; then
+    test -f "$mission" || fail "mission record not found: $mission"
+    evidence_type="mission"
+    related_mission="\`$mission\`"
+    related_forge_review=""
+    evidence_from_missions="\`$mission\`"
+    evidence_from_forge=""
+  else
+    test -f "$forge_review" || fail "forge review not found: $forge_review"
+    evidence_type="forge review"
+    related_mission=""
+    related_forge_review="\`$forge_review\`"
+    evidence_from_missions=""
+    evidence_from_forge="\`$forge_review\`"
+  fi
   test -n "$title" || fail "propose-upgrade requires --title"
   test -n "$problem" || fail "propose-upgrade requires --problem"
   test -n "$slug" || slug=$(slugify "$title")
@@ -1172,7 +1198,9 @@ create_proposal() {
 - Upgrade title: $title
 - Proposal ID: proposal-$stamp-$slug
 - Date/time: $(now_readable)
-- Related mission record: \`$mission\`
+- Related mission record: $related_mission
+- Related Forge review: $related_forge_review
+- Evidence source type: $evidence_type
 - Proposed activation mode: human review required
 - Allowed activation modes: suggest only; draft files only; human review required; auto-install low risk
 - Backlog priority:
@@ -1181,7 +1209,8 @@ create_proposal() {
 ## Problem
 
 - Problem observed: $problem
-- Evidence from mission records:
+- Evidence from mission records: $evidence_from_missions
+- Evidence from Forge reviews: $evidence_from_forge
 - Why the current Suit was insufficient:
 
 ## Proposed Capability
@@ -1224,7 +1253,7 @@ print_workshop_prompt() {
   cat <<'EOF'
 Use HyperAgent Workshop Mode.
 
-Read recent mission records in missions/. Identify concrete Suit friction supported by evidence. Choose the highest-value friction, then create or update a proposal in workshop/proposals/ using templates/upgrade-proposal.md. Include the linked mission record, proposed capability, safety risk, eval or acceptance test, rollback plan, and an Implementation Plan with the highest-priority step first. Do not activate the upgrade. Default the activation mode to human review required.
+Read recent mission records in missions/. Identify concrete Suit friction supported by evidence. Choose the highest-value friction, then create or update a proposal in workshop/proposals/ using templates/upgrade-proposal.md. Include the linked mission record, proposed capability, safety risk, eval or acceptance test, rollback plan, and an Implementation Plan with the highest-priority step first. If the evidence is a Forge review about Workshop quality, create the proposal with --forge-review instead of --mission. Do not activate the upgrade. Default the activation mode to human review required.
 EOF
 }
 
@@ -1257,25 +1286,115 @@ create_forge_review() {
 - Review ID: forge-$stamp-$slug
 - Date/time: $(now_readable)
 - Proposals reviewed:
+- Decisions reviewed:
+- Evals reviewed:
+- Accepted capabilities reviewed:
+- Prior Forge score history reviewed:
 - Reviewer: Codex wearing the HyperAgent Suit
 
-## Workshop Quality
+## Structured Summary
+
+\`\`\`json
+{
+  "reviewed_artifacts": {
+    "missions": [],
+    "proposals": [],
+    "decisions": [],
+    "evals": [],
+    "accepted_capabilities": [],
+    "prior_forge_reviews": []
+  },
+  "scores": {
+    "outcome_quality": {"score": null, "evidence": []},
+    "proposal_specificity": {"score": null, "evidence": []},
+    "eval_coverage": {"score": null, "evidence": []},
+    "safety_boundary_preservation": {"score": null, "evidence": []},
+    "regression_detection": {"score": null, "evidence": []},
+    "process_bloat_risk": {"score": null, "evidence": []}
+  },
+  "pass_fail_gates": {
+    "testable_behavior_claim": null,
+    "owner_surface_named": null,
+    "eval_or_check_plan": null,
+    "rollback_or_human_review_boundary": null,
+    "scores_have_evidence": null
+  },
+  "payoff_metrics": {
+    "regressions_caught": 0,
+    "repeat_friction_seen_again": 0,
+    "manual_steps_removed": 0,
+    "evals_added": 0,
+    "artifacts_retired": 0
+  },
+  "recommendation": "",
+  "confidence": "",
+  "follow_up_required": false,
+  "upgrade_id": ""
+}
+\`\`\`
+
+## Outcome Quality
+
+- Did accepted upgrades improve agent behavior?
+- Which upgrades paid off?
+- Which upgrades created process bloat?
+- What behavior evidence supports the outcome judgment?
+- Outcome quality score (0-5):
+- Outcome quality evidence:
+
+## Proposal Quality
 
 - Are proposals specific and evidence-backed?
-- Are acceptance tests concrete?
+- Which templates or proposal sections produced vague output?
+- Are priorities and decision handoffs clear?
+- Are repeated friction patterns being missed?
+- Proposal specificity score (0-5):
+- Proposal specificity evidence:
+
+## Eval Quality
+
+- Are acceptance tests concrete enough to catch regressions?
+- Did evals verify behavior instead of file presence only?
+- Which regressions would current evals miss?
+- Eval coverage score (0-5):
+- Eval coverage evidence:
+- Regression detection score (0-5):
+- Regression detection evidence:
+
+## Safety Quality
+
 - Are safety risks explicit?
 - Are activation modes appropriate?
-- Are repeated friction patterns being missed?
-- Proposal quality score:
-- Process reliability score:
+- Are authority, permission, secrets, deployment, and rollback boundaries clear?
+- Are rejected or deferred upgrades recorded with reasons?
+- Safety boundary preservation score (0-5):
+- Safety boundary preservation evidence:
 
-## Process Upgrade Candidates
+## Process Quality
+
+- Are process costs proportionate to the value of the upgrade?
+- Are accepted capabilities traceable from mission evidence to proposal, decision, eval, and registry entry?
+- Process bloat risk score (0-5):
+- Process bloat risk evidence:
+
+## Deterministic Gates
+
+- Testable behavior claim present: yes/no
+- Owner surface named: yes/no
+- Eval or check plan present: yes/no
+- Rollback or human-review boundary present: yes/no
+- Every score has evidence: yes/no
+- Gate result: ready/not ready
+
+## Process Improvement Proposal
 
 - Workshop process friction:
 - Proposed process change:
 - Expected effect:
 - Eval for the process change:
 - Rollback plan:
+- Generate proposal when:
+- Suggested proposal command: \`sh scripts/hyperagent.sh propose-upgrade --forge-review PATH --title "..." --problem "..."\`
 
 ## Decision
 
@@ -1291,7 +1410,7 @@ print_forge_prompt() {
   cat <<'EOF'
 Use HyperAgent Forge Mode.
 
-Read recent Workshop proposals in workshop/proposals/ and decisions in workshop/decisions/. Judge whether the Workshop is producing proposals that are specific, evidence-backed, testable, safe, and worth installing. Write a Forge review in forge/reviews/ using templates/forge-review.md. If the Workshop process needs an upgrade, create a separate proposal that changes the proposal template, rubric, eval format, telemetry capture, or approval policy. Do not activate process changes without human approval.
+Read recent Workshop proposals in workshop/proposals/, decisions in workshop/decisions/, accepted capabilities in hyperagent/capability-registry.md, evals in evals/ plus scripts/verify-mvp.sh, and prior Forge score history in forge/reviews/. Judge outcome quality, proposal specificity, eval coverage, safety boundary preservation, regression detection, and process bloat risk with 0-5 scores. Every score must cite evidence or a missing-artifact reason. Fill the structured summary, deterministic gates, payoff metrics, recommendation, confidence, and follow-up fields in templates/forge-review.md. Run Forge reviews when proposals are accepted or rejected, evals change, a release checklist asks whether upgrades paid off, or repeated missions show the Workshop producing vague or low-value proposals. If the Workshop process needs an upgrade, create a separate process-improvement proposal with sh scripts/hyperagent.sh propose-upgrade --forge-review PATH --title "..." --problem "...". Do not activate process changes without human approval.
 EOF
 }
 

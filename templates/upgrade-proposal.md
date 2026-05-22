@@ -4,6 +4,8 @@
 - Proposal ID:
 - Date/time:
 - Related mission record:
+- Related Forge review:
+- Evidence source type:
 - Proposed activation mode: human review required
 - Allowed activation modes: suggest only; draft files only; human review required; auto-install low risk
 - Backlog priority:
@@ -13,6 +15,7 @@
 
 - Problem observed:
 - Evidence from mission records:
+- Evidence from Forge reviews:
 - Why the current Suit was insufficient:
 
 ## Proposed Capability

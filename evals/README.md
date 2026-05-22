@@ -20,7 +20,7 @@ sh evals/smoke-loop.sh
 
 The smoke loop copies the repo to a temporary directory, then verifies that the local helper can:
 
-- create a mission record in `missions/`,
+- create a mission record in `missions/` with repo evidence, command evidence, verification status, and closeout placeholders,
 - create a proposal linked to that mission in `workshop/proposals/`,
 - create a Forge review in `forge/reviews/`,
 - record a human-review decision in `workshop/decisions/`,

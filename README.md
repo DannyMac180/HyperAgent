@@ -131,7 +131,7 @@ flowchart TD
    The sensing summary reports branch, git status, changed files, opt-in command/check evidence, failures and retries, optional PR/CI status when locally available through `gh`, optional trace links, and local Workbench trace metadata when the default ignored trace log is present. Workbench enriches the default senses but is not required; `doctor` reports whether local trace enrichment is healthy. The fallback does not inspect file contents, environment variables, shell history, or secrets.
 6. Start Codex in this repo and ask it to use the `codex-hyperagent` skill.
 7. Use `hyperagent/operating-prompt.md` as the canonical Suit prompt.
-8. After a task, inspect the new mission record in `missions/`.
+8. After a task, inspect the new mission record in `missions/`. New records prefill repo path, branch, git status, changed files, command evidence, verification status, and closeout placeholders.
 9. Inspect any evidence-backed upgrade proposals in `workshop/proposals/`.
 10. Record explicit human approval or rejection in `workshop/decisions/` before a proposal becomes accepted Suit memory.
 

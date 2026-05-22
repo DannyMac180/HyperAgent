@@ -21,7 +21,7 @@ Commands:
   record-check --command TEXT --status passed|failed|retried|skipped [--note TEXT]
       Append an opt-in check or command result to the local evidence log.
 
-  new-mission --request TEXT [--slug SLUG]
+  new-mission --request TEXT [--slug SLUG] [--commands-run TEXT] [--verification-status TEXT]
       Create a mission record in missions/.
 
   propose-upgrade --mission PATH --title TEXT --problem TEXT [--slug SLUG]
@@ -573,6 +573,46 @@ count_markdown_files() {
   find "$dir" -maxdepth 1 -type f -name '*.md' 2>/dev/null | wc -l | tr -d ' '
 }
 
+is_git_repo() {
+  command -v git >/dev/null 2>&1 && git -C "$repo_root" rev-parse --is-inside-work-tree >/dev/null 2>&1
+}
+
+git_branch() {
+  if is_git_repo; then
+    git -C "$repo_root" symbolic-ref --short HEAD 2>/dev/null \
+      || git -C "$repo_root" rev-parse --short HEAD 2>/dev/null \
+      || printf 'unknown'
+  else
+    printf 'not a git repository'
+  fi
+}
+
+git_status_short() {
+  if is_git_repo; then
+    status=$(git -C "$repo_root" status --short 2>/dev/null || true)
+    if [ -n "$status" ]; then
+      printf '%s\n' "$status"
+    else
+      printf 'clean\n'
+    fi
+  else
+    printf 'not a git repository\n'
+  fi
+}
+
+git_changed_files() {
+  if is_git_repo; then
+    status=$(git -C "$repo_root" status --short 2>/dev/null || true)
+    if [ -n "$status" ]; then
+      printf '%s\n' "$status" | sed 's/^...//'
+    else
+      printf 'none\n'
+    fi
+  else
+    printf 'not a git repository\n'
+  fi
+}
+
 print_status() {
   ensure_dirs
   printf 'HyperAgent status\n'
@@ -975,6 +1015,8 @@ print_doctor() {
 create_mission() {
   request=
   slug=
+  commands_run='Not captured by helper. Add commands manually during mission closeout.'
+  verification_status='Pending verification. Replace with the final verification result during mission closeout.'
 
   while [ "$#" -gt 0 ]; do
     case "$1" in
@@ -987,6 +1029,16 @@ create_mission() {
         shift
         test "$#" -gt 0 || fail "--slug requires text"
         slug=$(slugify "$1")
+        ;;
+      --commands-run)
+        shift
+        test "$#" -gt 0 || fail "--commands-run requires text"
+        commands_run=$1
+        ;;
+      --verification-status)
+        shift
+        test "$#" -gt 0 || fail "--verification-status requires text"
+        verification_status=$1
         ;;
       *)
         fail "unknown new-mission option: $1"
@@ -1003,6 +1055,9 @@ create_mission() {
   stamp=$(now_stamp)
   file="$mission_dir/$stamp-$slug.md"
   test ! -e "$file" || fail "mission already exists: $file"
+  branch=$(git_branch)
+  git_status=$(git_status_short)
+  changed_files=$(git_changed_files)
 
   cat >"$file" <<EOF
 # Mission Record
@@ -1013,11 +1068,32 @@ create_mission() {
 - Environment: \`$repo_root\`
 - User request: $request
 
+## Repository Evidence
+
+- Repo path: \`$repo_root\`
+- Branch: \`$branch\`
+- Git status:
+
+~~~text
+$git_status
+~~~
+
+- Changed files:
+
+~~~text
+$changed_files
+~~~
+
+## Execution Evidence
+
+- Commands run: $commands_run
+- Verification status: $verification_status
+
 ## Outcome
 
-- Final outcome:
+- Final outcome: Pending final outcome. Replace during mission closeout.
 - Completion evidence:
-- Unresolved risks:
+- Unresolved risks: Pending unresolved risk review. Replace during mission closeout.
 
 ## Actions
 

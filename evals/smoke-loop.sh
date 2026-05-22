@@ -33,10 +33,25 @@ grep -F "human review required" "$proposal" >/dev/null || fail "proposal missing
 
 forge_review=$(sh scripts/hyperagent.sh new-forge-review --slug smoke-loop-forge-review)
 test -f "$forge_review" || fail "forge review was not created"
-grep -F "Proposal quality score" "$forge_review" >/dev/null || fail "forge review missing quality score"
-grep -F "Outcome quality score" "$forge_review" >/dev/null || fail "forge review missing outcome quality score"
-grep -F "Eval quality score" "$forge_review" >/dev/null || fail "forge review missing eval quality score"
-grep -F "Safety quality score" "$forge_review" >/dev/null || fail "forge review missing safety quality score"
+replace_field() {
+  perl -0pi -e "s{\Q$1\E}{$2}" "$forge_review"
+}
+
+replace_field "Outcome quality score (0-5):" "Outcome quality score (0-5): 3"
+replace_field "Outcome quality evidence:" "Outcome quality evidence: Evidence: smoke mission and generated proposal"
+replace_field "Proposal specificity score (0-5):" "Proposal specificity score (0-5): 3"
+replace_field "Proposal specificity evidence:" "Proposal specificity evidence: Evidence: generated proposal names a problem and activation mode"
+replace_field "Eval coverage score (0-5):" "Eval coverage score (0-5): 3"
+replace_field "Eval coverage evidence:" "Eval coverage evidence: Evidence: evals/smoke-loop.sh checks generated artifacts"
+replace_field "Regression detection score (0-5):" "Regression detection score (0-5): 3"
+replace_field "Regression detection evidence:" "Regression detection evidence: Evidence: smoke loop fails on missing Forge fields"
+replace_field "Safety boundary preservation score (0-5):" "Safety boundary preservation score (0-5): 3"
+replace_field "Safety boundary preservation evidence:" "Safety boundary preservation evidence: Evidence: generated proposal remains human review required"
+replace_field "Process bloat risk score (0-5):" "Process bloat risk score (0-5): 3"
+replace_field "Process bloat risk evidence:" "Process bloat risk evidence: Evidence: verifier uses local markdown checks only"
+replace_field "Every score has evidence: yes/no" "Every score has evidence: yes"
+replace_field "Gate result: ready/not ready" "Gate result: ready"
+sh scripts/verify-forge-review.sh "$forge_review" >/dev/null
 grep -F "Suggested proposal command" "$forge_review" >/dev/null || fail "forge review missing process proposal command"
 
 process_proposal=$(sh scripts/hyperagent.sh propose-upgrade \

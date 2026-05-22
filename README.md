@@ -20,7 +20,7 @@ Release notes: `docs/releases/v0.1.0-alpha.md`
 
 HyperAgent is designed to sit at the Codex Mac app level as a user-level operating layer across Codex workspaces. The Global Suit provides shared operating rules, safety defaults, and reusable capabilities. Each workspace gets its own local Suit context for repo-specific rules, workflows, and memory.
 
-Mission records capture evidence from real work. The Workshop turns that evidence into proposed Suit upgrades. The Forge improves the Workshop itself by checking whether proposals are specific, evidence-backed, safe, testable, worth installing, and actually improving behavior after acceptance. Human review approves persistent behavior changes before they become part of the Suit.
+Mission records capture evidence from real work. The Workshop turns that evidence into proposed Suit upgrades. The Forge improves the Workshop itself by checking whether proposals are specific, evidence-backed, safe, testable, worth installing, and actually improving behavior after acceptance. Forge reviews use anchored 0-5 scores, evidence references, deterministic gates, and small payoff counters so the process can be inspected over time. Human review approves persistent behavior changes before they become part of the Suit.
 
 ```mermaid
 flowchart TD
@@ -171,7 +171,7 @@ Restart Codex Desktop or open a fresh thread after updating the installed skill.
 - `hyperagent/capability-registry.md`: accepted capability registry with reviewed local capabilities.
 - `templates/mission-record.md`: mission telemetry template.
 - `templates/upgrade-proposal.md`: Workshop proposal template.
-- `templates/forge-review.md`: Forge review template for outcome, proposal, eval, safety, and process quality.
+- `templates/forge-review.md`: Forge review template for outcome, proposal, eval, safety, process bloat, structured summary, gates, and payoff metrics.
 - `templates/upgrade-decision.md`: human approval or rejection template.
 - `workshop/backlog.md`: first-class upgrade backlog.
 - `workshop/rubric.md`: proposal prioritization rubric.

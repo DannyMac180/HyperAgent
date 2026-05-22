@@ -12,9 +12,22 @@ A Forge review should inspect recent:
 - evals and verifier checks in `evals/` and `scripts/verify-mvp.sh`,
 - mission records or follow-up evidence that show whether accepted upgrades changed behavior.
 
+## Score Scale
+
+Forge scores use a 0-5 scale. Every score must include at least one evidence reference such as a mission path, proposal path, eval path, command result, changed file, before/after behavior, or a specific missing-artifact reason.
+
+| Score | Meaning |
+| --- | --- |
+| 0 | Missing, invalid, or contradicted by evidence |
+| 1 | Present only as vague narrative with weak evidence |
+| 2 | Partially present, but important gaps remain |
+| 3 | Adequate and traceable for human review |
+| 4 | Strong, specific, and backed by direct evidence |
+| 5 | Exemplary, deterministic, reusable, and supported by direct before/after or regression evidence |
+
 ## Outcome Quality Metrics
 
-Score the recent accepted upgrades from 0 to 2.
+Score the recent accepted upgrades from 0 to 5.
 
 | Metric | 0 | 1 | 2 |
 | --- | --- | --- | --- |
@@ -25,7 +38,7 @@ Score the recent accepted upgrades from 0 to 2.
 
 ## Proposal Quality Metrics
 
-Score each recent Workshop proposal from 0 to 2.
+Score each recent Workshop proposal from 0 to 5.
 
 | Metric | 0 | 1 | 2 |
 | --- | --- | --- | --- |
@@ -37,7 +50,7 @@ Score each recent Workshop proposal from 0 to 2.
 
 ## Eval Quality Metrics
 
-Score eval coverage from 0 to 2.
+Score eval coverage from 0 to 5.
 
 | Metric | 0 | 1 | 2 |
 | --- | --- | --- | --- |
@@ -48,7 +61,7 @@ Score eval coverage from 0 to 2.
 
 ## Safety Quality Metrics
 
-Score safety quality from 0 to 2.
+Score safety quality from 0 to 5.
 
 | Metric | 0 | 1 | 2 |
 | --- | --- | --- | --- |
@@ -68,6 +81,30 @@ Review the Workshop process itself:
 - Are evals catching behavior, not just file presence?
 - Are templates producing vague, repetitive, or low-value output?
 - Are the Mission -> Workshop -> Forge steps adding useful evidence or process bloat?
+
+## Deterministic Gates
+
+A Forge recommendation should be `ready` only when all gates pass:
+
+- Testable behavior claim present.
+- Owner surface named.
+- Eval or check plan present.
+- Rollback or human-review boundary present.
+- Every score has at least one evidence reference or a missing-artifact reason.
+
+If any gate fails, the recommendation should be `not ready` and the follow-up should name the missing artifact or weak process field.
+
+## Payoff Metrics
+
+For each accepted Workshop proposal reviewed, record simple counters when evidence exists:
+
+- `regressions_caught`
+- `repeat_friction_seen_again`
+- `manual_steps_removed`
+- `evals_added`
+- `artifacts_retired`
+
+These metrics are intentionally small and local. They help answer whether an upgrade paid off without turning Forge into a hosted analytics system.
 
 ## Forge Actions
 

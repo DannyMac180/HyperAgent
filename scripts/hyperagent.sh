@@ -753,7 +753,49 @@ create_forge_review() {
 - Decisions reviewed:
 - Evals reviewed:
 - Accepted capabilities reviewed:
+- Prior Forge score history reviewed:
 - Reviewer: Codex wearing the HyperAgent Suit
+
+## Structured Summary
+
+\`\`\`json
+{
+  "reviewed_artifacts": {
+    "missions": [],
+    "proposals": [],
+    "decisions": [],
+    "evals": [],
+    "accepted_capabilities": [],
+    "prior_forge_reviews": []
+  },
+  "scores": {
+    "outcome_quality": {"score": null, "evidence": []},
+    "proposal_specificity": {"score": null, "evidence": []},
+    "eval_coverage": {"score": null, "evidence": []},
+    "safety_boundary_preservation": {"score": null, "evidence": []},
+    "regression_detection": {"score": null, "evidence": []},
+    "process_bloat_risk": {"score": null, "evidence": []}
+  },
+  "pass_fail_gates": {
+    "testable_behavior_claim": null,
+    "owner_surface_named": null,
+    "eval_or_check_plan": null,
+    "rollback_or_human_review_boundary": null,
+    "scores_have_evidence": null
+  },
+  "payoff_metrics": {
+    "regressions_caught": 0,
+    "repeat_friction_seen_again": 0,
+    "manual_steps_removed": 0,
+    "evals_added": 0,
+    "artifacts_retired": 0
+  },
+  "recommendation": "",
+  "confidence": "",
+  "follow_up_required": false,
+  "upgrade_id": ""
+}
+\`\`\`
 
 ## Outcome Quality
 
@@ -761,7 +803,8 @@ create_forge_review() {
 - Which upgrades paid off?
 - Which upgrades created process bloat?
 - What behavior evidence supports the outcome judgment?
-- Outcome quality score:
+- Outcome quality score (0-5):
+- Outcome quality evidence:
 
 ## Proposal Quality
 
@@ -769,14 +812,18 @@ create_forge_review() {
 - Which templates or proposal sections produced vague output?
 - Are priorities and decision handoffs clear?
 - Are repeated friction patterns being missed?
-- Proposal quality score:
+- Proposal specificity score (0-5):
+- Proposal specificity evidence:
 
 ## Eval Quality
 
 - Are acceptance tests concrete enough to catch regressions?
 - Did evals verify behavior instead of file presence only?
 - Which regressions would current evals miss?
-- Eval quality score:
+- Eval coverage score (0-5):
+- Eval coverage evidence:
+- Regression detection score (0-5):
+- Regression detection evidence:
 
 ## Safety Quality
 
@@ -784,13 +831,24 @@ create_forge_review() {
 - Are activation modes appropriate?
 - Are authority, permission, secrets, deployment, and rollback boundaries clear?
 - Are rejected or deferred upgrades recorded with reasons?
-- Safety quality score:
+- Safety boundary preservation score (0-5):
+- Safety boundary preservation evidence:
 
 ## Process Quality
 
 - Are process costs proportionate to the value of the upgrade?
 - Are accepted capabilities traceable from mission evidence to proposal, decision, eval, and registry entry?
-- Process reliability score:
+- Process bloat risk score (0-5):
+- Process bloat risk evidence:
+
+## Deterministic Gates
+
+- Testable behavior claim present: yes/no
+- Owner surface named: yes/no
+- Eval or check plan present: yes/no
+- Rollback or human-review boundary present: yes/no
+- Every score has evidence: yes/no
+- Gate result: ready/not ready
 
 ## Process Improvement Proposal
 
@@ -816,7 +874,7 @@ print_forge_prompt() {
   cat <<'EOF'
 Use HyperAgent Forge Mode.
 
-Read recent Workshop proposals in workshop/proposals/, decisions in workshop/decisions/, accepted capabilities in hyperagent/capability-registry.md, and evals in evals/ plus scripts/verify-mvp.sh. Judge outcome quality, proposal quality, eval quality, safety quality, and process bloat. Write a Forge review in forge/reviews/ using templates/forge-review.md. Run Forge reviews when proposals are accepted or rejected, evals change, a release checklist asks whether upgrades paid off, or repeated missions show the Workshop producing vague or low-value proposals. If the Workshop process needs an upgrade, create a separate process-improvement proposal with sh scripts/hyperagent.sh propose-upgrade --forge-review PATH --title "..." --problem "...". Do not activate process changes without human approval.
+Read recent Workshop proposals in workshop/proposals/, decisions in workshop/decisions/, accepted capabilities in hyperagent/capability-registry.md, evals in evals/ plus scripts/verify-mvp.sh, and prior Forge score history in forge/reviews/. Judge outcome quality, proposal specificity, eval coverage, safety boundary preservation, regression detection, and process bloat risk with 0-5 scores. Every score must cite evidence or a missing-artifact reason. Fill the structured summary, deterministic gates, payoff metrics, recommendation, confidence, and follow-up fields in templates/forge-review.md. Run Forge reviews when proposals are accepted or rejected, evals change, a release checklist asks whether upgrades paid off, or repeated missions show the Workshop producing vague or low-value proposals. If the Workshop process needs an upgrade, create a separate process-improvement proposal with sh scripts/hyperagent.sh propose-upgrade --forge-review PATH --title "..." --problem "...". Do not activate process changes without human approval.
 EOF
 }
 

@@ -42,6 +42,7 @@ require_file bin/hyperagent
 require_file scripts/install-codex-skill.sh
 require_file scripts/update-codex-skill.sh
 require_file scripts/hyperagent.sh
+require_file scripts/verify-forge-review.sh
 require_file hyperagent/operating-prompt.md
 require_file hyperagent/capability-registry.md
 require_file templates/mission-record.md
@@ -85,6 +86,7 @@ require_text scripts/hyperagent.sh "HyperAgent Project Upgrade Backlog"
 require_text scripts/hyperagent.sh "decide-upgrade"
 require_text scripts/hyperagent.sh "human review required"
 require_text scripts/hyperagent.sh "Copy And Symlink Behavior"
+require_text scripts/verify-forge-review.sh "Forge review verification passed."
 require_text .hyperagent 'hyperagent_version = "v0.1.0-alpha"'
 require_text .hyperagent 'install_mode = "copy"'
 require_text .hyperagent 'project_instructions = "AGENTS.md"'
@@ -100,7 +102,7 @@ require_text README.md "--symlink"
 require_text docs/release-checklist.md "Update And Upgrade Model"
 require_text docs/release-checklist.md "Forge Readiness"
 require_text docs/release-checklist.md "Forge review flow"
-require_text docs/release-checklist.md "outcome, proposal, eval, safety, and process reliability"
+require_text docs/release-checklist.md "outcome, proposal, eval, safety, process bloat, structured summary, gate, and payoff fields"
 require_text docs/release-checklist.md "v0.1.0-alpha"
 require_text docs/release-checklist.md "Clean-Clone Test"
 require_text docs/releases/v0.1.0-alpha.md "Forge Review Flow"
@@ -110,6 +112,7 @@ require_text evals/README.md "Installer Smoke Eval"
 require_text evals/README.md "Init Smoke Eval"
 require_text evals/smoke-loop.sh "HyperAgent smoke loop passed."
 require_text evals/smoke-loop.sh "Evidence source type: forge review"
+require_text evals/smoke-loop.sh "verify-forge-review.sh"
 require_text evals/init-smoke.sh "HyperAgent init smoke passed."
 require_text hyperagent/operating-prompt.md "human review required"
 require_text hyperagent/operating-prompt.md "relevance triage"
@@ -132,6 +135,9 @@ require_text templates/forge-review.md "Are proposals specific and evidence-back
 require_text templates/forge-review.md "Outcome Quality"
 require_text templates/forge-review.md "Eval Quality"
 require_text templates/forge-review.md "Safety Quality"
+require_text templates/forge-review.md "Structured Summary"
+require_text templates/forge-review.md "Deterministic Gates"
+require_text templates/forge-review.md "payoff_metrics"
 require_text templates/forge-review.md "Suggested proposal command"
 require_text templates/upgrade-decision.md "Silent activation allowed: no"
 require_text workshop/backlog.md "This backlog tracks"
@@ -140,6 +146,8 @@ require_text forge/process/quality-rubric.md "Proposal Quality Metrics"
 require_text forge/process/quality-rubric.md "Outcome Quality Metrics"
 require_text forge/process/quality-rubric.md "Eval Quality Metrics"
 require_text forge/process/quality-rubric.md "Safety Quality Metrics"
+require_text forge/process/quality-rubric.md "Score Scale"
+require_text forge/process/quality-rubric.md "Deterministic Gates"
 require_text scripts/hyperagent.sh "--forge-review"
 
 sh scripts/hyperagent.sh status >/dev/null

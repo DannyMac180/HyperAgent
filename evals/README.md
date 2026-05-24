@@ -44,6 +44,23 @@ including a baseline `without-hyperagent` case and a `with-hyperagent` case. It
 is deterministic, dependency-free, and writes inspectable output to
 `evals/out/reliability-gains/`.
 
+By default it scores both curated fixtures and real mission records from
+`missions/`. Mission records are converted into generated Markdown cases under
+`evals/out/reliability-gains/generated-cases/mission-derived/` before the normal
+rubric runs, so maintainers can inspect the evidence instead of trusting hidden
+state.
+
+Trace-derived case files can be included when local Workbench or Raindrop trace
+evidence exists:
+
+```bash
+sh evals/reliability-gains.sh --traces evals/fixtures/reliability-traces
+```
+
+Trace-derived inputs must be explicit Markdown cases with
+`Evidence source type: trace-derived`; the eval does not claim more precision
+than the exported evidence and manual annotations can support.
+
 The first rubric scores six dimensions:
 
 - task completion,

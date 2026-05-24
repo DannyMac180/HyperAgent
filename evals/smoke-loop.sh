@@ -19,6 +19,7 @@ cp -R "$repo_root" "$tmpdir/HyperAgent"
 cd "$tmpdir/HyperAgent"
 
 sh scripts/verify-mvp.sh >/dev/null
+sh evals/digest-smoke.sh >/dev/null
 
 sh scripts/hyperagent.sh check --note "smoke wrapper passed" -- sh scripts/hyperagent.sh status >/dev/null
 grep -F "passed" .hyperagent-evidence/commands.log >/dev/null || fail "check wrapper did not record passed status"

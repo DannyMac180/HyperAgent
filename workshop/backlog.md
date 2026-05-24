@@ -12,6 +12,8 @@ Default activation mode: `human review required`.
 - Accepted items require a decision record in `workshop/decisions/`.
 - Accepted Suit capabilities are recorded in `hyperagent/capability-registry.md`.
 - Implemented surfaces without a proposal or decision belong in `Review Candidates` until a reviewer decides whether to write a proposal, accept/reject the surface, or defer it.
+- Run `sh scripts/hyperagent.sh workshop-digest --limit 12` after several missions or before release-readiness review to find recurring friction, stale proposals, weak proposal evidence, and Forge cadence needs.
+- Digest-generated proposals are drafts only. They must stay `human review required` and cannot be moved to accepted backlog status without a decision record.
 
 ## Priority Rubric
 

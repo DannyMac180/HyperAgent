@@ -59,6 +59,7 @@ require_file templates/forge-review.md
 require_file templates/upgrade-decision.md
 require_file evals/README.md
 require_file evals/smoke-loop.sh
+require_file evals/digest-smoke.sh
 require_file evals/setup-hyperagent-smoke.sh
 require_file evals/forge-audit-smoke.sh
 require_file evals/init-smoke.sh
@@ -131,6 +132,8 @@ require_text scripts/hyperagent.sh "record-check --command TEXT"
 require_text scripts/hyperagent.sh "check [--note TEXT]"
 require_text scripts/hyperagent.sh "mission-closeout --request TEXT [--mission PATH]"
 require_text scripts/hyperagent.sh "verify-mission [--strict] PATH"
+require_text scripts/hyperagent.sh "workshop-digest [--limit N]"
+require_text scripts/hyperagent.sh "review-digest [--limit N]"
 require_text scripts/hyperagent.sh "Does not inspect file contents"
 require_text scripts/hyperagent.sh ".hyperagent-evidence/commands.log"
 require_text scripts/hyperagent.sh ".hyperagent-evidence/workbench/traces.jsonl"
@@ -197,6 +200,7 @@ require_text docs/quickstart.md "sh scripts/hyperagent.sh sense"
 require_text docs/quickstart.md "sh scripts/hyperagent.sh doctor"
 require_text docs/quickstart.md "sh scripts/hyperagent.sh check -- sh scripts/verify-mvp.sh"
 require_text docs/quickstart.md "sh scripts/hyperagent.sh mission-closeout"
+require_text docs/quickstart.md "sh scripts/hyperagent.sh workshop-digest"
 require_text docs/quickstart.md "sh scripts/hyperagent.sh verify-mission --strict"
 require_text docs/quickstart.md "--mission missions/DRAFT.md"
 require_text docs/quickstart.md ".hyperagent-evidence/"

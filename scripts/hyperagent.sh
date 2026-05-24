@@ -61,6 +61,12 @@ Commands:
   decide-upgrade --proposal PATH --decision accepted|rejected --reviewer NAME --reason TEXT [--capability ID]
       Record a human approval decision. Accepted decisions require --capability and are added to the capability registry.
 
+  workshop-digest [--limit N] [--draft-proposal] [--title TEXT] [--slug SLUG]
+      Review recent missions, Workshop proposals, and Forge reviews for backlog movement opportunities.
+
+  review-digest [--limit N] [--draft-proposal] [--title TEXT] [--slug SLUG]
+      Alias for workshop-digest.
+
   help
       Show this help.
 USAGE
@@ -1167,6 +1173,12 @@ verify_config() {
 count_markdown_files() {
   dir="$1"
   find "$dir" -maxdepth 1 -type f -name '*.md' 2>/dev/null | wc -l | tr -d ' '
+}
+
+recent_markdown_files() {
+  dir="$1"
+  limit="$2"
+  find "$dir" -maxdepth 1 -type f -name '*.md' 2>/dev/null | sort -r | awk -v limit="$limit" 'limit <= 0 || NR <= limit'
 }
 
 is_git_repo() {
@@ -2309,6 +2321,170 @@ EOF
   printf '%s\n' "$file"
 }
 
+proposal_has_decision() {
+  proposal="$1"
+  test -d "$decision_dir" || return 1
+  for decision_file in "$decision_dir"/*.md; do
+    test -f "$decision_file" || continue
+    grep -F -e "$proposal" -e "$(basename "$proposal")" "$decision_file" >/dev/null 2>&1 && return 0
+  done
+  return 1
+}
+
+mission_has_proposal_handoff() {
+  mission="$1"
+  test -d "$proposal_dir" || return 1
+  grep -R -F "$mission" "$proposal_dir"/*.md >/dev/null 2>&1 && return 0
+  grep -R -F "$(basename "$mission")" "$proposal_dir"/*.md >/dev/null 2>&1
+}
+
+mission_has_friction() {
+  mission="$1"
+  grep -Ei '^- (Candidate upgrades|Unresolved risks|Suit friction observed):' "$mission" \
+    | grep -Eiv 'Candidate upgrades:[[:space:]]*(None|None recorded by closeout\.?)\.?$|Unresolved risks:[[:space:]]*(No unresolved|None)|No additional.*friction|No .*friction' >/dev/null 2>&1
+}
+
+proposal_is_weak() {
+  proposal="$1"
+  grep -E 'Eval or acceptance test:[[:space:]]*$|Rollback plan:[[:space:]]*$|Highest-priority plan step:[[:space:]]*$|Recommended decision:[[:space:]]*$' "$proposal" >/dev/null 2>&1
+}
+
+print_workshop_digest() {
+  verify_config >/dev/null
+
+  limit=12
+  draft_proposal=0
+  title="Convert recurring mission friction into a Workshop proposal"
+  slug=
+
+  while [ "$#" -gt 0 ]; do
+    case "$1" in
+      --limit)
+        shift
+        test "$#" -gt 0 || fail "--limit requires a number"
+        limit=$1
+        ;;
+      --draft-proposal)
+        draft_proposal=1
+        ;;
+      --title)
+        shift
+        test "$#" -gt 0 || fail "--title requires text"
+        title=$1
+        ;;
+      --slug)
+        shift
+        test "$#" -gt 0 || fail "--slug requires text"
+        slug=$(slugify "$1")
+        ;;
+      *)
+        fail "unknown workshop-digest option: $1"
+        ;;
+    esac
+    shift
+  done
+
+  ensure_dirs
+  tmp_friction=$(mktemp)
+  tmp_missing=$(mktemp)
+  tmp_stale=$(mktemp)
+  tmp_weak=$(mktemp)
+  tmp_keyword=$(mktemp)
+  recent_markdown_files "$mission_dir" "$limit" | while IFS= read -r mission; do
+    if mission_has_friction "$mission"; then
+      printf '%s\n' "$mission" >>"$tmp_friction"
+      if ! mission_has_proposal_handoff "$mission"; then
+        printf '%s\n' "$mission" >>"$tmp_missing"
+      fi
+      grep -Ei '^- (Candidate upgrades|Unresolved risks|Suit friction observed):' "$mission" \
+        | grep -Eiv 'Candidate upgrades:[[:space:]]*(None|None recorded by closeout\.?)\.?$|Unresolved risks:[[:space:]]*(No unresolved|None)|No additional.*friction|No .*friction' \
+        | grep -Eio 'friction|brittle|manual|missing proposal|unresolved risk|repeated|weak|stale|proposal handoff|graveyard' \
+        | tr '[:upper:]' '[:lower:]' >>"$tmp_keyword" || true
+    fi
+  done
+
+  recent_markdown_files "$proposal_dir" 0 | while IFS= read -r proposal; do
+    if ! proposal_has_decision "$proposal"; then
+      printf '%s\n' "$proposal" >>"$tmp_stale"
+    fi
+    if proposal_is_weak "$proposal"; then
+      printf '%s\n' "$proposal" >>"$tmp_weak"
+    fi
+  done
+
+  friction_count=$(wc -l <"$tmp_friction" | tr -d ' ')
+  missing_count=$(wc -l <"$tmp_missing" | tr -d ' ')
+  stale_count=$(wc -l <"$tmp_stale" | tr -d ' ')
+  weak_count=$(wc -l <"$tmp_weak" | tr -d ' ')
+  proposal_count=$(count_markdown_files "$proposal_dir")
+  decision_count=$(count_markdown_files "$decision_dir")
+  forge_count=$(count_markdown_files "$forge_dir")
+  top_keyword=$(sort "$tmp_keyword" | uniq -c | sort -rn | awk 'NR == 1 { print $2 }')
+  test -n "$top_keyword" || top_keyword="mission friction"
+
+  printf '# HyperAgent Workshop Digest\n\n'
+  printf '%s\n' "- Recent mission limit: $limit"
+  printf '%s\n' "- Missions with friction evidence: $friction_count"
+  printf '%s\n' "- Friction missions without proposal handoff: $missing_count"
+  printf '%s\n' "- Workshop proposals without decision records: $stale_count"
+  printf '%s\n' "- Weak proposal process evidence: $weak_count"
+  printf '%s\n\n' "- Mission/proposal/decision/Forge counts: $(count_markdown_files "$mission_dir")/$proposal_count/$decision_count/$forge_count"
+
+  printf '## Recent Missions Missing Proposal Handoff\n\n'
+  if [ "$missing_count" -eq 0 ]; then
+    printf '%s\n\n' "- None found."
+  else
+    sed 's/^/- `/' "$tmp_missing" | sed 's/$/`/' | head -5
+    printf '\n'
+  fi
+
+  printf '## Workshop And Forge Cadence\n\n'
+  if [ "$stale_count" -gt 0 ]; then
+    printf '%s\n' "- Stale proposals need human accept/reject/defer decisions before any capability is treated as accepted."
+  fi
+  if [ "$weak_count" -gt 0 ]; then
+    printf '%s\n' "- Forge cadence is due: at least one proposal lacks rollback, eval, decision, or first-step specificity."
+  fi
+  if [ "$missing_count" -gt 0 ]; then
+    printf '%s\n' "- Workshop cadence is due: recent mission friction exists without proposal handoff."
+  fi
+  if [ "$stale_count" -eq 0 ] && [ "$weak_count" -eq 0 ] && [ "$missing_count" -eq 0 ]; then
+    printf '%s\n' "- Cadence looks current for the scanned window."
+  fi
+  printf '\n'
+
+  printf '## Recommended Next Actions\n\n'
+  if [ "$missing_count" -gt 0 ]; then
+    first_mission=$(sed -n '1p' "$tmp_missing")
+    printf '1. Draft one Workshop proposal for `%s`, focused on recurring `%s` evidence. Keep activation mode `human review required`.\n' "$first_mission" "$top_keyword"
+  elif [ "$stale_count" -gt 0 ]; then
+    first_proposal=$(sed -n '1p' "$tmp_stale")
+    printf '1. Review `%s` and record an explicit accept/reject/defer decision. Do not update the capability registry unless accepted by a human.\n' "$first_proposal"
+  elif [ "$weak_count" -gt 0 ]; then
+    first_weak=$(sed -n '1p' "$tmp_weak")
+    printf '1. Run Forge review on `%s` to tighten proposal specificity, eval coverage, and rollback evidence.\n' "$first_weak"
+  else
+    printf '1. No backlog movement required from this digest window.\n'
+  fi
+  printf '\n'
+
+  if [ "$draft_proposal" -eq 1 ]; then
+    test "$missing_count" -gt 0 || fail "--draft-proposal requires at least one friction mission without proposal handoff"
+    first_mission=$(sed -n '1p' "$tmp_missing")
+    problem="Recent mission evidence shows $top_keyword friction without a Workshop proposal handoff; the digest should move the highest-value repeat pattern into reviewed backlog."
+    if [ -n "$slug" ]; then
+      proposal=$(create_proposal --mission "$first_mission" --title "$title" --problem "$problem" --slug "$slug")
+    else
+      proposal=$(create_proposal --mission "$first_mission" --title "$title" --problem "$problem")
+    fi
+    printf '## Draft Files\n\n'
+    printf '%s\n' "- Draft Workshop proposal: \`$proposal\`"
+    printf '%s\n' "- Activation mode remains \`human review required\`; no decision record was created."
+  fi
+
+  rm -f "$tmp_friction" "$tmp_missing" "$tmp_stale" "$tmp_weak" "$tmp_keyword"
+}
+
 print_workshop_prompt() {
   cat <<'EOF'
 Use HyperAgent Workshop Mode.
@@ -2480,12 +2656,14 @@ proposal_has_decision() {
   proposal="$1"
   rel=$(repo_relative_path "$proposal")
   base=$(basename "$proposal")
-  find "$decision_dir" -maxdepth 1 -type f -name '*.md' 2>/dev/null | while IFS= read -r decision_file; do
+  for decision_file in "$decision_dir"/*.md; do
+    test -f "$decision_file" || continue
     if grep -F -e "\`$rel\`" -e "$rel" -e "\`$proposal\`" -e "$proposal" -e "$base" "$decision_file" >/dev/null 2>&1; then
       printf '%s\n' "$decision_file"
-      break
+      return 0
     fi
   done
+  return 1
 }
 
 audit_proposals() {
@@ -2947,6 +3125,9 @@ case "$command" in
     ;;
   decide-upgrade)
     record_decision "$@"
+    ;;
+  workshop-digest|review-digest)
+    print_workshop_digest "$@"
     ;;
   help|-h|--help)
     usage

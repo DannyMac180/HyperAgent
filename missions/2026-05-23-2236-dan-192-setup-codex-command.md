@@ -43,9 +43,17 @@ scripts/verify-mvp.sh
 - Commands run: `sh -n scripts/setup-codex.sh`; `sh -n evals/setup-codex-smoke.sh`; `sh -n scripts/hyperagent.sh`; `sh evals/setup-codex-smoke.sh`; `sh scripts/verify-mvp.sh`; `tmpdir=$(mktemp -d) && sh scripts/install-codex-skill.sh "$tmpdir" && test -f "$tmpdir/codex-hyperagent/SKILL.md" && rm -rf "$tmpdir"`; `sh evals/init-smoke.sh`; `sh evals/smoke-loop.sh`; `git diff --check`.
 - Verification status: passed.
 
+## Follow-Up Hardening Evidence
+
+- Date/time: 2026-05-23 23:02 EDT.
+- Additional change: made `scripts/setup-codex.sh` honor `HYPERAGENT_HOME` directly and updated the public README/quickstart command to pass the resolved clone path into setup with `--install-dir "$dest"`.
+- Regression covered: `evals/setup-codex-smoke.sh` now asserts that a dry run with `HYPERAGENT_HOME` reports that path as the install dir, and `scripts/verify-mvp.sh` pins the documented command shape.
+- Additional commands run: `sh -n scripts/setup-codex.sh`; `sh -n evals/setup-codex-smoke.sh`; `sh -n scripts/verify-mvp.sh`; `sh evals/setup-codex-smoke.sh`; `sh scripts/verify-mvp.sh`; `tmpdir=$(mktemp -d) && sh scripts/install-codex-skill.sh "$tmpdir" && test -f "$tmpdir/codex-hyperagent/SKILL.md" && rm -rf "$tmpdir"`; `sh evals/init-smoke.sh`; `sh evals/smoke-loop.sh`; `git diff --check`.
+- Verification status: passed.
+
 ## Outcome
 
-- Final outcome: Added a documented `scripts/setup-codex.sh` setup path and `bin/hyperagent setup-codex` wrapper route that clone/update HyperAgent, run verification, install/update the Codex skill, and optionally initialize a target project only after confirmation. Follow-up hardening also refuses unsafe skills directories and makes dry-run summary output avoid claiming verification/install checks ran.
+- Final outcome: Added a documented `scripts/setup-codex.sh` setup path and `bin/hyperagent setup-codex` wrapper route that clone/update HyperAgent, run verification, install/update the Codex skill, and optionally initialize a target project only after confirmation. Follow-up hardening also refuses unsafe skills directories, makes dry-run summary output avoid claiming verification/install checks ran, and keeps custom `HYPERAGENT_HOME` command-path installs on the same resolved clone path.
 - Completion evidence: MVP verifier, setup smoke, installer smoke, init smoke, and Mission -> Workshop smoke loop all passed locally.
 - Unresolved risks: The README command still relies on normal `git clone` network access for a truly fresh machine; no hosted service or new secret handling was introduced.
 

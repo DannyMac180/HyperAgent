@@ -71,6 +71,14 @@ require_text "$dry_log" "Would clone:"
 require_text "$dry_log" "Would run: sh"
 require_text "$dry_log" "Dry run: verification and install checks were not executed."
 
+env_home_log="$tmpdir/env-home.log"
+HYPERAGENT_HOME="$repo_root" sh "$repo_root/scripts/setup-codex.sh" \
+  --skills-dir "$tmpdir/env-home-skills" \
+  --skip-smoke \
+  --no-update \
+  --dry-run >"$env_home_log"
+require_text "$env_home_log" "Install dir: $repo_root"
+
 unsafe_log="$tmpdir/unsafe.log"
 if sh "$repo_root/scripts/setup-codex.sh" \
   --install-dir "$repo_root" \

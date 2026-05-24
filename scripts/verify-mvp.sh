@@ -95,6 +95,7 @@ require_text scripts/install-codex-skill.sh "Usage: sh scripts/install-codex-ski
 require_text scripts/install-codex-skill.sh "--dry-run"
 require_text scripts/install-codex-skill.sh "--force"
 require_text scripts/setup-codex.sh "Usage: sh scripts/setup-codex.sh"
+require_text scripts/setup-codex.sh 'install_dir="${HYPERAGENT_HOME:-$home/HyperAgent}"'
 require_text scripts/setup-codex.sh "Global Codex custom instructions: unchanged"
 require_text scripts/setup-codex.sh "--init-target"
 require_text scripts/setup-codex.sh 'git -C "$install_dir" pull --ff-only'
@@ -130,6 +131,7 @@ require_text README.md "Try HyperAgent In Codex Mac"
 require_text README.md "https://github.com/DannyMac180/HyperAgent"
 require_text README.md "~/HyperAgent"
 require_text README.md "scripts/setup-codex.sh"
+require_text README.md 'setup-codex.sh" --install-dir "$dest"'
 require_text README.md "Do not modify my global Codex custom instructions"
 require_text README.md "docs/quickstart.md"
 require_text README.md "docs/clean-install-uat.md"
@@ -139,6 +141,7 @@ require_text README.md "docs/assets/hyperagent-architecture.svg"
 require_text README.md "docs/architecture/hyperagent.mmd"
 require_text docs/quickstart.md "Manual Quickstart"
 require_text docs/quickstart.md "One-Command Codex Setup"
+require_text docs/quickstart.md 'setup-codex.sh" --install-dir "$dest"'
 require_text docs/quickstart.md 'sh "$HOME/HyperAgent/scripts/setup-codex.sh" --init-target'
 require_text docs/quickstart.md "sh scripts/hyperagent.sh init --target"
 require_text docs/quickstart.md "sh scripts/install-codex-skill.sh"

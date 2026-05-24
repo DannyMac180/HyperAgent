@@ -19,7 +19,7 @@ else
   test ! -e "$dest" || { echo "Refusing to replace non-repo path: $dest" >&2; exit 1; }
   git clone https://github.com/DannyMac180/HyperAgent "$dest"
 fi
-sh "$dest/scripts/setup-codex.sh"'
+sh "$dest/scripts/setup-codex.sh" --install-dir "$dest"'
 ```
 
 The setup command:

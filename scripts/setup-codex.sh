@@ -85,7 +85,7 @@ test -n "$home" || fail "HOME is not set"
 script_dir=$(CDPATH= cd "$(dirname "$0")" && pwd)
 source_repo=$(CDPATH= cd "$script_dir/.." && pwd)
 
-install_dir="$home/HyperAgent"
+install_dir="${HYPERAGENT_HOME:-$home/HyperAgent}"
 skills_dir="$home/.codex/skills"
 repo_url="https://github.com/DannyMac180/HyperAgent.git"
 init_target=

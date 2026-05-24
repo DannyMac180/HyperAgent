@@ -1265,6 +1265,7 @@ git_changed_files() {
 print_status() {
   verify_config >/dev/null
   ensure_dirs
+  accepted_capabilities=$(read_accepted_capabilities)
   printf 'HyperAgent status\n'
   printf 'Repo: %s\n' "$repo_root"
   printf 'Mode: human review required\n'
@@ -1274,6 +1275,8 @@ print_status() {
   printf 'Forge reviews: %s\n' "$(count_markdown_files "$forge_dir")"
   test -f "$registry_file" || fail "missing capability registry: $registry_file"
   printf 'Capability registry: %s\n' "$registry_file"
+  printf 'Accepted capabilities: %s\n' "$(accepted_capability_count "$accepted_capabilities")"
+  print_accepted_capabilities_text "$accepted_capabilities" '  '
 }
 
 record_check() {
@@ -1441,6 +1444,115 @@ read_failure_commands() {
   fi
 }
 
+read_accepted_capabilities() {
+  test -f "$registry_file" || return 0
+  awk '
+    function flush_entry() {
+      if (id != "" && status == "accepted") {
+        print id "|" title "|" activation "|" verification "|" decision
+      }
+    }
+    /^## / {
+      flush_entry()
+      id = $0
+      sub(/^##[[:space:]]*/, "", id)
+      status = title = activation = verification = decision = ""
+      next
+    }
+    id != "" && /^- Status:/ {
+      status = $0
+      sub(/^- Status:[[:space:]]*/, "", status)
+      next
+    }
+    id != "" && /^- Title:/ {
+      title = $0
+      sub(/^- Title:[[:space:]]*/, "", title)
+      next
+    }
+    id != "" && /^- Activation mode:/ {
+      activation = $0
+      sub(/^- Activation mode:[[:space:]]*/, "", activation)
+      next
+    }
+    id != "" && /^- Verification:/ {
+      verification = $0
+      sub(/^- Verification:[[:space:]]*/, "", verification)
+      next
+    }
+    id != "" && /^- Decision record:/ {
+      decision = $0
+      sub(/^- Decision record:[[:space:]]*/, "", decision)
+      next
+    }
+    END {
+      flush_entry()
+    }
+  ' "$registry_file"
+}
+
+accepted_capability_count() {
+  capabilities="$1"
+  if [ -z "$capabilities" ]; then
+    printf '0'
+    return 0
+  fi
+  printf '%s\n' "$capabilities" | awk 'NF { count++ } END { print count + 0 }'
+}
+
+print_accepted_capabilities_text() {
+  capabilities="$1"
+  prefix="$2"
+  if [ -z "$capabilities" ]; then
+    printf '%s%s\n' "$prefix" "none"
+    return 0
+  fi
+  printf '%s\n' "$capabilities" | awk -F '|' -v prefix="$prefix" '
+    NF {
+      printf "%s- %s: %s (activation: %s; verification: %s; decision: %s)\n", prefix, $1, $2, $3, $4, $5
+    }
+  '
+}
+
+print_accepted_capabilities_markdown() {
+  capabilities="$1"
+  printf '\n## Accepted Capabilities\n\n'
+  if [ -z "$capabilities" ]; then
+    printf '%s\n' "- none"
+    return 0
+  fi
+  printf '%s\n' "$capabilities" | awk -F '|' '
+    NF {
+      printf "- `%s` - %s\n", $1, $2
+      printf "  - Activation mode: `%s`\n", $3
+      printf "  - Verification: %s\n", $4
+      printf "  - Decision evidence: %s\n", $5
+    }
+  '
+}
+
+print_accepted_capabilities_json() {
+  capabilities="$1"
+  if [ -z "$capabilities" ]; then
+    printf '[]'
+    return 0
+  fi
+  printf '%s\n' "$capabilities" | awk -F '|' '
+    BEGIN { printf "[" }
+    NF {
+      for (i = 1; i <= NF; i++) {
+        gsub(/\\/, "\\\\", $i)
+        gsub(/"/, "\\\"", $i)
+      }
+      if (seen > 0) {
+        printf ","
+      }
+      printf "{\"id\":\"%s\",\"title\":\"%s\",\"activation_mode\":\"%s\",\"verification\":\"%s\",\"decision_record\":\"%s\"}", $1, $2, $3, $4, $5
+      seen++
+    }
+    END { printf "]" }
+  '
+}
+
 workbench_trace_log_path() {
   override="$1"
   if [ -n "$override" ]; then
@@ -1513,6 +1625,7 @@ print_sense_markdown() {
   pr_info=$(pr_summary "$pr_mode")
   workbench_status=$(workbench_trace_status "$workbench_trace_log")
   workbench_traces=$(read_workbench_traces "$workbench_trace_log")
+  accepted_capabilities=$(read_accepted_capabilities)
 
   printf '# HyperAgent Sense Summary\n\n'
   printf '%s\n' "- Generated: $(now_readable)"
@@ -1553,6 +1666,7 @@ print_sense_markdown() {
   else
     printf '%s\n' "- not available locally"
   fi
+  print_accepted_capabilities_markdown "$accepted_capabilities"
   printf '\n## Workbench Traces\n\n'
   if [ -n "$workbench_traces" ]; then
     printf '%s\n' "$workbench_traces" | sed 's/^/- `/' | sed 's/$/`/'
@@ -1601,6 +1715,7 @@ print_sense_json() {
   pr_info=$(pr_summary "$pr_mode")
   workbench_status=$(workbench_trace_status "$workbench_trace_log")
   workbench_traces=$(read_workbench_traces "$workbench_trace_log")
+  accepted_capabilities=$(read_accepted_capabilities)
 
   printf '{\n'
   printf '  "generated": "%s",\n' "$(now_readable | json_escape)"
@@ -1621,6 +1736,9 @@ print_sense_json() {
   printf ',\n'
   printf '  "pr_and_ci": '
   print_json_array_from_lines "$pr_info"
+  printf ',\n'
+  printf '  "accepted_capabilities": '
+  print_accepted_capabilities_json "$accepted_capabilities"
   printf ',\n'
   printf '  "trace": "%s",\n' "$(redact_text "$trace_url" | json_escape)"
   printf '  "workbench": {\n'
@@ -2194,15 +2312,16 @@ verify_registry_safety() {
   awk '
     /^## / {
       if (in_entry) {
-        print title "\t" status "\t" proposal "\t" decision "\t" activation "\t" verification "\t" rollback
+        print id "|" title "|" status "|" proposal "|" decision "|" activation "|" verification "|" rollback
       }
       in_entry = 1
-      title = $0
-      sub(/^## /, "", title)
-      status = proposal = decision = activation = verification = rollback = ""
+      id = $0
+      sub(/^## /, "", id)
+      title = status = proposal = decision = activation = verification = rollback = ""
       next
     }
     in_entry && /^- Status:/ { status = $0; sub(/^- Status:[[:space:]]*/, "", status) }
+    in_entry && /^- Title:/ { title = $0; sub(/^- Title:[[:space:]]*/, "", title) }
     in_entry && /^- Source proposal:/ { proposal = $0; sub(/^- Source proposal:[[:space:]]*/, "", proposal) }
     in_entry && /^- Proposal:/ { proposal = $0; sub(/^- Proposal:[[:space:]]*/, "", proposal) }
     in_entry && /^- Decision record:/ { decision = $0; sub(/^- Decision record:[[:space:]]*/, "", decision) }
@@ -2211,27 +2330,30 @@ verify_registry_safety() {
     in_entry && /^- Rollback:/ { rollback = $0; sub(/^- Rollback:[[:space:]]*/, "", rollback) }
     END {
       if (in_entry) {
-        print title "\t" status "\t" proposal "\t" decision "\t" activation "\t" verification "\t" rollback
+        print id "|" title "|" status "|" proposal "|" decision "|" activation "|" verification "|" rollback
       }
     }
   ' "$registry_file" >"$tmp"
 
-  while IFS="$(printf '\t')" read -r title status proposal decision activation verification rollback; do
+  while IFS='|' read -r capability_id title status proposal decision activation verification rollback; do
     case "$status" in
       accepted) ;;
       *) continue ;;
     esac
 
-    test -n "$proposal" || fail "accepted capability missing source proposal: $title"
-    test -n "$decision" || fail "accepted capability missing decision record: $title"
-    test "$activation" = "human review required" || fail "accepted capability has unsafe activation mode: $title"
-    test -n "$verification" || fail "accepted capability missing verification evidence: $title"
-    test -n "$rollback" || fail "accepted capability missing rollback plan: $title"
+    test -n "$capability_id" || fail "accepted capability missing capability ID"
+    test "$capability_id" != "Accepted Capabilities" || fail "accepted capability entry missing capability ID"
+    test -n "$title" || fail "accepted capability missing title: $capability_id"
+    test -n "$proposal" || fail "accepted capability missing source proposal: $capability_id"
+    test -n "$decision" || fail "accepted capability missing decision record: $capability_id"
+    test "$activation" = "human review required" || fail "accepted capability has unsafe activation mode: $capability_id"
+    test -n "$verification" || fail "accepted capability missing verification evidence: $capability_id"
+    test -n "$rollback" || fail "accepted capability missing rollback plan: $capability_id"
 
     proposal_path=$(printf '%s' "$proposal" | sed 's/`//g')
     decision_path=$(printf '%s' "$decision" | sed 's/`//g')
-    test -f "$proposal_path" || test -f "$repo_root/$proposal_path" || fail "accepted capability proposal path missing: $title -> $proposal_path"
-    test -f "$decision_path" || test -f "$repo_root/$decision_path" || fail "accepted capability decision path missing: $title -> $decision_path"
+    test -f "$proposal_path" || test -f "$repo_root/$proposal_path" || fail "accepted capability proposal path missing: $capability_id -> $proposal_path"
+    test -f "$decision_path" || test -f "$repo_root/$decision_path" || fail "accepted capability decision path missing: $capability_id -> $decision_path"
     verify_accepted_proposal_safety "$proposal_path"
     verify_decision_safety "$decision_path"
   done <"$tmp"
@@ -3089,11 +3211,14 @@ EOF
 
   if [ "$decision" = accepted ]; then
     test -f "$registry_file" || fail "missing capability registry: $registry_file"
+    proposal_title=$(field_value "$proposal" "Upgrade title")
+    test -n "$proposal_title" || proposal_title=$capability
     cat >>"$registry_file" <<EOF
 
 ## $capability
 
 - Status: accepted
+- Title: $proposal_title
 - Proposal: \`$proposal\`
 - Decision record: \`$file\`
 - Accepted by: $reviewer

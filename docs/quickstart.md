@@ -119,15 +119,34 @@ The default mode is `human review required`.
 
 `--symlink` is only for the global Codex skill install. Project-local files created by `hyperagent init` remain normal files, while the generated project shim delegates to the global runtime.
 
-## 4. Check Local Status
+## 4. Use The Five Primary Flows
+
+HyperAgent's public command model is intentionally small:
+
+- `init`: initialize or update a repo.
+- `sense`: understand current state, recent checks, changed files, PR status, and local trace health.
+- `mission`: start or close out mission records.
+- `review`: create Workshop proposals, run Forge reviews, record decisions, and inspect backlog movement.
+- `ui`: open the local cockpit surface when available; in this alpha it prints local cockpit pointers.
+
+Advanced helpers remain available as compatibility aliases for at least one release. For example, `status`, `doctor`, `new-mission`, `mission-closeout`, `propose-upgrade`, `workshop-prompt`, `new-forge-review`, `forge-prompt`, and `decide-upgrade` still work while the docs move users toward complete flows.
+
+## 5. Sense Current State
+
+```bash
+sh scripts/hyperagent.sh sense
+sh scripts/hyperagent.sh sense --doctor
+```
+
+You should see the current branch, upstream, HEAD, git status counts, changed files, recent command evidence, and optional PR/trace context.
+
+`status` remains a compatibility diagnostics alias:
 
 ```bash
 sh scripts/hyperagent.sh status
 ```
 
-You should see counts for missions, Workshop proposals, Workshop decisions, Forge reviews, and the capability registry path.
-
-## 5. Capture Local Senses
+## 6. Capture Local Senses
 
 Record commands and checks explicitly when they matter for a mission:
 
@@ -147,9 +166,9 @@ sh scripts/hyperagent.sh doctor
 
 The sensing layer summarizes the current branch, upstream, HEAD, git status counts, changed files, recent opt-in commands/checks, failures and retries, optional PR/CI status when `gh` can find a pull request, and an optional trace link passed with `--trace-url`. By default, it also checks `.hyperagent-evidence/workbench/traces.jsonl` or `HYPERAGENT_WORKBENCH_TRACE_LOG` for local Workbench/Raindrop trace entries. It is local-first and does not require hosted services. It does not inspect file contents, environment variables, shell history, credentials, or secrets, and it redacts secret-like command and trace fragments before output.
 
-Workbench trace enrichment is a background sensing subsystem. If Workbench is unavailable, unhealthy, or not initialized yet, `sense` reports that state and continues with the lightweight fallback. Use `doctor` for local diagnostics and retention/redaction reminders before adding trace evidence to a mission record.
+Workbench trace enrichment is a background sensing subsystem. If Workbench is unavailable, unhealthy, or not initialized yet, `sense` reports that state and continues with the lightweight fallback. Use `sense --doctor` for local diagnostics and retention/redaction reminders before adding trace evidence to a mission record. `doctor` remains as a compatibility alias.
 
-## 6. Run A Mission In Codex
+## 7. Run A Mission In Codex
 
 Ask Codex:
 
@@ -173,17 +192,30 @@ sh scripts/hyperagent.sh verify-mission --strict missions/MISSION.md
 Closeout auto-fills the current sense snapshot, recent command/check evidence, changed files, verification status, unresolved-risk prompt, and candidate upgrade field so the record is suitable for Workshop evidence without copy/paste cleanup.
 Pass `--mission missions/DRAFT.md` to replace a draft record with the closeout evidence instead of creating a new file.
 
+The grouped command is the preferred user-facing form:
+
+```bash
+sh scripts/hyperagent.sh mission closeout \
+  --request "Run a small HyperAgent mission" \
+  --slug small-hyperagent-mission \
+  --outcome "Mission completed and verification passed" \
+  --risks "No unresolved risks"
+sh scripts/hyperagent.sh mission verify --strict missions/MISSION.md
+```
+
 You can also create a mission record shell:
 
 ```bash
-sh scripts/hyperagent.sh new-mission \
+sh scripts/hyperagent.sh mission new \
   --request "Run a small HyperAgent mission" \
   --slug small-hyperagent-mission \
   --commands-run "sh scripts/verify-mvp.sh" \
   --verification-status "pending"
 ```
 
-## 7. Run Workshop Review
+`new-mission`, `mission-closeout`, and `verify-mission` remain compatibility aliases.
+
+## 8. Run Review Flows
 
 `new-mission` remains useful for drafts, but strict verification intentionally fails its placeholder closeout fields until they are replaced.
 
@@ -198,13 +230,13 @@ Then have Codex follow the printed prompt. Proposals belong in `workshop/proposa
 After several missions, run a digest before writing another standalone proposal:
 
 ```bash
-sh scripts/hyperagent.sh workshop-digest --limit 12
+sh scripts/hyperagent.sh review digest --limit 12
 ```
 
 The digest scans recent mission records for friction evidence that lacks proposal handoff, lists stale proposals without decisions, surfaces weak proposal evidence that may deserve Forge review, and recommends one next backlog action. To draft a proposal from the highest-value missing handoff without accepting anything:
 
 ```bash
-sh scripts/hyperagent.sh workshop-digest --limit 12 --draft-proposal
+sh scripts/hyperagent.sh review digest --limit 12 --draft-proposal
 ```
 
 Drafted digest proposals remain `human review required` and do not create decision records.
@@ -212,15 +244,34 @@ Drafted digest proposals remain `human review required` and do not create decisi
 To create a proposal shell:
 
 ```bash
-sh scripts/hyperagent.sh propose-upgrade \
+sh scripts/hyperagent.sh review workshop \
   --mission missions/2026-05-01-2108-mark-i-build.md \
   --title "Improve first-run verification" \
   --problem "The install step needs a concrete smoke test"
 ```
 
-## 8. Record Human Approval Or Rejection
+`workshop-prompt`, `propose-upgrade`, `workshop-digest`, and `review-digest` remain compatibility aliases:
+
+```bash
+sh scripts/hyperagent.sh workshop-digest --limit 12
+```
+
+## 9. Record Human Approval Or Rejection
 
 Persistent behavior changes are not activated silently.
+
+```bash
+sh scripts/hyperagent.sh review decide \
+  --proposal workshop/proposals/2026-05-01-2108-codex-skill-installer.md \
+  --decision accepted \
+  --reviewer "Human reviewer" \
+  --reason "The installer reduces first-run ambiguity and has a local smoke test" \
+  --capability codex-skill-installer
+```
+
+Accepted decisions are recorded in `workshop/decisions/` and appended to `hyperagent/capability-registry.md`.
+
+`decide-upgrade` remains a compatibility alias:
 
 ```bash
 sh scripts/hyperagent.sh decide-upgrade \
@@ -231,14 +282,12 @@ sh scripts/hyperagent.sh decide-upgrade \
   --capability codex-skill-installer
 ```
 
-Accepted decisions are recorded in `workshop/decisions/` and appended to `hyperagent/capability-registry.md`.
-
-## 9. Run Forge Review
+## 10. Run Forge Review
 
 Ask Codex:
 
 ```bash
-sh scripts/hyperagent.sh forge-prompt
+sh scripts/hyperagent.sh review forge new --slug workshop-quality-review
 ```
 
 Forge reviews belong in `forge/reviews/`. Run one after proposals are accepted or rejected, after evals change, before release-readiness decisions, or when repeated missions show the Workshop producing vague, unsafe, untested, or low-value proposals.
@@ -254,25 +303,31 @@ sh scripts/verify-forge-review.sh forge/reviews/2026-05-16-1216-workshop-quality
 For a compact process-health report across proposals, decisions, registry entries, and audit eval coverage:
 
 ```bash
-sh scripts/hyperagent.sh forge audit
+sh scripts/hyperagent.sh review forge audit
 ```
 
 The audit identifies weak proposals, proposals missing decisions, accepted capabilities with incomplete traceability, and missing Forge audit eval coverage. It is read-only by default. When the findings are concrete enough to justify a process improvement, draft a normal human-review-required Workshop proposal explicitly:
 
 ```bash
-sh scripts/hyperagent.sh forge audit --write-proposal
+sh scripts/hyperagent.sh review forge audit --write-proposal
 ```
 
 The Forge should improve the Workshop process, not silently activate new capabilities. If the review finds a concrete process improvement, create a normal Workshop proposal linked to the Forge review:
 
 ```bash
-sh scripts/hyperagent.sh propose-upgrade \
+sh scripts/hyperagent.sh review workshop \
   --forge-review forge/reviews/2026-05-16-1216-workshop-quality-review.md \
   --title "Improve Workshop proposal quality" \
   --problem "Recent proposals are too vague to evaluate safely"
 ```
 
-## 10. Verify
+`forge-prompt`, `new-forge-review`, `forge audit`, and `forge-audit` remain compatibility aliases:
+
+```bash
+sh scripts/hyperagent.sh forge audit
+```
+
+## 11. Verify
 
 ```bash
 sh scripts/hyperagent.sh verify-config
@@ -284,7 +339,7 @@ sh evals/forge-audit-smoke.sh
 sh evals/smoke-loop.sh
 ```
 
-## 11. Update Later
+## 12. Update Later
 
 For copy installs:
 

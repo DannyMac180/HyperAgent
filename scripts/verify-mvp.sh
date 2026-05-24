@@ -26,6 +26,8 @@ require_file CONTRIBUTING.md
 require_file SECURITY.md
 require_file .github/pull_request_template.md
 require_file .hyperagent
+require_file adapters/contract.md
+require_file adapters/codex.md
 require_file .github/ISSUE_TEMPLATE/bug_report.md
 require_file .github/ISSUE_TEMPLATE/suit_friction.md
 require_file .github/ISSUE_TEMPLATE/upgrade_proposal.md
@@ -83,8 +85,8 @@ require_dir forge/reviews
 require_text skills/codex-hyperagent/SKILL.md "Workshop Review Prompt"
 require_text skills/codex-hyperagent/SKILL.md "Forge Review Prompt"
 require_text skills/codex-hyperagent/SKILL.md "Relevance Triage"
-require_text skills/codex-hyperagent/SKILL.md "mission-closeout"
-require_text skills/codex-hyperagent/SKILL.md "verify-mission --strict"
+require_text skills/codex-hyperagent/SKILL.md "mission closeout"
+require_text skills/codex-hyperagent/SKILL.md "mission verify --strict"
 require_text skills/codex-hyperagent/SKILL.md "workshop/rubric.md"
 require_text skills/codex-hyperagent/SKILL.md "name: codex-hyperagent"
 require_text skills/codex-hyperagent/SKILL.md "version: v0.1.0-alpha"
@@ -115,6 +117,13 @@ require_text scripts/setup-hyperagent.sh "Dry run: verification and install chec
 require_text scripts/update-codex-skill.sh "update complete"
 require_text bin/hyperagent "scripts/hyperagent.sh"
 require_text scripts/hyperagent.sh "init [--target DIR] [--update] [--force] [--dry-run]"
+require_text scripts/hyperagent.sh "Primary flows:"
+require_text scripts/hyperagent.sh "mission new --request TEXT"
+require_text scripts/hyperagent.sh "mission closeout --request TEXT"
+require_text scripts/hyperagent.sh "review workshop (--mission PATH | --forge-review PATH)"
+require_text scripts/hyperagent.sh "review forge audit [--write-proposal]"
+require_text scripts/hyperagent.sh "review decide --proposal PATH"
+require_text scripts/hyperagent.sh "Compatibility and diagnostics:"
 require_text scripts/hyperagent.sh "setup-hyperagent [options]"
 require_text scripts/hyperagent.sh "verify-config"
 require_text scripts/hyperagent.sh "verify-safety"
@@ -134,6 +143,8 @@ require_text scripts/hyperagent.sh "mission-closeout --request TEXT [--mission P
 require_text scripts/hyperagent.sh "verify-mission [--strict] PATH"
 require_text scripts/hyperagent.sh "workshop-digest [--limit N]"
 require_text scripts/hyperagent.sh "review-digest [--limit N]"
+require_text evals/cli-help-smoke.sh "mission closeout"
+require_text evals/cli-help-smoke.sh "new-mission"
 require_text scripts/hyperagent.sh "Does not inspect file contents"
 require_text scripts/hyperagent.sh ".hyperagent-evidence/commands.log"
 require_text scripts/hyperagent.sh ".hyperagent-evidence/workbench/traces.jsonl"
@@ -152,6 +163,21 @@ require_text .hyperagent 'evidence_log = ".hyperagent-evidence/commands.log"'
 require_text .hyperagent 'workbench_trace_log = ".hyperagent-evidence/workbench/traces.jsonl"'
 require_text .hyperagent 'codex = true'
 require_text .hyperagent 'sh evals/forge-audit-smoke.sh'
+require_text adapters/contract.md "HyperAgent Adapter Contract"
+require_text adapters/contract.md "Install path"
+require_text adapters/contract.md "Prompt format"
+require_text adapters/contract.md "Tool capabilities"
+require_text adapters/contract.md "Memory location"
+require_text adapters/contract.md "Verification commands"
+require_text adapters/contract.md "Safety constraints"
+require_text adapters/contract.md "Status reporting"
+require_text adapters/contract.md "UI and sensing integration"
+require_text adapters/contract.md "Codex is the only enabled adapter"
+require_text adapters/codex.md "Codex Adapter"
+require_text adapters/codex.md "Codex is the only shipped HyperAgent adapter"
+require_text adapters/codex.md "Global Codex custom instructions are not edited"
+require_text adapters/codex.md 'Default activation mode remains `human review required`'
+require_text adapters/codex.md "does not provide a hosted dashboard"
 require_text README.md "v0.1.0-alpha"
 require_text README.md "docs/releases/v0.1.0-alpha.md"
 require_text README.md "Try HyperAgent In Codex Mac"
@@ -163,6 +189,8 @@ require_text README.md 'setup-hyperagent.sh" --install-dir "$dest"'
 require_text README.md "Do not modify my global Codex custom instructions"
 require_text README.md "docs/quickstart.md"
 require_text README.md "docs/config.md"
+require_text README.md "adapters/contract.md"
+require_text README.md "adapters/codex.md"
 require_text README.md "docs/clean-install-uat.md"
 require_text README.md "sh scripts/update-codex-skill.sh"
 require_text README.md "docs/release-checklist.md"
@@ -275,9 +303,9 @@ require_text hyperagent/operating-prompt.md "human review required"
 require_text hyperagent/operating-prompt.md "relevance triage"
 require_text hyperagent/operating-prompt.md "workshop/decisions"
 require_text hyperagent/operating-prompt.md "--forge-review"
-require_text hyperagent/operating-prompt.md "forge audit"
-require_text hyperagent/operating-prompt.md "mission-closeout"
-require_text hyperagent/operating-prompt.md "verify-mission --strict"
+require_text hyperagent/operating-prompt.md "review forge audit"
+require_text hyperagent/operating-prompt.md "mission closeout"
+require_text hyperagent/operating-prompt.md "mission verify --strict"
 require_text hyperagent/capability-registry.md "human review required"
 require_text hyperagent/capability-registry.md "codex-skill-installer"
 require_text hyperagent/capability-registry.md "In Review Capabilities"

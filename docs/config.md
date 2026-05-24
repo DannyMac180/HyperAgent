@@ -66,6 +66,13 @@ codex = true
 
 Future adapters should add their own booleans or adapter-specific sections without changing the meaning of the Codex key.
 
+Adapter responsibilities are documented outside the config file:
+
+- `adapters/contract.md`: generic requirements for any future platform adapter.
+- `adapters/codex.md`: Codex-specific install, prompt, tools, memory, verification, safety, status, and sensing boundaries.
+
+The config flag says which adapter is enabled. The adapter docs explain what that adapter owns. Non-Codex adapter docs or flags should not be added until a reviewed issue authorizes that platform.
+
 ## Verification Commands
 
 Verification commands are workspace guidance for humans and agents. The verifier requires the array to be present and to include the config verifier and status command:

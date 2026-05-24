@@ -77,6 +77,18 @@ The MVP is file-based on purpose. There is no hosted service, no database, and n
 
 For the manual and one-command setup paths, see `docs/quickstart.md`.
 
+The primary CLI model has five flows:
+
+```bash
+sh scripts/hyperagent.sh init --target /path/to/project
+sh scripts/hyperagent.sh sense
+sh scripts/hyperagent.sh mission closeout --request "Describe the task" --slug task-slug
+sh scripts/hyperagent.sh review workshop --mission missions/MISSION.md --title "Improve the Suit" --problem "Concrete mission friction"
+sh scripts/hyperagent.sh ui
+```
+
+Development helpers such as `status`, `doctor`, `new-mission`, `mission-closeout`, `propose-upgrade`, `new-forge-review`, `forge audit`, and `decide-upgrade` remain available as compatibility aliases for at least one release.
+
 For the project config contract, see `docs/config.md`.
 
 For clean-install acceptance testing, see `docs/clean-install-uat.md`.
@@ -109,6 +121,8 @@ Restart Codex Desktop or open a fresh thread after updating the installed skill.
 - `docs/hyperagent-prd.md`: product requirements and milestone plan.
 - `docs/concepts.md`: the Suit, Mission, Workshop, and Forge mental model.
 - `docs/config.md`: `.hyperagent` schema, stable fields, adapter-owned fields, and verification command contract.
+- `adapters/contract.md`: generic adapter contract for future platform work.
+- `adapters/codex.md`: Codex-specific adapter responsibilities for the current alpha.
 - `docs/clean-install-uat.md`: repeatable clean-install acceptance test for the README prompt.
 - `docs/evidence-policy.md`: committed-versus-local mission evidence policy, redaction checklist, and public example rules.
 - `docs/release-checklist.md`: alpha release criteria, clean-clone test, and update model.
@@ -122,7 +136,7 @@ Restart Codex Desktop or open a fresh thread after updating the installed skill.
 - `scripts/setup-hyperagent.sh`: one-command HyperAgent setup path for clone/update, verification, skill install, and optional project init.
 - `scripts/install-codex-skill.sh`: dependency-free Codex skill installer.
 - `scripts/update-codex-skill.sh`: update helper for copy installs.
-- `scripts/hyperagent.sh`: runtime helper for project init, local sensing, command/check evidence, mission shells, proposals, Forge reviews, Forge audits, approval decisions, and status. Initialized projects get a small shim that delegates to this runtime.
+- `scripts/hyperagent.sh`: runtime helper organized around five user-facing flows: `init`, `sense`, `mission`, `review`, and `ui`. Existing development commands remain available as compatibility aliases. Initialized projects get a small shim that delegates to this runtime.
 - `.hyperagent-evidence/`: ignored local runtime evidence, including the opt-in command/check log used by `sense`.
 - `hyperagent/operating-prompt.md`: the operating layer Codex wears during work.
 - `hyperagent/capability-registry.md`: accepted capability registry with reviewed local capabilities.
@@ -151,7 +165,7 @@ sh scripts/hyperagent.sh verify-config
 sh scripts/verify-mvp.sh
 ```
 
-The config verifier checks the root `.hyperagent` contract. The MVP verifier checks that the Codex skill, installer, operating prompt, local memory directories, templates, documentation, capability registry, and safety defaults are present.
+The config verifier checks the root `.hyperagent` contract. The MVP verifier checks that the Codex adapter docs, Codex skill, installer, operating prompt, local memory directories, templates, documentation, capability registry, and safety defaults are present.
 
 Run the end-to-end local smoke loop:
 

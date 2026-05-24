@@ -20,6 +20,10 @@ cd "$tmpdir/HyperAgent"
 
 sh scripts/verify-mvp.sh >/dev/null
 
+sh scripts/hyperagent.sh check --note "smoke wrapper passed" -- sh scripts/hyperagent.sh status >/dev/null
+grep -F "passed" .hyperagent-evidence/commands.log >/dev/null || fail "check wrapper did not record passed status"
+grep -F "sh scripts/hyperagent.sh status" .hyperagent-evidence/commands.log >/dev/null || fail "check wrapper did not record command"
+
 mission=$(sh scripts/hyperagent.sh new-mission \
   --request "Smoke test the HyperAgent loop" \
   --slug smoke-loop \
@@ -35,6 +39,25 @@ grep -F "Commands run: sh scripts/verify-mvp.sh" "$mission" >/dev/null || fail "
 grep -F "Verification status: Smoke verification pending" "$mission" >/dev/null || fail "mission missing verification status"
 grep -F "Final outcome: Pending final outcome." "$mission" >/dev/null || fail "mission missing final outcome placeholder"
 grep -F "Unresolved risks: Pending unresolved risk review." "$mission" >/dev/null || fail "mission missing unresolved risk placeholder"
+if sh scripts/hyperagent.sh verify-mission --strict "$mission" >/dev/null 2>&1; then
+  fail "strict mission verification accepted placeholder mission"
+fi
+
+closeout=$(sh scripts/hyperagent.sh mission-closeout \
+  --request "Smoke test closeout automation" \
+  --mission "$mission" \
+  --slug smoke-closeout \
+  --outcome "Smoke closeout completed" \
+  --risks "No unresolved smoke risks" \
+  --candidate-upgrades "None")
+test "$closeout" = "$mission" || fail "closeout did not update requested mission"
+test -f "$closeout" || fail "closeout mission was not created"
+grep -F "Auto-Filled Evidence" "$closeout" >/dev/null || fail "closeout missing auto-filled evidence"
+grep -F "Sense Snapshot" "$closeout" >/dev/null || fail "closeout missing sense snapshot"
+grep -F "Recent Commands And Checks" "$closeout" >/dev/null || fail "closeout missing recent checks"
+grep -F "sh scripts/hyperagent.sh status" "$closeout" >/dev/null || fail "closeout missing recorded check"
+grep -F "Candidate upgrades: None" "$closeout" >/dev/null || fail "closeout missing candidate upgrades"
+sh scripts/hyperagent.sh verify-mission --strict "$closeout" >/dev/null
 
 proposal=$(sh scripts/hyperagent.sh propose-upgrade \
   --mission "$mission" \

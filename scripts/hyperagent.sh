@@ -21,8 +21,17 @@ Commands:
   record-check --command TEXT --status passed|failed|retried|skipped [--note TEXT]
       Append an opt-in check or command result to the local evidence log.
 
+  check [--note TEXT] [--command-log PATH] -- COMMAND [ARG...]
+      Run a command and automatically record its pass/fail status.
+
   new-mission --request TEXT [--slug SLUG] [--commands-run TEXT] [--verification-status TEXT]
       Create a mission record in missions/.
+
+  mission-closeout --request TEXT [--mission PATH] [--slug SLUG] [--outcome TEXT] [--risks TEXT] [--candidate-upgrades TEXT]
+      Create or update a near-final mission record with current sense, checks, changed files, and review prompts.
+
+  verify-mission [--strict] PATH
+      Check a mission record. Strict mode fails placeholder closeout text.
 
   propose-upgrade (--mission PATH | --forge-review PATH) --title TEXT --problem TEXT [--slug SLUG]
       Create a Workshop proposal in workshop/proposals/ from mission evidence or Forge review evidence.
@@ -340,9 +349,11 @@ Use these files to keep agent work inspectable:
 ```bash
 sh scripts/hyperagent.sh status
 sh scripts/hyperagent.sh sense
+sh scripts/hyperagent.sh check -- sh scripts/verify-mvp.sh
 sh scripts/hyperagent.sh record-check --status passed --command "sh scripts/verify-mvp.sh"
 sh scripts/hyperagent.sh doctor
-sh scripts/hyperagent.sh new-mission --request "Describe the task" --slug task-slug
+sh scripts/hyperagent.sh mission-closeout --request "Describe the task" --slug task-slug
+sh scripts/hyperagent.sh verify-mission --strict missions/MISSION.md
 sh scripts/hyperagent.sh workshop-prompt
 sh scripts/hyperagent.sh forge-prompt
 sh scripts/hyperagent.sh propose-upgrade --forge-review forge/reviews/REVIEW.md --title "Improve Workshop quality" --problem "The Workshop process needs a concrete fix"
@@ -361,8 +372,11 @@ sh scripts/hyperagent.sh status
 To capture local task evidence for mission records:
 
 ```bash
+sh scripts/hyperagent.sh check -- sh scripts/verify-mvp.sh
 sh scripts/hyperagent.sh record-check --status passed --command "sh scripts/verify-mvp.sh"
 sh scripts/hyperagent.sh sense
+sh scripts/hyperagent.sh mission-closeout --request "Describe the task" --slug task-slug
+sh scripts/hyperagent.sh verify-mission --strict missions/MISSION.md
 ```
 
 The sensing summary reads Git metadata, the opt-in local command log, and local Workbench trace metadata when the default ignored trace log exists. It does not inspect repository file contents or environment values, and command text is redacted for secret-like tokens before storage and output.
@@ -675,6 +689,64 @@ record_check() {
   safe_note=$(redact_text "$note")
   printf '%s\t%s\t%s\t%s\n' "$(now_readable)" "$status" "$safe_command" "$safe_note" >>"$log_file"
   printf '%s\n' "$log_file"
+}
+
+run_check() {
+  note=
+  log_file="$default_command_log"
+
+  while [ "$#" -gt 0 ]; do
+    case "$1" in
+      --note)
+        shift
+        test "$#" -gt 0 || fail "--note requires text"
+        note=$1
+        ;;
+      --command-log)
+        shift
+        test "$#" -gt 0 || fail "--command-log requires a path"
+        log_file=$1
+        ;;
+      --)
+        shift
+        break
+        ;;
+      *)
+        break
+        ;;
+    esac
+    shift
+  done
+
+  test "$#" -gt 0 || fail "check requires a command after --"
+  command_text=
+  for arg in "$@"; do
+    if [ -n "$command_text" ]; then
+      command_text="$command_text $arg"
+    else
+      command_text=$arg
+    fi
+  done
+
+  set +e
+  "$@"
+  status_code=$?
+  set -e
+
+  if [ "$status_code" -eq 0 ]; then
+    check_status=passed
+  else
+    check_status=failed
+    if [ -n "$note" ]; then
+      note="$note; exit $status_code"
+    else
+      note="exit $status_code"
+    fi
+  fi
+
+  record_check --command "$command_text" --status "$check_status" --note "$note" --command-log "$log_file" >/dev/null
+  printf 'HyperAgent check recorded: %s `%s`\n' "$check_status" "$(redact_text "$command_text")"
+  return "$status_code"
 }
 
 git_value() {
@@ -1122,6 +1194,223 @@ EOF
   printf '%s\n' "$file"
 }
 
+create_mission_closeout() {
+  request=
+  mission_path=
+  slug=
+  outcome="Task completed; review the evidence below for exact scope."
+  risks="No unresolved risks recorded by closeout. Human reviewer should confirm before activation or merge."
+  candidate_upgrades="None recorded by closeout."
+  command_log="$default_command_log"
+  trace_url=
+  pr_mode=auto
+  workbench_trace_log_override=
+
+  while [ "$#" -gt 0 ]; do
+    case "$1" in
+      --request)
+        shift
+        test "$#" -gt 0 || fail "--request requires text"
+        request=$1
+        ;;
+      --slug)
+        shift
+        test "$#" -gt 0 || fail "--slug requires text"
+        slug=$(slugify "$1")
+        ;;
+      --mission)
+        shift
+        test "$#" -gt 0 || fail "--mission requires a path"
+        mission_path=$1
+        ;;
+      --outcome)
+        shift
+        test "$#" -gt 0 || fail "--outcome requires text"
+        outcome=$1
+        ;;
+      --risks)
+        shift
+        test "$#" -gt 0 || fail "--risks requires text"
+        risks=$1
+        ;;
+      --candidate-upgrades)
+        shift
+        test "$#" -gt 0 || fail "--candidate-upgrades requires text"
+        candidate_upgrades=$1
+        ;;
+      --command-log)
+        shift
+        test "$#" -gt 0 || fail "--command-log requires a path"
+        command_log=$1
+        ;;
+      --trace-url)
+        shift
+        test "$#" -gt 0 || fail "--trace-url requires a URL or local trace reference"
+        trace_url=$1
+        ;;
+      --workbench-trace-log)
+        shift
+        test "$#" -gt 0 || fail "--workbench-trace-log requires a path"
+        workbench_trace_log_override=$1
+        ;;
+      --pr)
+        shift
+        test "$#" -gt 0 || fail "--pr requires auto or off"
+        pr_mode=$1
+        ;;
+      *)
+        fail "unknown mission-closeout option: $1"
+        ;;
+    esac
+    shift
+  done
+
+  test -n "$request" || fail "mission-closeout requires --request"
+  test -n "$slug" || slug=$(slugify "$request")
+  test -n "$slug" || slug=mission-closeout
+
+  ensure_dirs
+  stamp=$(now_stamp)
+  if [ -n "$mission_path" ]; then
+    file=$mission_path
+    case "$file" in
+      */*) mkdir -p "$(dirname "$file")" ;;
+    esac
+  else
+    file="$mission_dir/$stamp-$slug.md"
+    test ! -e "$file" || fail "mission already exists: $file"
+  fi
+
+  workbench_trace_log=$(workbench_trace_log_path "$workbench_trace_log_override")
+  branch=$(git_branch)
+  git_status=$(git_status_short)
+  changed_files=$(git_changed_files)
+  recent_commands=$(read_recent_commands "$command_log")
+  failure_commands=$(read_failure_commands "$command_log")
+  status_counts=$(git_status_counts)
+  workbench_status=$(workbench_trace_status "$workbench_trace_log")
+  sense_snapshot=$(mktemp)
+  print_sense_markdown "$command_log" "$trace_url" "$pr_mode" "$workbench_trace_log" >"$sense_snapshot"
+
+  if [ -n "$recent_commands" ]; then
+    verification_status="Recent check evidence captured below. Review failed/retried entries before merge."
+  else
+    verification_status="No recorded checks found in $command_log. Run hyperagent check or record-check before review."
+  fi
+
+  cat >"$file" <<EOF
+# Mission Record
+
+- Mission ID: mission-$stamp-$slug
+- Date/time: $(now_readable)
+- Agent identity: Codex wearing the HyperAgent Suit
+- Environment: \`$repo_root\`
+- User request: $request
+
+## Auto-Filled Evidence
+
+- Repo path: \`$repo_root\`
+- Branch: \`$branch\`
+- Git status counts: \`$status_counts\`
+- Command log: \`$command_log\`
+- Workbench trace status: \`$workbench_status\`
+
+### Git Status
+
+~~~text
+$git_status
+~~~
+
+### Changed Files
+
+~~~text
+$changed_files
+~~~
+
+### Recent Commands And Checks
+
+~~~text
+${recent_commands:-no command log entries found}
+~~~
+
+### Failures And Retries
+
+~~~text
+${failure_commands:-none recorded}
+~~~
+
+### Sense Snapshot
+
+EOF
+  cat "$sense_snapshot" >>"$file"
+  rm -f "$sense_snapshot"
+  cat >>"$file" <<EOF
+
+## Agent Judgment
+
+- Final outcome: $outcome
+- Completion evidence: Auto-filled evidence captured git status, changed files, recent checks, failures/retries, and current sense snapshot.
+- Verification status: $verification_status
+- Unresolved risks: $risks
+- Candidate upgrades: $candidate_upgrades
+
+## Actions
+
+- Agent plan: Review the user request, make focused changes, run checks through \`hyperagent check\` or record them with \`record-check\`, then run closeout.
+- Summary of actions taken: See changed files, command evidence, and final response.
+- Tools used: HyperAgent helper, local shell, git, and project verification commands.
+- Files or systems changed: See changed files.
+- Verification performed: See recent commands and checks.
+
+## Workshop Handoff
+
+- Upgrade proposal paths: None created by closeout.
+- Follow-up owner: Human reviewer
+- Review prompts:
+  - Confirm failed or retried checks are resolved or intentionally accepted.
+  - Confirm unresolved risks are explicit enough for Human Review.
+  - Create a Workshop proposal only if the evidence shows reusable Suit friction.
+EOF
+
+  printf '%s\n' "$file"
+}
+
+verify_mission() {
+  strict=0
+  file=
+
+  while [ "$#" -gt 0 ]; do
+    case "$1" in
+      --strict)
+        strict=1
+        ;;
+      *)
+        test -z "$file" || fail "verify-mission accepts one mission path"
+        file=$1
+        ;;
+    esac
+    shift
+  done
+
+  test -n "$file" || fail "verify-mission requires a mission path"
+  test -f "$file" || fail "mission record not found: $file"
+
+  grep -F "Mission ID:" "$file" >/dev/null || fail "mission missing Mission ID"
+  grep -F "User request:" "$file" >/dev/null || fail "mission missing User request"
+  grep -F "Final outcome:" "$file" >/dev/null || fail "mission missing Final outcome"
+  grep -F "Unresolved risks:" "$file" >/dev/null || fail "mission missing Unresolved risks"
+  grep -F "Changed Files" "$file" >/dev/null || grep -F "Changed files:" "$file" >/dev/null || fail "mission missing changed files evidence"
+  grep -F "Verification status:" "$file" >/dev/null || fail "mission missing Verification status"
+
+  if [ "$strict" -eq 1 ]; then
+    if grep -E 'Pending final outcome|Pending unresolved risk review|Replace during mission closeout|Pending verification|Not captured by helper|TODO|TBD|FIXME' "$file" >/dev/null; then
+      fail "strict mission verification found placeholder text: $file"
+    fi
+  fi
+
+  printf 'Mission verification passed: %s\n' "$file"
+}
+
 create_proposal() {
   mission=
   forge_review=
@@ -1535,8 +1824,17 @@ case "$command" in
   record-check)
     record_check "$@"
     ;;
+  check)
+    run_check "$@"
+    ;;
   new-mission)
     create_mission "$@"
+    ;;
+  mission-closeout)
+    create_mission_closeout "$@"
+    ;;
+  verify-mission)
+    verify_mission "$@"
     ;;
   propose-upgrade)
     create_proposal "$@"

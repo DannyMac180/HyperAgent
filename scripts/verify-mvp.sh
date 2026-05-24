@@ -35,6 +35,7 @@ require_file docs/assets/hyperagent-architecture.svg
 require_file docs/hyperagent-prd.md
 require_file docs/iron-man-suit-essence.md
 require_file docs/concepts.md
+require_file docs/config.md
 require_file docs/article-outline.md
 require_file docs/quickstart.md
 require_file docs/clean-install-uat.md
@@ -100,7 +101,9 @@ require_text scripts/install-codex-skill.sh "--force"
 require_text scripts/update-codex-skill.sh "update complete"
 require_text bin/hyperagent "scripts/hyperagent.sh"
 require_text scripts/hyperagent.sh "init [--target DIR] [--force] [--dry-run]"
+require_text scripts/hyperagent.sh "verify-config"
 require_text scripts/hyperagent.sh "generate_init_config"
+require_text scripts/hyperagent.sh "verify_config"
 require_text scripts/hyperagent.sh "HyperAgent Project Upgrade Backlog"
 require_text scripts/hyperagent.sh "decide-upgrade"
 require_text scripts/hyperagent.sh "sense [--format markdown|json]"
@@ -118,6 +121,7 @@ require_text scripts/hyperagent.sh "git_status_short"
 require_text scripts/hyperagent.sh "Copy And Symlink Behavior"
 require_text scripts/verify-forge-review.sh "Forge review verification passed."
 require_text .hyperagent 'hyperagent_version = "v0.1.0-alpha"'
+require_text .hyperagent '"sh scripts/hyperagent.sh verify-config"'
 require_text .hyperagent 'install_mode = "copy"'
 require_text .hyperagent 'project_instructions = "AGENTS.md"'
 require_text .hyperagent 'evidence_log = ".hyperagent-evidence/commands.log"'
@@ -130,6 +134,7 @@ require_text README.md "https://github.com/DannyMac180/HyperAgent"
 require_text README.md "~/HyperAgent"
 require_text README.md "Do not modify my global Codex custom instructions"
 require_text README.md "docs/quickstart.md"
+require_text README.md "docs/config.md"
 require_text README.md "docs/clean-install-uat.md"
 require_text README.md "sh scripts/update-codex-skill.sh"
 require_text README.md "docs/release-checklist.md"
@@ -150,6 +155,7 @@ require_text docs/quickstart.md "Manual Quickstart"
 require_text docs/quickstart.md "sh scripts/hyperagent.sh init --target"
 require_text docs/quickstart.md "sh scripts/install-codex-skill.sh"
 require_text docs/quickstart.md "sh scripts/hyperagent.sh status"
+require_text docs/quickstart.md "sh scripts/hyperagent.sh verify-config"
 require_text docs/quickstart.md "sh scripts/hyperagent.sh sense"
 require_text docs/quickstart.md "sh scripts/hyperagent.sh doctor"
 require_text docs/quickstart.md "sh scripts/hyperagent.sh check -- sh scripts/verify-mvp.sh"
@@ -178,6 +184,11 @@ require_text docs/releases/next-alpha.md "Unreleased Since"
 require_text docs/releases/next-alpha.md "Acceptance Status"
 require_text docs/releases/next-alpha.md "Persistent behavior changes still require human review."
 require_text docs/quickstart.md "--forge-review"
+require_text docs/config.md "HyperAgent Project Config"
+require_text docs/config.md "config_version = 1"
+require_text docs/config.md "Adapter-Owned Fields"
+require_text docs/config.md "verification.commands"
+require_text docs/config.md "TOML subset"
 require_text evals/README.md "Installer Smoke Eval"
 require_text evals/README.md "Init Smoke Eval"
 require_text evals/README.md "Reliability Gains Eval"

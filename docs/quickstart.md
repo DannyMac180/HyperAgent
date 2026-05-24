@@ -37,6 +37,12 @@ The init command creates or updates:
 
 The root `.hyperagent` file is the machine-readable project anchor. It records the HyperAgent version, install mode, initialized paths, enabled adapters, verification commands, and links to project instruction files.
 
+The schema and supported TOML subset are documented in `docs/config.md`. Validate the project contract with:
+
+```bash
+sh scripts/hyperagent.sh verify-config
+```
+
 Generated operational files are plain Markdown and shell scripts. Init copies project setup files by default instead of symlinking them, so each repo can inspect, edit, and commit its own local memory. Existing files are left alone when identical, and conflicting files are refused unless `--force` is passed.
 
 Preview changes without writing files:
@@ -191,6 +197,7 @@ sh scripts/hyperagent.sh propose-upgrade \
 ## 9. Verify
 
 ```bash
+sh scripts/hyperagent.sh verify-config
 sh scripts/verify-mvp.sh
 sh evals/init-smoke.sh
 sh evals/sense-smoke.sh

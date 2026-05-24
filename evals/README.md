@@ -5,10 +5,11 @@ Mark I evals are local checks for the Mission -> Workshop loop. They are intenti
 Run:
 
 ```bash
+sh scripts/hyperagent.sh verify-config
 sh scripts/verify-mvp.sh
 ```
 
-The verifier checks whether the repo contains the artifacts required by the PRD for the Codex-first prototype.
+The config verifier checks the root `.hyperagent` project contract. The artifact verifier checks whether the repo contains the artifacts required by the PRD for the Codex-first prototype.
 
 ## Loop Smoke Eval
 
@@ -67,6 +68,8 @@ The init smoke test creates a temporary repo, runs `sh scripts/hyperagent.sh ini
 
 - creates `missions/`, `workshop/proposals/`, `workshop/decisions/`, and `forge/reviews/`,
 - creates `.hyperagent` as the machine-readable project anchor for version, install mode, paths, adapters, verification commands, and instruction links,
+- validates the generated `.hyperagent` contract,
+- fails with an actionable error when a core config field is missing,
 - copies templates, rubrics, the local prompt, a blank project backlog, a project capability registry, and `scripts/hyperagent.sh`,
 - adds project instructions to `AGENTS.md`,
 - documents copy vs symlink behavior in `hyperagent/README.md`,

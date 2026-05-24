@@ -76,9 +76,11 @@ require_text "$target/.hyperagent" 'install_mode = "copy"'
 require_text "$target/.hyperagent" 'project_instructions = "AGENTS.md"'
 require_text "$target/.hyperagent" 'evidence_log = ".hyperagent-evidence/commands.log"'
 require_text "$target/.hyperagent" 'codex = true'
+require_text "$target/.hyperagent" '"sh scripts/hyperagent.sh verify-config"'
 require_text "$target/.hyperagent" '"sh scripts/hyperagent.sh status"'
 require_text "$target/hyperagent/README.md" "Copy And Symlink Behavior"
 require_text "$target/hyperagent/README.md" "machine-readable project anchor"
+require_text "$target/hyperagent/README.md" "sh scripts/hyperagent.sh verify-config"
 require_text "$target/hyperagent/README.md" "sh scripts/hyperagent.sh sense"
 require_text "$target/hyperagent/README.md" "opt-in local command log"
 require_text "$target/hyperagent/README.md" "does not symlink project setup files by default"
@@ -89,7 +91,39 @@ if grep -F "2026-05-16-1216-local-loop-helper-and-smoke-eval" "$target/workshop/
   fail "init copied source-repo backlog entries into the target"
 fi
 
+sh "$target/scripts/hyperagent.sh" verify-config >/dev/null
 sh "$target/scripts/hyperagent.sh" status >/dev/null
+
+bad_config="$tmpdir/bad-project"
+mkdir -p "$bad_config"
+sh "$repo_root/scripts/hyperagent.sh" init --target "$bad_config" >/dev/null
+awk '$1 != "hyperagent_version"' "$bad_config/.hyperagent" >"$bad_config/.hyperagent.tmp"
+mv "$bad_config/.hyperagent.tmp" "$bad_config/.hyperagent"
+if sh "$bad_config/scripts/hyperagent.sh" verify-config >"$tmpdir/bad-config.out" 2>"$tmpdir/bad-config.err"; then
+  fail "verify-config passed with a missing hyperagent_version"
+fi
+require_text "$tmpdir/bad-config.err" "missing required field hyperagent_version"
+
+custom_paths="$tmpdir/custom-path-project"
+mkdir -p "$custom_paths/project-memory/missions" "$custom_paths/project-memory/forge-reviews"
+sh "$repo_root/scripts/hyperagent.sh" init --target "$custom_paths" >/dev/null
+sed \
+  -e 's#missions = "missions"#missions = "project-memory/missions"#' \
+  -e 's#forge_reviews = "forge/reviews"#forge_reviews = "project-memory/forge-reviews"#' \
+  "$custom_paths/.hyperagent" >"$custom_paths/.hyperagent.tmp"
+mv "$custom_paths/.hyperagent.tmp" "$custom_paths/.hyperagent"
+custom_mission=$(sh "$custom_paths/scripts/hyperagent.sh" new-mission --request "Verify configured mission path" --slug configured-mission-path)
+case "$custom_mission" in
+  "$custom_paths/project-memory/missions/"*) ;;
+  *) fail "new-mission did not honor configured missions path: $custom_mission" ;;
+esac
+test -f "$custom_mission" || fail "configured mission path did not create a mission"
+custom_review=$(sh "$custom_paths/scripts/hyperagent.sh" new-forge-review --slug configured-forge-path)
+case "$custom_review" in
+  "$custom_paths/project-memory/forge-reviews/"*) ;;
+  *) fail "new-forge-review did not honor configured forge_reviews path: $custom_review" ;;
+esac
+test -f "$custom_review" || fail "configured forge review path did not create a review"
 
 printf 'local change\n' >>"$target/.hyperagent"
 if sh "$repo_root/scripts/hyperagent.sh" init --target "$target" >"$refusal_log" 2>&1; then

@@ -33,5 +33,6 @@ commands = [
   "sh scripts/verify-mvp.sh",
   "sh evals/init-smoke.sh",
   "sh evals/sense-smoke.sh",
+  "sh evals/forge-audit-smoke.sh",
   "sh evals/smoke-loop.sh",
 ]

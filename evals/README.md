@@ -31,6 +31,21 @@ The smoke loop copies the repo to a temporary directory, then verifies that the 
 - record a human-review decision in `workshop/decisions/`,
 - append an accepted capability to `hyperagent/capability-registry.md`.
 
+## Forge Audit Smoke Eval
+
+Run:
+
+```bash
+sh evals/forge-audit-smoke.sh
+```
+
+The Forge audit smoke test copies the repo to a temporary directory, adds one complete proposal fixture and one intentionally weak proposal fixture, then verifies that `forge audit`:
+
+- prints a concise process-health report,
+- identifies weak proposals and proposals missing decisions,
+- reports a finding count,
+- drafts a human-review-required process proposal only when explicitly requested with `--write-proposal`.
+
 ## Reliability Gains Eval
 
 Run:
@@ -117,3 +132,4 @@ The installed `SKILL.md` should retain the source-of-truth links to the Suit pro
 6. Confirm a human approval or rejection can be recorded in `workshop/decisions/`.
 7. Confirm Forge can review recent proposal quality and write a review in `forge/reviews/`.
 8. Confirm Forge can generate a process-improvement proposal with `propose-upgrade --forge-review`.
+9. Confirm Forge can audit proposal quality and traceability with `sh scripts/hyperagent.sh forge audit`.

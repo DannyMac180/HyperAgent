@@ -45,6 +45,19 @@ Accepted upgrades require:
 - a capability registry entry in `hyperagent/capability-registry.md`,
 - verification evidence.
 
+## How To Handle Mission Evidence
+
+Mission records can include local paths, issue metadata, trace references, and implementation details from real dogfooding. Before committing mission evidence, follow `docs/evidence-policy.md`.
+
+Use `docs/examples/missions/` for public-safe sample missions. Keep raw local evidence in ignored paths such as `.hyperagent-evidence/`.
+
+Before proposing a public mission commit, run:
+
+```bash
+sh scripts/hyperagent.sh verify-mission --strict PATH
+sh scripts/hyperagent.sh mission redact-check PATH
+```
+
 ## How To Add Evals
 
 Put small, repeatable checks in `evals/`.

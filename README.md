@@ -124,6 +124,7 @@ Restart Codex Desktop or open a fresh thread after updating the installed skill.
 - `adapters/contract.md`: generic adapter contract for future platform work.
 - `adapters/codex.md`: Codex-specific adapter responsibilities for the current alpha.
 - `docs/clean-install-uat.md`: repeatable clean-install acceptance test for the README prompt.
+- `docs/evidence-policy.md`: committed-versus-local mission evidence policy, redaction checklist, and public example rules.
 - `docs/release-checklist.md`: alpha release criteria, clean-clone test, and update model.
 - `docs/releases/v0.1.0-alpha.md`: first alpha release notes.
 - `docs/releases/next-alpha.md`: unreleased next-alpha notes.
@@ -147,6 +148,7 @@ Restart Codex Desktop or open a fresh thread after updating the installed skill.
 - `workshop/rubric.md`: proposal prioritization rubric.
 - `forge/process/quality-rubric.md`: Forge quality metrics for improving Workshop output.
 - `evals/`: small local checks for the Mission -> Workshop loop.
+- `docs/examples/missions/`: public-safe sample mission records that demonstrate the loop without private local context.
 
 ## Safety Model
 

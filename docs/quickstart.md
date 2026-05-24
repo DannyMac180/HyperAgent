@@ -31,19 +31,37 @@ The init command creates or updates:
 - `workshop/backlog.md`
 - `forge/reviews/`
 - `templates/`
-- `hyperagent/`
-- `scripts/hyperagent.sh`
+- `hyperagent/README.md`
+- `hyperagent/capability-registry.md`
+- `scripts/hyperagent.sh` as a project shim
 - a HyperAgent instructions block in `AGENTS.md`
 
 The root `.hyperagent` file is the machine-readable project anchor. It records the HyperAgent version, install mode, initialized paths, enabled adapters, verification commands, and links to project instruction files.
 
-Generated operational files are plain Markdown and shell scripts. Init copies project setup files by default instead of symlinking them, so each repo can inspect, edit, and commit its own local memory. Existing files are left alone when identical, and conflicting files are refused unless `--force` is passed.
+Generated operational files are plain Markdown and shell scripts. Init separates project-local artifacts from global runtime files so each repo can inspect, edit, and commit its own local memory without receiving unnecessary runtime churn.
+
+Init output categories:
+
+- Project-local artifacts: mission records, Workshop proposals and decisions, Forge reviews, `AGENTS.md`, blank `workshop/backlog.md`, and blank `hyperagent/capability-registry.md`.
+- Copied templates and rubrics: `templates/`, `workshop/rubric.md`, and `forge/process/quality-rubric.md`.
+- Generated config and docs: `.hyperagent`, `hyperagent/README.md`, and the HyperAgent block in `AGENTS.md`.
+- Global runtime dependency: `scripts/hyperagent.sh` is a small project shim that delegates to the installed HyperAgent runtime. The runtime helper and operating prompt are not copied into initialized repos by default.
+
+Existing files are left alone when identical, and conflicting files are refused unless `--force` is passed.
 
 Preview changes without writing files:
 
 ```bash
 sh scripts/hyperagent.sh init --target /path/to/project --dry-run
 ```
+
+After updating your HyperAgent install, migrate an already initialized project:
+
+```bash
+sh scripts/hyperagent.sh init --target /path/to/project --update
+```
+
+Update mode replaces older copied runtime helpers with the project shim and removes an unchanged copied runtime prompt. Locally changed files are refused unless `--force` is passed.
 
 ## 2. Install The Codex Skill
 
@@ -59,7 +77,7 @@ sh scripts/install-codex-skill.sh --symlink "$HOME/.codex/skills"
 
 The default mode is `human review required`.
 
-`--symlink` is only for the global Codex skill install. Project-local files created by `hyperagent init` are copies by default.
+`--symlink` is only for the global Codex skill install. Project-local files created by `hyperagent init` remain normal files, while the generated project shim delegates to the global runtime.
 
 ## 3. Check Local Status
 

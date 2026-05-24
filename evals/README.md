@@ -64,9 +64,13 @@ The init smoke test creates a temporary repo, runs `sh scripts/hyperagent.sh ini
 
 - creates `missions/`, `workshop/proposals/`, `workshop/decisions/`, and `forge/reviews/`,
 - creates `.hyperagent` as the machine-readable project anchor for version, install mode, paths, adapters, verification commands, and instruction links,
-- copies templates, rubrics, the local prompt, a blank project backlog, a project capability registry, and `scripts/hyperagent.sh`,
+- copies templates and rubrics,
+- generates a blank project backlog, a project capability registry, local setup docs, and a `scripts/hyperagent.sh` project shim,
+- keeps global runtime files such as the full helper and operating prompt out of the initialized repo by default,
 - adds project instructions to `AGENTS.md`,
+- documents init output categories and the global-runtime boundary in `hyperagent/README.md`,
 - documents copy vs symlink behavior in `hyperagent/README.md`,
+- migrates an already initialized fixture with `--update`,
 - refuses conflicting overwrites unless `--force` is passed,
 - leaves the target untouched during `--dry-run`.
 

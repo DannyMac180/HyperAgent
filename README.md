@@ -105,7 +105,7 @@ Restart Codex Desktop or open a fresh thread after updating the installed skill.
 - `.hyperagent`: machine-readable project config for initialized paths, adapters, and verification commands.
 - `scripts/install-codex-skill.sh`: dependency-free Codex skill installer.
 - `scripts/update-codex-skill.sh`: update helper for copy installs.
-- `scripts/hyperagent.sh`: local helper for project init, local sensing, command/check evidence, mission shells, proposals, Forge reviews, approval decisions, and status.
+- `scripts/hyperagent.sh`: runtime helper for project init, local sensing, command/check evidence, mission shells, proposals, Forge reviews, approval decisions, and status. Initialized projects get a small shim that delegates to this runtime.
 - `.hyperagent-evidence/`: ignored local runtime evidence, including the opt-in command/check log used by `sense`.
 - `hyperagent/operating-prompt.md`: the operating layer Codex wears during work.
 - `hyperagent/capability-registry.md`: accepted capability registry with reviewed local capabilities.
@@ -148,7 +148,7 @@ Run the project init smoke test:
 sh evals/init-smoke.sh
 ```
 
-The init smoke test creates a temporary repo, runs `hyperagent init`, checks the generated markdown-first structure and `.hyperagent` config, verifies overwrite refusal, verifies `--force`, and confirms `--dry-run` leaves the target untouched.
+The init smoke test creates a temporary repo, runs `hyperagent init`, checks the generated markdown-first structure and `.hyperagent` config, verifies that global runtime files are not copied into the target, verifies `--update`, verifies overwrite refusal, verifies `--force`, and confirms `--dry-run` leaves the target untouched.
 
 Run the sensing smoke test:
 

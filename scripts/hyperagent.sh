@@ -6,7 +6,7 @@ usage() {
 Usage: sh scripts/hyperagent.sh COMMAND [options]
 
 Commands:
-  init [--target DIR] [--force] [--dry-run]
+  init [--target DIR] [--update] [--force] [--dry-run]
       Create or update HyperAgent project setup files in DIR. Defaults to the current directory.
 
   status
@@ -50,7 +50,8 @@ fail() {
 }
 
 script_dir=$(CDPATH= cd "$(dirname "$0")" && pwd)
-repo_root=$(CDPATH= cd "$script_dir/.." && pwd)
+runtime_root=$(CDPATH= cd "$script_dir/.." && pwd)
+repo_root=${HYPERAGENT_PROJECT_ROOT:-$runtime_root}
 
 mission_dir="$repo_root/missions"
 proposal_dir="$repo_root/workshop/proposals"
@@ -139,6 +140,16 @@ init_same_file() {
   test -f "$1" && test -f "$2" && cmp -s "$1" "$2"
 }
 
+shell_single_quote() {
+  printf "%s" "$1" | sed "s/'/'\\\\''/g; 1s/^/'/; \$s/\$/'/"
+}
+
+init_is_runtime_helper_copy() {
+  test -f "$1" \
+    && grep -F "generate_init_config()" "$1" >/dev/null 2>&1 \
+    && grep -F "init_project()" "$1" >/dev/null 2>&1
+}
+
 init_install_file() {
   src="$1"
   dest="$2"
@@ -175,6 +186,8 @@ init_write_generated() {
   force="$2"
   dry_run="$3"
   generator="$4"
+  update="${5:-0}"
+  legacy_generator="${6:-}"
   tmp=$(mktemp)
   "$generator" >"$tmp"
 
@@ -183,6 +196,22 @@ init_write_generated() {
       init_log "up to date: $dest"
       rm -f "$tmp"
       return 0
+    fi
+    if [ "$update" -eq 1 ] && [ -n "$legacy_generator" ]; then
+      legacy_tmp=$(mktemp)
+      "$legacy_generator" >"$legacy_tmp"
+      if cmp -s "$legacy_tmp" "$dest"; then
+        if [ "$dry_run" -eq 1 ]; then
+          init_log "would update generated file: $dest"
+          rm -f "$tmp" "$legacy_tmp"
+          return 0
+        fi
+        cp "$tmp" "$dest"
+        init_log "updated generated file: $dest"
+        rm -f "$tmp" "$legacy_tmp"
+        return 0
+      fi
+      rm -f "$legacy_tmp"
     fi
     test "$force" -eq 1 || {
       rm -f "$tmp"
@@ -228,6 +257,114 @@ init_touch_file() {
   mkdir -p "$(init_parent_dir "$dest")"
   : >"$dest"
   init_log "created: $dest"
+}
+
+generate_init_project_helper() {
+  runtime_hint=$(shell_single_quote "$runtime_root")
+  cat <<EOF
+#!/bin/sh
+set -eu
+
+script_dir=\$(CDPATH= cd "\$(dirname "\$0")" && pwd)
+project_root=\$(CDPATH= cd "\$script_dir/.." && pwd)
+runtime_root_hint=$runtime_hint
+
+if [ -n "\${HYPERAGENT_RUNTIME_ROOT:-}" ]; then
+  runtime_helper="\$HYPERAGENT_RUNTIME_ROOT/scripts/hyperagent.sh"
+elif [ -n "\$runtime_root_hint" ] && [ -f "\$runtime_root_hint/scripts/hyperagent.sh" ]; then
+  runtime_helper="\$runtime_root_hint/scripts/hyperagent.sh"
+else
+  runtime_helper=
+fi
+
+if [ -n "\$runtime_helper" ] && [ -f "\$runtime_helper" ]; then
+  HYPERAGENT_PROJECT_ROOT="\$project_root" exec sh "\$runtime_helper" "\$@"
+fi
+
+if command -v hyperagent >/dev/null 2>&1; then
+  HYPERAGENT_PROJECT_ROOT="\$project_root" exec hyperagent "\$@"
+fi
+
+printf 'FAIL: HyperAgent runtime not found. Set HYPERAGENT_RUNTIME_ROOT or put hyperagent on PATH.\\n' >&2
+exit 1
+EOF
+}
+
+init_write_project_helper() {
+  dest="$1"
+  force="$2"
+  dry_run="$3"
+  update="$4"
+  tmp=$(mktemp)
+  generate_init_project_helper >"$tmp"
+
+  if [ -e "$dest" ]; then
+    if cmp -s "$tmp" "$dest"; then
+      init_log "up to date: $dest"
+      rm -f "$tmp"
+      return 0
+    fi
+    if [ "$update" -eq 1 ] && init_is_runtime_helper_copy "$dest"; then
+      if [ "$dry_run" -eq 1 ]; then
+        init_log "would replace copied runtime helper with project shim: $dest"
+        rm -f "$tmp"
+        return 0
+      fi
+      cp "$tmp" "$dest"
+      chmod +x "$dest"
+      init_log "replaced copied runtime helper with project shim: $dest"
+      rm -f "$tmp"
+      return 0
+    fi
+    test "$force" -eq 1 || {
+      rm -f "$tmp"
+      fail "refusing to overwrite existing file without --force: $dest"
+    }
+    if [ "$dry_run" -eq 1 ]; then
+      init_log "would replace: $dest"
+      rm -f "$tmp"
+      return 0
+    fi
+    cp "$tmp" "$dest"
+    chmod +x "$dest"
+    init_log "replaced: $dest"
+    rm -f "$tmp"
+    return 0
+  fi
+
+  if [ "$dry_run" -eq 1 ]; then
+    init_log "would create: $dest"
+    rm -f "$tmp"
+    return 0
+  fi
+
+  mkdir -p "$(init_parent_dir "$dest")"
+  cp "$tmp" "$dest"
+  chmod +x "$dest"
+  init_log "created: $dest"
+  rm -f "$tmp"
+}
+
+init_migrate_runtime_prompt() {
+  dest="$1"
+  force="$2"
+  dry_run="$3"
+  update="$4"
+
+  [ -e "$dest" ] || return 0
+  [ "$update" -eq 1 ] || return 0
+
+  if init_same_file "$runtime_root/hyperagent/operating-prompt.md" "$dest" || [ "$force" -eq 1 ]; then
+    if [ "$dry_run" -eq 1 ]; then
+      init_log "would remove copied runtime prompt: $dest"
+    else
+      rm -f "$dest"
+      init_log "removed copied runtime prompt: $dest"
+    fi
+    return 0
+  fi
+
+  fail "refusing to remove changed legacy runtime file without --force: $dest"
 }
 
 generate_init_registry() {
@@ -286,6 +423,45 @@ generate_init_config() {
 
 hyperagent_version = "v0.1.0-alpha"
 config_version = 1
+install_mode = "global-runtime"
+
+[paths]
+project_instructions = "AGENTS.md"
+missions = "missions"
+workshop_proposals = "workshop/proposals"
+workshop_decisions = "workshop/decisions"
+workshop_backlog = "workshop/backlog.md"
+workshop_rubric = "workshop/rubric.md"
+forge_reviews = "forge/reviews"
+forge_quality_rubric = "forge/process/quality-rubric.md"
+templates = "templates"
+capability_registry = "hyperagent/capability-registry.md"
+project_readme = "hyperagent/README.md"
+local_helper = "scripts/hyperagent.sh"
+evidence_log = ".hyperagent-evidence/commands.log"
+workbench_trace_log = ".hyperagent-evidence/workbench/traces.jsonl"
+
+[runtime]
+helper = "scripts/hyperagent.sh"
+operating_prompt = "hyperagent/operating-prompt.md"
+override_env = "HYPERAGENT_RUNTIME_ROOT"
+
+[adapters]
+codex = true
+
+[verification]
+commands = [
+  "sh scripts/hyperagent.sh status",
+]
+EOF
+}
+
+generate_init_config_legacy_copy() {
+  cat <<'EOF'
+# HyperAgent project config
+
+hyperagent_version = "v0.1.0-alpha"
+config_version = 1
 install_mode = "copy"
 
 [paths]
@@ -316,6 +492,80 @@ EOF
 }
 
 generate_init_readme() {
+  cat <<'EOF'
+# HyperAgent Project Setup
+
+This repository has local HyperAgent memory and workflow files.
+
+The root `.hyperagent` file is the machine-readable project anchor. Scripts and
+adapters can read it to find the HyperAgent version, install mode, initialized
+paths, enabled adapters, verification commands, and instruction files.
+
+Use these files to keep agent work inspectable:
+
+- `missions/`: mission records from meaningful tasks.
+- `workshop/proposals/`: proposed improvements backed by mission or Forge review evidence.
+- `workshop/decisions/`: explicit human approvals or rejections.
+- `forge/reviews/`: reviews of Workshop proposal quality.
+- `templates/`: markdown templates for records, proposals, decisions, and Forge reviews.
+- `hyperagent/capability-registry.md`: accepted local capabilities.
+
+## Init Output Categories
+
+- Project-local artifacts: `missions/`, `workshop/proposals/`, `workshop/decisions/`, `forge/reviews/`, `AGENTS.md`, `workshop/backlog.md`, and `hyperagent/capability-registry.md`.
+- Copied templates and rubrics: `templates/`, `workshop/rubric.md`, and `forge/process/quality-rubric.md`.
+- Generated config and docs: `.hyperagent`, `hyperagent/README.md`, and this repository's HyperAgent block in `AGENTS.md`.
+- Global runtime dependency: the local `scripts/hyperagent.sh` shim delegates to the installed HyperAgent runtime instead of copying the full runtime helper or operating prompt into this repo.
+
+## Local Commands
+
+```bash
+sh scripts/hyperagent.sh status
+sh scripts/hyperagent.sh sense
+sh scripts/hyperagent.sh record-check --status passed --command "sh scripts/verify-mvp.sh"
+sh scripts/hyperagent.sh doctor
+sh scripts/hyperagent.sh new-mission --request "Describe the task" --slug task-slug
+sh scripts/hyperagent.sh workshop-prompt
+sh scripts/hyperagent.sh forge-prompt
+sh scripts/hyperagent.sh propose-upgrade --forge-review forge/reviews/REVIEW.md --title "Improve Workshop quality" --problem "The Workshop process needs a concrete fix"
+```
+
+## Verification
+
+Run Forge reviews after proposal decisions, eval changes, release-readiness checks, or repeated vague Workshop output. Forge process improvements should become normal Workshop proposals linked to the Forge review and remain `human review required`.
+
+For this project, the lightweight check is:
+
+```bash
+sh scripts/hyperagent.sh status
+```
+
+To capture local task evidence for mission records:
+
+```bash
+sh scripts/hyperagent.sh record-check --status passed --command "sh scripts/verify-mvp.sh"
+sh scripts/hyperagent.sh sense
+```
+
+The sensing summary reads Git metadata, the opt-in local command log, and local Workbench trace metadata when the default ignored trace log exists. It does not inspect repository file contents or environment values, and command text is redacted for secret-like tokens before storage and output.
+
+Add any project-specific build, test, lint, or smoke commands to `AGENTS.md` so future agents know the strongest relevant verification path.
+
+## Copy And Symlink Behavior
+
+`hyperagent init` copies stable markdown templates and rubrics into the target repository. It generates blank project-local backlog and capability registry files, and it installs a small `scripts/hyperagent.sh` shim that runs the global HyperAgent runtime against this project.
+
+If you installed the global Codex skill with `scripts/install-codex-skill.sh --symlink`, only the Codex skill install is symlinked. Project-local files created by `hyperagent init` are still normal files.
+
+Existing files are left alone when they are identical. Conflicting generated files are not overwritten unless `--force` is passed.
+
+## Updating Existing Projects
+
+Run `hyperagent init --target /path/to/project --update` after updating the HyperAgent install. Update mode migrates older initialized repos from copied runtime files to the project shim when the files match the known generated runtime copies. Locally changed runtime copies are refused unless `--force` is passed.
+EOF
+}
+
+generate_init_readme_legacy_copy() {
   cat <<'EOF'
 # HyperAgent Project Setup
 
@@ -496,6 +746,7 @@ init_project() {
   target=.
   force=0
   dry_run=0
+  update=0
 
   while [ "$#" -gt 0 ]; do
     case "$1" in
@@ -506,6 +757,9 @@ init_project() {
         ;;
       --force)
         force=1
+        ;;
+      --update)
+        update=1
         ;;
       --dry-run)
         dry_run=1
@@ -552,19 +806,19 @@ init_project() {
   init_touch_file "$target_root/workshop/decisions/.gitkeep" "$dry_run"
   init_touch_file "$target_root/forge/reviews/.gitkeep" "$dry_run"
 
-  init_install_file "$repo_root/templates/mission-record.md" "$target_root/templates/mission-record.md" "$force" "$dry_run"
-  init_install_file "$repo_root/templates/upgrade-proposal.md" "$target_root/templates/upgrade-proposal.md" "$force" "$dry_run"
-  init_install_file "$repo_root/templates/upgrade-decision.md" "$target_root/templates/upgrade-decision.md" "$force" "$dry_run"
-  init_install_file "$repo_root/templates/forge-review.md" "$target_root/templates/forge-review.md" "$force" "$dry_run"
-  init_install_file "$repo_root/workshop/rubric.md" "$target_root/workshop/rubric.md" "$force" "$dry_run"
-  init_install_file "$repo_root/forge/process/quality-rubric.md" "$target_root/forge/process/quality-rubric.md" "$force" "$dry_run"
-  init_install_file "$repo_root/hyperagent/operating-prompt.md" "$target_root/hyperagent/operating-prompt.md" "$force" "$dry_run"
-  init_install_file "$repo_root/scripts/hyperagent.sh" "$target_root/scripts/hyperagent.sh" "$force" "$dry_run"
+  init_install_file "$runtime_root/templates/mission-record.md" "$target_root/templates/mission-record.md" "$force" "$dry_run"
+  init_install_file "$runtime_root/templates/upgrade-proposal.md" "$target_root/templates/upgrade-proposal.md" "$force" "$dry_run"
+  init_install_file "$runtime_root/templates/upgrade-decision.md" "$target_root/templates/upgrade-decision.md" "$force" "$dry_run"
+  init_install_file "$runtime_root/templates/forge-review.md" "$target_root/templates/forge-review.md" "$force" "$dry_run"
+  init_install_file "$runtime_root/workshop/rubric.md" "$target_root/workshop/rubric.md" "$force" "$dry_run"
+  init_install_file "$runtime_root/forge/process/quality-rubric.md" "$target_root/forge/process/quality-rubric.md" "$force" "$dry_run"
+  init_migrate_runtime_prompt "$target_root/hyperagent/operating-prompt.md" "$force" "$dry_run" "$update"
+  init_write_project_helper "$target_root/scripts/hyperagent.sh" "$force" "$dry_run" "$update"
 
-  init_write_generated "$target_root/.hyperagent" "$force" "$dry_run" generate_init_config
-  init_write_generated "$target_root/workshop/backlog.md" "$force" "$dry_run" generate_init_backlog
-  init_write_generated "$target_root/hyperagent/capability-registry.md" "$force" "$dry_run" generate_init_registry
-  init_write_generated "$target_root/hyperagent/README.md" "$force" "$dry_run" generate_init_readme
+  init_write_generated "$target_root/.hyperagent" "$force" "$dry_run" generate_init_config "$update" generate_init_config_legacy_copy
+  init_write_generated "$target_root/workshop/backlog.md" "$force" "$dry_run" generate_init_backlog "$update"
+  init_write_generated "$target_root/hyperagent/capability-registry.md" "$force" "$dry_run" generate_init_registry "$update"
+  init_write_generated "$target_root/hyperagent/README.md" "$force" "$dry_run" generate_init_readme "$update" generate_init_readme_legacy_copy
   init_update_agents "$target_root" "$force" "$dry_run"
 
   init_log "HyperAgent init complete."

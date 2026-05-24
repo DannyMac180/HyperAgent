@@ -50,6 +50,10 @@ require_text "$markdown" "Branch:"
 require_text "$markdown" 'README.md'
 require_text "$markdown" "Recent Commands And Checks"
 require_text "$markdown" "Failures And Retries"
+require_text "$markdown" "Accepted Capabilities"
+require_text "$markdown" 'codex-skill-installer'
+require_text "$markdown" "Activation mode: \`human review required\`"
+require_text "$markdown" "Decision evidence:"
 require_text "$markdown" "Workbench Traces"
 require_text "$markdown" "healthy: 1 local trace entries available"
 require_text "$markdown" "SECRET_TOKEN=[REDACTED]"
@@ -67,6 +71,10 @@ require_text "$json" '"branch"'
 require_text "$json" '"changed_files"'
 require_text "$json" '"recent_commands"'
 require_text "$json" '"failures_and_retries"'
+require_text "$json" '"accepted_capabilities"'
+require_text "$json" '"id":"codex-skill-installer"'
+require_text "$json" '"activation_mode":"human review required"'
+require_text "$json" '"decision_record"'
 require_text "$json" '"workbench"'
 require_text "$json" 'healthy: 1 local trace entries available'
 require_text "$json" 'local-trace://sense-smoke'

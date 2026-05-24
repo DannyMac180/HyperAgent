@@ -57,6 +57,8 @@ grep -F "Auto-Filled Evidence" "$closeout" >/dev/null || fail "closeout missing 
 grep -F "Sense Snapshot" "$closeout" >/dev/null || fail "closeout missing sense snapshot"
 grep -F "Recent Commands And Checks" "$closeout" >/dev/null || fail "closeout missing recent checks"
 grep -F "sh scripts/hyperagent.sh status" "$closeout" >/dev/null || fail "closeout missing recorded check"
+grep -F "Accepted Capabilities" "$closeout" >/dev/null || fail "closeout missing accepted capability summary"
+grep -F "codex-skill-installer" "$closeout" >/dev/null || fail "closeout missing accepted capability ID"
 grep -F "Candidate upgrades: None" "$closeout" >/dev/null || fail "closeout missing candidate upgrades"
 sh scripts/hyperagent.sh verify-mission --strict "$closeout" >/dev/null
 
@@ -121,7 +123,23 @@ decision=$(sh scripts/hyperagent.sh decide-upgrade \
 test -f "$decision" || fail "decision was not created"
 grep -F "smoke-test-upgrade" hyperagent/capability-registry.md >/dev/null || fail "registry missing accepted capability"
 
-sh scripts/hyperagent.sh status >/dev/null
+status_output=$(sh scripts/hyperagent.sh status)
+printf '%s\n' "$status_output" | grep -F "Accepted capabilities:" >/dev/null || fail "status missing accepted capability count"
+printf '%s\n' "$status_output" | grep -F "smoke-test-upgrade: Smoke-test upgrade proposal" >/dev/null || fail "status missing accepted capability details"
+printf '%s\n' "$status_output" | grep -F "activation: human review required" >/dev/null || fail "status missing accepted capability activation mode"
+
+registry_backup="$tmpdir/capability-registry.backup.md"
+cp hyperagent/capability-registry.md "$registry_backup"
+perl -0pi -e 's/- Title: Smoke-test upgrade proposal\n//' hyperagent/capability-registry.md
+if sh scripts/hyperagent.sh verify-safety >/dev/null 2>&1; then
+  fail "verify-safety accepted an accepted capability without a title"
+fi
+cp "$registry_backup" hyperagent/capability-registry.md
+perl -0pi -e 's/- Decision record: `workshop\/decisions\/[^`]+`\n//' hyperagent/capability-registry.md
+if sh scripts/hyperagent.sh verify-safety >/dev/null 2>&1; then
+  fail "verify-safety accepted an accepted capability without a decision record"
+fi
+cp "$registry_backup" hyperagent/capability-registry.md
 sh scripts/hyperagent.sh verify-safety >/dev/null
 
 printf 'HyperAgent smoke loop passed.\n'

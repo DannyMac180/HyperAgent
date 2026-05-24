@@ -15,6 +15,9 @@ Commands:
   verify-config
       Validate the root .hyperagent project contract.
 
+  verify-safety
+      Validate proposal, decision, and accepted capability safety boundaries.
+
   status
       Print HyperAgent local product status.
 
@@ -1996,6 +1999,184 @@ verify_mission() {
   printf 'Mission verification passed: %s\n' "$file"
 }
 
+safety_field_value() {
+  file="$1"
+  label="$2"
+  grep -F -- "- $label:" "$file" | head -n 1 | sed 's/^[^:]*:[[:space:]]*//'
+}
+
+safety_require_nonempty_field() {
+  file="$1"
+  label="$2"
+  value=$(safety_field_value "$file" "$label")
+  test -n "$value" || fail "missing required safety field in $file: $label"
+}
+
+safety_require_field_value() {
+  file="$1"
+  label="$2"
+  expected="$3"
+  value=$(safety_field_value "$file" "$label")
+  test "$value" = "$expected" || fail "invalid $label in $file: expected '$expected', got '$value'"
+}
+
+safety_path_from_field() {
+  file="$1"
+  label="$2"
+  safety_field_value "$file" "$label" | sed 's/`//g'
+}
+
+safety_require_existing_path_field() {
+  file="$1"
+  label="$2"
+  path=$(safety_path_from_field "$file" "$label")
+  test -n "$path" || fail "missing required path field in $file: $label"
+  test -f "$path" || test -f "$repo_root/$path" || fail "path field in $file does not exist: $label=$path"
+}
+
+safety_require_field_prompt() {
+  file="$1"
+  label="$2"
+  grep -F -- "- $label:" "$file" >/dev/null || fail "missing safety prompt in $file: $label"
+}
+
+verify_proposal_template_safety() {
+  file="$1"
+  test -f "$file" || fail "proposal template not found: $file"
+  safety_require_field_prompt "$file" "Proposed activation mode"
+  safety_require_field_prompt "$file" "Allowed activation modes"
+  safety_require_field_prompt "$file" "Verification for the first step"
+  safety_require_field_prompt "$file" "Safety risk"
+  safety_require_field_prompt "$file" "Permission or authority changes"
+  safety_require_field_prompt "$file" "Filesystem impact"
+  safety_require_field_prompt "$file" "Network or account impact"
+  safety_require_field_prompt "$file" "Secrets handling impact"
+  safety_require_field_prompt "$file" "Human approval required before activation"
+  safety_require_field_prompt "$file" "Eval or acceptance test"
+  safety_require_field_prompt "$file" "Rollback plan"
+}
+
+verify_decision_template_safety() {
+  file="$1"
+  test -f "$file" || fail "decision template not found: $file"
+  safety_require_field_prompt "$file" "Proposal"
+  safety_require_field_prompt "$file" "Decision"
+  safety_require_field_prompt "$file" "Human approval recorded"
+  safety_require_field_prompt "$file" "Silent activation allowed"
+  safety_require_field_prompt "$file" "Permission or secrets changes approved"
+  safety_require_field_prompt "$file" "Filesystem authority approved"
+  safety_require_field_prompt "$file" "Network or account authority approved"
+  safety_require_field_prompt "$file" "Verification"
+  safety_require_field_prompt "$file" "Rollback path"
+}
+
+verify_proposal_safety() {
+  proposal="$1"
+  test -f "$proposal" || fail "proposal not found: $proposal"
+
+  safety_require_nonempty_field "$proposal" "Evidence source type"
+  safety_require_nonempty_field "$proposal" "Proposed activation mode"
+  safety_require_nonempty_field "$proposal" "Allowed activation modes"
+  safety_require_nonempty_field "$proposal" "Verification for the first step"
+  safety_require_nonempty_field "$proposal" "Safety risk"
+  safety_require_nonempty_field "$proposal" "Permission or authority changes"
+  safety_require_nonempty_field "$proposal" "Filesystem impact"
+  safety_require_nonempty_field "$proposal" "Network or account impact"
+  safety_require_nonempty_field "$proposal" "Secrets handling impact"
+  safety_require_field_value "$proposal" "Human approval required before activation" "yes"
+  safety_require_nonempty_field "$proposal" "Eval or acceptance test"
+  safety_require_nonempty_field "$proposal" "Rollback plan"
+
+  activation=$(safety_field_value "$proposal" "Proposed activation mode")
+  case "$activation" in
+    "suggest only"|"draft files only"|"human review required"|"auto-install low risk") ;;
+    *) fail "invalid proposed activation mode in $proposal: $activation" ;;
+  esac
+}
+
+verify_accepted_proposal_safety() {
+  proposal="$1"
+  verify_proposal_safety "$proposal"
+  safety_require_field_value "$proposal" "Proposed activation mode" "human review required"
+}
+
+verify_decision_safety() {
+  decision_file="$1"
+  test -f "$decision_file" || fail "decision record not found: $decision_file"
+
+  safety_require_existing_path_field "$decision_file" "Proposal"
+  safety_require_nonempty_field "$decision_file" "Decision"
+  safety_require_nonempty_field "$decision_file" "Reviewer"
+  safety_require_nonempty_field "$decision_file" "Reason"
+  safety_require_field_value "$decision_file" "Human approval recorded" "yes"
+  safety_require_field_value "$decision_file" "Silent activation allowed" "no"
+  safety_require_nonempty_field "$decision_file" "Permission or secrets changes approved"
+  safety_require_nonempty_field "$decision_file" "Filesystem authority approved"
+  safety_require_nonempty_field "$decision_file" "Network or account authority approved"
+  safety_require_nonempty_field "$decision_file" "Verification"
+  safety_require_nonempty_field "$decision_file" "Rollback path"
+}
+
+verify_registry_safety() {
+  test -f "$registry_file" || fail "missing capability registry: $registry_file"
+  tmp="${TMPDIR:-/tmp}/hyperagent-registry-safety-$$.tsv"
+  awk '
+    /^## / {
+      if (in_entry) {
+        print title "\t" status "\t" proposal "\t" decision "\t" activation "\t" verification "\t" rollback
+      }
+      in_entry = 1
+      title = $0
+      sub(/^## /, "", title)
+      status = proposal = decision = activation = verification = rollback = ""
+      next
+    }
+    in_entry && /^- Status:/ { status = $0; sub(/^- Status:[[:space:]]*/, "", status) }
+    in_entry && /^- Source proposal:/ { proposal = $0; sub(/^- Source proposal:[[:space:]]*/, "", proposal) }
+    in_entry && /^- Proposal:/ { proposal = $0; sub(/^- Proposal:[[:space:]]*/, "", proposal) }
+    in_entry && /^- Decision record:/ { decision = $0; sub(/^- Decision record:[[:space:]]*/, "", decision) }
+    in_entry && /^- Activation mode:/ { activation = $0; sub(/^- Activation mode:[[:space:]]*/, "", activation) }
+    in_entry && /^- Verification:/ { verification = $0; sub(/^- Verification:[[:space:]]*/, "", verification) }
+    in_entry && /^- Rollback:/ { rollback = $0; sub(/^- Rollback:[[:space:]]*/, "", rollback) }
+    END {
+      if (in_entry) {
+        print title "\t" status "\t" proposal "\t" decision "\t" activation "\t" verification "\t" rollback
+      }
+    }
+  ' "$registry_file" >"$tmp"
+
+  while IFS="$(printf '\t')" read -r title status proposal decision activation verification rollback; do
+    case "$status" in
+      accepted) ;;
+      *) continue ;;
+    esac
+
+    test -n "$proposal" || fail "accepted capability missing source proposal: $title"
+    test -n "$decision" || fail "accepted capability missing decision record: $title"
+    test "$activation" = "human review required" || fail "accepted capability has unsafe activation mode: $title"
+    test -n "$verification" || fail "accepted capability missing verification evidence: $title"
+    test -n "$rollback" || fail "accepted capability missing rollback plan: $title"
+
+    proposal_path=$(printf '%s' "$proposal" | sed 's/`//g')
+    decision_path=$(printf '%s' "$decision" | sed 's/`//g')
+    test -f "$proposal_path" || test -f "$repo_root/$proposal_path" || fail "accepted capability proposal path missing: $title -> $proposal_path"
+    test -f "$decision_path" || test -f "$repo_root/$decision_path" || fail "accepted capability decision path missing: $title -> $decision_path"
+    verify_accepted_proposal_safety "$proposal_path"
+    verify_decision_safety "$decision_path"
+  done <"$tmp"
+  rm -f "$tmp"
+}
+
+verify_safety() {
+  verify_config >/dev/null
+
+  verify_proposal_template_safety templates/upgrade-proposal.md
+  verify_decision_template_safety templates/upgrade-decision.md
+  verify_registry_safety
+
+  printf 'HyperAgent safety verification passed.\n'
+}
+
 create_proposal() {
   verify_config >/dev/null
 
@@ -2101,18 +2282,21 @@ create_proposal() {
 - Highest-priority plan step:
 - Implementation steps:
 - Files or instructions likely to change:
-- Verification for the first step:
+- Verification for the first step: Run the smallest local check that proves the proposed behavior before requesting acceptance.
 
 ## Safety
 
-- Safety risk:
-- Permission or authority changes:
+- Safety risk: Pending reviewer assessment before acceptance.
+- Permission or authority changes: Document any filesystem, shell, network, deployment, account, or persistent behavior authority changes before acceptance.
+- Filesystem impact: None proposed unless listed in the implementation plan.
+- Network or account impact: None proposed unless explicitly listed here.
+- Secrets handling impact: None proposed; do not add or alter secrets handling without human approval.
 - Human approval required before activation: yes
 
 ## Evaluation
 
-- Eval or acceptance test:
-- Rollback plan:
+- Eval or acceptance test: Add or run a local verification command before acceptance.
+- Rollback plan: Revert the changed files or remove the accepted registry entry if the upgrade fails review.
 - Open questions:
 
 ## Decision Handoff
@@ -2630,6 +2814,7 @@ record_decision() {
   test -n "$reason" || fail "decide-upgrade requires --reason"
   if [ "$decision" = accepted ]; then
     test -n "$capability" || fail "accepted decisions require --capability"
+    verify_accepted_proposal_safety "$proposal"
   fi
 
   ensure_dirs
@@ -2654,9 +2839,14 @@ record_decision() {
 - Human approval recorded: yes
 - Silent activation allowed: no
 - Permission or secrets changes approved: no
+- Filesystem authority approved: no
+- Network or account authority approved: no
 
-## Rollback
+## Outcome
 
+- Files or instructions changed: see proposal implementation plan.
+- Verification: reviewer confirmed the proposal verification evidence before acceptance.
+- Registry update: $registry_file
 - Rollback path: follow the proposal rollback plan and remove any registry entry associated with \`$capability\`.
 EOF
 
@@ -2672,6 +2862,7 @@ EOF
 - Accepted by: $reviewer
 - Date/time: $(now_readable)
 - Activation mode: human review required
+- Verification: reviewer confirmed the proposal verification evidence before acceptance.
 - Rollback: remove this registry entry and revert files named by the decision/proposal.
 EOF
   fi
@@ -2693,6 +2884,9 @@ case "$command" in
     ;;
   verify-config)
     verify_config "$@"
+    ;;
+  verify-safety)
+    verify_safety "$@"
     ;;
   status)
     print_status "$@"

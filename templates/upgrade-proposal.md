@@ -36,6 +36,9 @@
 
 - Safety risk:
 - Permission or authority changes:
+- Filesystem impact:
+- Network or account impact:
+- Secrets handling impact:
 - Human approval required before activation: yes
 
 ## Evaluation

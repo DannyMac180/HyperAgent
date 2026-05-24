@@ -121,6 +121,8 @@ Restart Codex Desktop or open a fresh thread after updating the installed skill.
 - `docs/hyperagent-prd.md`: product requirements and milestone plan.
 - `docs/concepts.md`: the Suit, Mission, Workshop, and Forge mental model.
 - `docs/config.md`: `.hyperagent` schema, stable fields, adapter-owned fields, and verification command contract.
+- `adapters/contract.md`: generic adapter contract for future platform work.
+- `adapters/codex.md`: Codex-specific adapter responsibilities for the current alpha.
 - `docs/clean-install-uat.md`: repeatable clean-install acceptance test for the README prompt.
 - `docs/release-checklist.md`: alpha release criteria, clean-clone test, and update model.
 - `docs/releases/v0.1.0-alpha.md`: first alpha release notes.
@@ -161,7 +163,7 @@ sh scripts/hyperagent.sh verify-config
 sh scripts/verify-mvp.sh
 ```
 
-The config verifier checks the root `.hyperagent` contract. The MVP verifier checks that the Codex skill, installer, operating prompt, local memory directories, templates, documentation, capability registry, and safety defaults are present.
+The config verifier checks the root `.hyperagent` contract. The MVP verifier checks that the Codex adapter docs, Codex skill, installer, operating prompt, local memory directories, templates, documentation, capability registry, and safety defaults are present.
 
 Run the end-to-end local smoke loop:
 

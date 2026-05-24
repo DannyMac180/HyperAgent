@@ -26,6 +26,8 @@ require_file CONTRIBUTING.md
 require_file SECURITY.md
 require_file .github/pull_request_template.md
 require_file .hyperagent
+require_file adapters/contract.md
+require_file adapters/codex.md
 require_file .github/ISSUE_TEMPLATE/bug_report.md
 require_file .github/ISSUE_TEMPLATE/suit_friction.md
 require_file .github/ISSUE_TEMPLATE/upgrade_proposal.md
@@ -161,6 +163,21 @@ require_text .hyperagent 'evidence_log = ".hyperagent-evidence/commands.log"'
 require_text .hyperagent 'workbench_trace_log = ".hyperagent-evidence/workbench/traces.jsonl"'
 require_text .hyperagent 'codex = true'
 require_text .hyperagent 'sh evals/forge-audit-smoke.sh'
+require_text adapters/contract.md "HyperAgent Adapter Contract"
+require_text adapters/contract.md "Install path"
+require_text adapters/contract.md "Prompt format"
+require_text adapters/contract.md "Tool capabilities"
+require_text adapters/contract.md "Memory location"
+require_text adapters/contract.md "Verification commands"
+require_text adapters/contract.md "Safety constraints"
+require_text adapters/contract.md "Status reporting"
+require_text adapters/contract.md "UI and sensing integration"
+require_text adapters/contract.md "Codex is the only enabled adapter"
+require_text adapters/codex.md "Codex Adapter"
+require_text adapters/codex.md "Codex is the only shipped HyperAgent adapter"
+require_text adapters/codex.md "Global Codex custom instructions are not edited"
+require_text adapters/codex.md 'Default activation mode remains `human review required`'
+require_text adapters/codex.md "does not provide a hosted dashboard"
 require_text README.md "v0.1.0-alpha"
 require_text README.md "docs/releases/v0.1.0-alpha.md"
 require_text README.md "Try HyperAgent In Codex Mac"
@@ -172,6 +189,8 @@ require_text README.md 'setup-hyperagent.sh" --install-dir "$dest"'
 require_text README.md "Do not modify my global Codex custom instructions"
 require_text README.md "docs/quickstart.md"
 require_text README.md "docs/config.md"
+require_text README.md "adapters/contract.md"
+require_text README.md "adapters/codex.md"
 require_text README.md "docs/clean-install-uat.md"
 require_text README.md "sh scripts/update-codex-skill.sh"
 require_text README.md "docs/release-checklist.md"

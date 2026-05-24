@@ -39,7 +39,9 @@ require_file docs/article-outline.md
 require_file docs/quickstart.md
 require_file docs/clean-install-uat.md
 require_file docs/release-checklist.md
+require_file docs/roadmap.md
 require_file docs/releases/v0.1.0-alpha.md
+require_file docs/releases/next-alpha.md
 require_file skills/codex-hyperagent/SKILL.md
 require_file skills/codex-hyperagent/agents/openai.yaml
 require_file bin/hyperagent
@@ -80,6 +82,7 @@ require_text skills/codex-hyperagent/agents/openai.yaml "display_name: \"HyperAg
 require_text AGENTS.md "HyperAgent triage on every task"
 require_text AGENTS.md "README Architecture Diagram"
 require_text CONTRIBUTING.md "How To Propose A Suit Upgrade"
+require_text CONTRIBUTING.md "Product State Reconciliation"
 require_text CONTRIBUTING.md "architecture diagram update"
 require_text SECURITY.md "Authority Boundary"
 require_text .github/pull_request_template.md "README architecture diagram was reviewed or updated"
@@ -125,8 +128,19 @@ require_text README.md "docs/quickstart.md"
 require_text README.md "docs/clean-install-uat.md"
 require_text README.md "sh scripts/update-codex-skill.sh"
 require_text README.md "docs/release-checklist.md"
+require_text README.md "docs/roadmap.md"
 require_text README.md "docs/assets/hyperagent-architecture.svg"
 require_text README.md "docs/architecture/hyperagent.mmd"
+require_text docs/roadmap.md "PRD Milestone Map"
+require_text docs/roadmap.md "Implemented Surfaces"
+require_text docs/roadmap.md "Current Limits"
+require_text docs/roadmap.md "Next Work"
+require_text docs/roadmap.md "Mark I"
+require_text docs/roadmap.md "Workshop"
+require_text docs/roadmap.md "Forge"
+require_text docs/roadmap.md "Codex Mac App Distribution"
+require_text docs/roadmap.md "Multi-Platform Suit"
+require_text docs/roadmap.md "human review required"
 require_text docs/quickstart.md "Manual Quickstart"
 require_text docs/quickstart.md "sh scripts/hyperagent.sh init --target"
 require_text docs/quickstart.md "sh scripts/install-codex-skill.sh"
@@ -149,7 +163,11 @@ require_text docs/release-checklist.md "outcome, proposal, eval, safety, process
 require_text docs/release-checklist.md "v0.1.0-alpha"
 require_text docs/release-checklist.md "Clean-Clone Test"
 require_text docs/releases/v0.1.0-alpha.md "Forge Review Flow"
+require_text docs/releases/v0.1.0-alpha.md "docs/releases/next-alpha.md"
 require_text docs/releases/v0.1.0-alpha.md "Persistent behavior changes require human review."
+require_text docs/releases/next-alpha.md "Unreleased Since"
+require_text docs/releases/next-alpha.md "Acceptance Status"
+require_text docs/releases/next-alpha.md "Persistent behavior changes still require human review."
 require_text docs/quickstart.md "--forge-review"
 require_text evals/README.md "Installer Smoke Eval"
 require_text evals/README.md "Init Smoke Eval"
@@ -174,6 +192,7 @@ require_text hyperagent/operating-prompt.md "workshop/decisions"
 require_text hyperagent/operating-prompt.md "--forge-review"
 require_text hyperagent/capability-registry.md "human review required"
 require_text hyperagent/capability-registry.md "codex-skill-installer"
+require_text hyperagent/capability-registry.md "In Review Capabilities"
 require_text templates/mission-record.md "Mission ID"
 require_text templates/mission-record.md "Repository Evidence"
 require_text templates/mission-record.md "Verification status"

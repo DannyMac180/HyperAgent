@@ -21,6 +21,7 @@ Use this skill when the user asks Codex to operate as HyperAgent, run a HyperAge
 - Upgrade backlog: `workshop/backlog.md`
 - Workshop rubric: `workshop/rubric.md`
 - Forge quality rubric: `forge/process/quality-rubric.md`
+- Forge audit command: `sh scripts/hyperagent.sh forge audit`
 - Local helper: `scripts/hyperagent.sh`
 
 ## Operating Loop
@@ -78,6 +79,8 @@ Review recent upgrade proposals in `workshop/proposals/`, decisions in `workshop
 Run Forge reviews after proposals are accepted or rejected, evals change, release-readiness checks, or repeated missions where Workshop output looks vague, unsafe, untested, or too heavy. Judge outcome quality, proposal quality, eval quality, safety quality, and process bloat. If the process itself needs improvement, create a Forge review in `forge/reviews/` using `templates/forge-review.md`.
 
 Use `forge/process/quality-rubric.md` to score the Workshop process and identify process upgrades. When a process upgrade is warranted, generate a Workshop proposal from the Forge review with `sh scripts/hyperagent.sh propose-upgrade --forge-review PATH --title "..." --problem "..."`. Keep the proposal in `human review required` mode.
+
+Use `sh scripts/hyperagent.sh forge audit` for a concise process-health report covering proposal quality, stale or missing decisions, accepted capability traceability, and Forge audit eval coverage. The audit is read-only unless `--write-proposal` is passed, and generated proposals must remain `human review required`.
 
 ## Safety Defaults
 

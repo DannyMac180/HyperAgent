@@ -118,6 +118,14 @@ The Forge may propose changes to:
 - `skills/codex-hyperagent/SKILL.md`
 - `hyperagent/operating-prompt.md`
 
+The Forge may also run an opinionated local audit:
+
+```bash
+sh scripts/hyperagent.sh forge audit
+```
+
+The audit reports weak proposals, stale or missing decisions, accepted registry entries without source proposal, decision, verification evidence, or rollback traceability, and missing Forge audit eval coverage. It is read-only by default. `--write-proposal` drafts one `human review required` process-improvement proposal when the findings are concrete enough to act on; it never accepts, installs, or records a decision.
+
 Forge reviews may generate process-improvement proposals. Use:
 
 ```bash

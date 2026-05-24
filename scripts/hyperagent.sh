@@ -45,6 +45,10 @@ Commands:
   new-forge-review [--slug SLUG]
       Create a Forge review record in forge/reviews/.
 
+  forge audit [--write-proposal]
+  forge-audit [--write-proposal]
+      Audit Workshop proposals, decisions, registry traceability, and eval coverage.
+
   forge-prompt
       Print the repeatable Forge review prompt.
 
@@ -178,6 +182,7 @@ registry_file=$(config_path_or_default capability_registry "hyperagent/capabilit
 default_command_log=$(config_path_or_default evidence_log ".hyperagent-evidence/commands.log")
 default_evidence_dir=$(dirname "$default_command_log")
 default_workbench_trace_log=$(config_path_or_default workbench_trace_log ".hyperagent-evidence/workbench/traces.jsonl")
+eval_dir="$repo_root/evals"
 
 now_stamp() {
   date '+%Y-%m-%d-%H%M'
@@ -222,6 +227,55 @@ redact_stream() {
 
 redact_text() {
   printf '%s\n' "$1" | redact_stream
+}
+
+trim_text() {
+  sed 's/^[[:space:]]*//; s/[[:space:]]*$//'
+}
+
+field_value() {
+  file="$1"
+  label="$2"
+  awk -v label="$label" '
+    index($0, "- " label ":") == 1 {
+      sub("^- " label ":[[:space:]]*", "")
+      print
+      exit
+    }
+  ' "$file" | trim_text
+}
+
+meaningful_value() {
+  value=$(printf '%s' "$1" | trim_text)
+  case "$value" in
+    ''|'-'|'`'|'``'|'yes/no'|'ready/not ready'|'PATH'|'PATH '*|'Pending '*|'pending')
+      return 1
+      ;;
+    *)
+      return 0
+      ;;
+  esac
+}
+
+strip_ticks() {
+  printf '%s' "$1" | sed 's/^`//; s/`$//'
+}
+
+repo_relative_path() {
+  path="$1"
+  case "$path" in
+    "$repo_root"/*) printf '%s\n' "${path#$repo_root/}" ;;
+    *) printf '%s\n' "$path" ;;
+  esac
+}
+
+path_exists_from_repo() {
+  raw_path=$(strip_ticks "$1")
+  meaningful_value "$raw_path" || return 1
+  case "$raw_path" in
+    /*) test -f "$raw_path" ;;
+    *) test -f "$repo_root/$raw_path" ;;
+  esac
 }
 
 json_escape() {
@@ -721,6 +775,7 @@ sh scripts/hyperagent.sh verify-mission --strict missions/MISSION.md
 sh scripts/hyperagent.sh workshop-prompt
 sh scripts/hyperagent.sh forge-prompt
 sh scripts/hyperagent.sh propose-upgrade --forge-review forge/reviews/REVIEW.md --title "Improve Workshop quality" --problem "The Workshop process needs a concrete fix"
+sh scripts/hyperagent.sh forge audit
 ```
 
 ## Verification
@@ -2234,6 +2289,291 @@ Read recent Workshop proposals in workshop/proposals/, decisions in workshop/dec
 EOF
 }
 
+proposal_has_decision() {
+  proposal="$1"
+  rel=$(repo_relative_path "$proposal")
+  base=$(basename "$proposal")
+  find "$decision_dir" -maxdepth 1 -type f -name '*.md' 2>/dev/null | while IFS= read -r decision_file; do
+    if grep -F -e "\`$rel\`" -e "$rel" -e "\`$proposal\`" -e "$proposal" -e "$base" "$decision_file" >/dev/null 2>&1; then
+      printf '%s\n' "$decision_file"
+      break
+    fi
+  done
+}
+
+audit_proposals() {
+  findings_file="$1"
+  find "$proposal_dir" -maxdepth 1 -type f -name '*.md' 2>/dev/null | sort | while IFS= read -r proposal; do
+    rel=$(repo_relative_path "$proposal")
+    missing_quality=
+
+    evidence_missions=$(field_value "$proposal" "Evidence from mission records")
+    evidence_forge=$(field_value "$proposal" "Evidence from Forge reviews")
+    if ! meaningful_value "$evidence_missions" && ! meaningful_value "$evidence_forge"; then
+      missing_quality="${missing_quality} evidence"
+    fi
+
+    proposed_capability=$(field_value "$proposal" "Proposed capability")
+    first_step=$(field_value "$proposal" "Highest-priority plan step")
+    changed_files=$(field_value "$proposal" "Files or instructions likely to change")
+    if ! meaningful_value "$proposed_capability" || ! meaningful_value "$first_step" || ! meaningful_value "$changed_files"; then
+      missing_quality="${missing_quality} specificity"
+    fi
+
+    eval_plan=$(field_value "$proposal" "Eval or acceptance test")
+    if ! meaningful_value "$eval_plan"; then
+      missing_quality="${missing_quality} acceptance-test"
+    fi
+
+    safety_risk=$(field_value "$proposal" "Safety risk")
+    authority_change=$(field_value "$proposal" "Permission or authority changes")
+    human_review=$(field_value "$proposal" "Human approval required before activation")
+    if ! meaningful_value "$safety_risk" || ! meaningful_value "$authority_change" || ! printf '%s' "$human_review" | grep -i 'yes' >/dev/null 2>&1; then
+      missing_quality="${missing_quality} safety"
+    fi
+
+    rollback_plan=$(field_value "$proposal" "Rollback plan")
+    if ! meaningful_value "$rollback_plan"; then
+      missing_quality="${missing_quality} rollback"
+    fi
+
+    recommended_decision=$(field_value "$proposal" "Recommended decision")
+    decision_record_path=$(field_value "$proposal" "Decision record path")
+    capability_id=$(field_value "$proposal" "Capability registry ID if accepted")
+    if ! meaningful_value "$recommended_decision" || ! meaningful_value "$decision_record_path" || ! meaningful_value "$capability_id"; then
+      missing_quality="${missing_quality} decision-handoff"
+    fi
+
+    if [ -n "$missing_quality" ]; then
+      cleaned=$(printf '%s' "$missing_quality" | sed 's/^ //; s/ /, /g')
+      printf '%s\n' "- [weak-proposal] \`$rel\`: missing $cleaned." >>"$findings_file"
+    fi
+
+    decision_match=$(proposal_has_decision "$proposal" | head -n 1)
+    if [ -z "$decision_match" ] && ! path_exists_from_repo "$decision_record_path"; then
+      printf '%s\n' "- [stale-proposal] \`$rel\`: no matching decision record found." >>"$findings_file"
+    fi
+  done
+}
+
+audit_decisions() {
+  findings_file="$1"
+  find "$decision_dir" -maxdepth 1 -type f -name '*.md' 2>/dev/null | sort | while IFS= read -r decision_file; do
+    rel=$(repo_relative_path "$decision_file")
+    proposal_path=$(field_value "$decision_file" "Proposal")
+    decision_value=$(field_value "$decision_file" "Decision")
+    capability=$(field_value "$decision_file" "Capability registry ID")
+
+    if ! path_exists_from_repo "$proposal_path"; then
+      printf '%s\n' "- [decision-link] \`$rel\`: proposal link is missing or points to a missing file." >>"$findings_file"
+    fi
+
+    if [ "$decision_value" = accepted ] && meaningful_value "$capability"; then
+      if ! grep -F "## $capability" "$registry_file" >/dev/null 2>&1; then
+        printf '%s\n' "- [decision-registry] \`$rel\`: accepted capability \`$capability\` is missing from the registry." >>"$findings_file"
+      fi
+    fi
+  done
+}
+
+audit_registry() {
+  findings_file="$1"
+  test -f "$registry_file" || {
+    printf '%s\n' "- [registry-traceability] \`$(repo_relative_path "$registry_file")\`: registry file is missing." >>"$findings_file"
+    return 0
+  }
+
+  awk -v findings_file="$findings_file" -v registry_rel="$(repo_relative_path "$registry_file")" '
+    function emit() {
+      if (cap == "" || cap == "Accepted Capabilities" || cap == "Capability Entry Template") {
+        return
+      }
+      missing = ""
+      if (block !~ /- Source proposal:/) {
+        missing = missing " source-proposal"
+      }
+      if (block !~ /- Decision record:/) {
+        missing = missing " decision-record"
+      }
+      if (block !~ /- Verification:/) {
+        missing = missing " evidence"
+      }
+      if (block !~ /- Rollback:/) {
+        missing = missing " rollback"
+      }
+      if (missing != "") {
+        gsub(/^ /, "", missing)
+        gsub(/ /, ", ", missing)
+        printf "- [registry-traceability] `%s#%s`: missing %s.\n", registry_rel, cap, missing >> findings_file
+      }
+    }
+    /^## / {
+      emit()
+      cap = substr($0, 4)
+      block = $0 "\n"
+      next
+    }
+    cap != "" {
+      block = block $0 "\n"
+    }
+    END {
+      emit()
+    }
+  ' "$registry_file"
+}
+
+audit_evals() {
+  findings_file="$1"
+  if [ ! -f "$eval_dir/forge-audit-smoke.sh" ]; then
+    printf '%s\n' "- [eval-coverage] \`evals/forge-audit-smoke.sh\`: missing Forge audit smoke eval." >>"$findings_file"
+  fi
+  if [ ! -d "$eval_dir/fixtures/forge-audit" ]; then
+    printf '%s\n' "- [eval-coverage] \`evals/fixtures/forge-audit\`: missing good/weak proposal fixtures." >>"$findings_file"
+  fi
+}
+
+generate_forge_audit_report() {
+  findings_file=$(mktemp)
+  audit_proposals "$findings_file"
+  audit_decisions "$findings_file"
+  audit_registry "$findings_file"
+  audit_evals "$findings_file"
+
+  proposal_count=$(count_markdown_files "$proposal_dir")
+  decision_count=$(count_markdown_files "$decision_dir")
+  registry_count=$(grep -c '^## ' "$registry_file" 2>/dev/null || true)
+  eval_check_count=$(find "$eval_dir" -maxdepth 1 -type f -name '*forge-audit*' 2>/dev/null | wc -l | tr -d ' ')
+  finding_count=$(wc -l <"$findings_file" | tr -d ' ')
+  test -n "$finding_count" || finding_count=0
+
+  printf '# Forge Audit\n\n'
+  printf '%s\n' "- Generated: $(now_readable)"
+  printf '%s\n' "- Proposals reviewed: $proposal_count"
+  printf '%s\n' "- Decisions reviewed: $decision_count"
+  printf '%s\n' "- Registry headings reviewed: $registry_count"
+  printf '%s\n' "- Forge audit eval checks found: $eval_check_count"
+  printf '%s\n' "- Finding count: $finding_count"
+  if [ "$finding_count" -eq 0 ] 2>/dev/null; then
+    printf '%s\n' "- Recommendation: no process proposal needed"
+  else
+    printf '%s\n' "- Recommendation: draft or review a human-review-required process proposal"
+  fi
+
+  printf '\n## Findings\n\n'
+  if [ "$finding_count" -eq 0 ] 2>/dev/null; then
+    printf '%s\n' "- none"
+  else
+    cat "$findings_file"
+  fi
+
+  printf '\n## Next Action\n\n'
+  if [ "$finding_count" -eq 0 ] 2>/dev/null; then
+    printf '%s\n' "- Continue using Forge reviews after proposal decisions and eval changes."
+  else
+    printf '%s\n' "- Resolve stale decisions, fill weak proposal fields, repair registry traceability, or run \`sh scripts/hyperagent.sh forge audit --write-proposal\` to draft a process-improvement proposal."
+  fi
+
+  rm -f "$findings_file"
+}
+
+create_forge_audit_process_proposal() {
+  audit_summary="$1"
+  stamp=$(now_stamp)
+  slug=forge-audit-process-health
+  file="$proposal_dir/$stamp-$slug.md"
+  test ! -e "$file" || fail "proposal already exists: $file"
+  finding_line=$(grep -F -- '- Finding count:' "$audit_summary" | head -n 1 | sed 's/^- Finding count: //')
+
+  cat >"$file" <<EOF
+# Upgrade Proposal
+
+- Upgrade title: Improve Forge audit follow-through
+- Proposal ID: proposal-$stamp-$slug
+- Date/time: $(now_readable)
+- Related mission record:
+- Related Forge review:
+- Evidence source type: forge audit
+- Proposed activation mode: human review required
+- Allowed activation modes: suggest only; draft files only; human review required; auto-install low risk
+- Backlog priority: P2
+- Workshop rubric score:
+
+## Problem
+
+- Problem observed: \`forge audit\` found $finding_line proposal, decision, registry, or eval process-health finding(s).
+- Evidence from mission records:
+- Evidence from Forge reviews: Forge audit output generated by \`sh scripts/hyperagent.sh forge audit\`.
+- Why the current Suit was insufficient: The Workshop process needs explicit follow-through on stale decisions, weak proposal fields, registry traceability, and eval coverage.
+
+## Proposed Capability
+
+- Type of upgrade: Process improvement.
+- Proposed capability: Add or tighten the smallest rule, template field, eval, or maintainer checklist item needed to prevent the repeated audit finding.
+- Expected impact: Better proposal quality and traceability without silently accepting or installing process changes.
+- Transferability: Useful across HyperAgent project workspaces that rely on local Markdown proposals, decisions, and registry entries.
+
+## Implementation Plan
+
+- Highest-priority plan step: Triage the audit findings and pick the smallest process change that prevents the most severe recurring issue.
+- Implementation steps: Review audit findings; update the relevant template, rubric, helper, or eval; run \`sh scripts/hyperagent.sh forge audit\`; record a human decision before activation.
+- Files or instructions likely to change: \`templates/upgrade-proposal.md\`, \`forge/process/quality-rubric.md\`, \`evals/\`, \`scripts/hyperagent.sh\`, or maintainer docs depending on the selected finding.
+- Verification for the first step: Re-run \`sh scripts/hyperagent.sh forge audit\` and confirm the selected finding is resolved or intentionally deferred.
+
+## Safety
+
+- Safety risk: Low. This proposal changes local process artifacts only after human review.
+- Permission or authority changes: None. It does not broaden filesystem, shell, network, account, deployment, or secrets access.
+- Human approval required before activation: yes
+
+## Evaluation
+
+- Eval or acceptance test: \`sh scripts/hyperagent.sh forge audit\`; \`sh evals/forge-audit-smoke.sh\`.
+- Rollback plan: Revert the process artifact changes and remove this proposal from the backlog if the audit rule proves too noisy.
+- Open questions: Which finding is recurring enough to justify a template or eval change rather than a one-time cleanup?
+
+## Decision Handoff
+
+- Recommended decision: proposed
+- Decision record path:
+- Capability registry ID if accepted: forge-audit-process-health
+EOF
+
+  printf '%s\n' "$file"
+}
+
+run_forge_audit() {
+  write_proposal=0
+
+  while [ "$#" -gt 0 ]; do
+    case "$1" in
+      --write-proposal)
+        write_proposal=1
+        ;;
+      *)
+        fail "unknown forge audit option: $1"
+        ;;
+    esac
+    shift
+  done
+
+  audit_tmp=$(mktemp)
+  generate_forge_audit_report >"$audit_tmp"
+  cat "$audit_tmp"
+
+  if [ "$write_proposal" -eq 1 ]; then
+    finding_count=$(grep -F -- '- Finding count:' "$audit_tmp" | head -n 1 | sed 's/^- Finding count: //')
+    test -n "$finding_count" || finding_count=0
+    if [ "$finding_count" -gt 0 ] 2>/dev/null; then
+      proposal_path=$(create_forge_audit_process_proposal "$audit_tmp")
+      printf '\n%s\n' "Process proposal created: \`$(repo_relative_path "$proposal_path")\`"
+    else
+      printf '\n%s\n' "Process proposal created: none; no audit findings were strong enough."
+    fi
+  fi
+
+  rm -f "$audit_tmp"
+}
+
 record_decision() {
   verify_config >/dev/null
 
@@ -2380,6 +2720,27 @@ case "$command" in
     ;;
   new-forge-review)
     create_forge_review "$@"
+    ;;
+  forge)
+    subcommand=${1:-help}
+    if [ "$#" -gt 0 ]; then
+      shift
+    fi
+    case "$subcommand" in
+      audit)
+        run_forge_audit "$@"
+        ;;
+      help|-h|--help)
+        usage
+        ;;
+      *)
+        usage >&2
+        fail "unknown forge subcommand: $subcommand"
+        ;;
+    esac
+    ;;
+  forge-audit)
+    run_forge_audit "$@"
     ;;
   forge-prompt)
     print_forge_prompt

@@ -58,12 +58,13 @@ This section keeps the 17 review improvements visible without requiring chat his
 | DAN-194 PRD milestone roadmap | In Progress | Current alpha | Roadmap | `docs/roadmap.md`, `CONTRIBUTING.md`, `scripts/verify-mvp.sh` | Keep this file reviewer-maintainable with status, owner/source issue, evidence, and next action columns. |
 | DAN-195 Init drift separation | Merging | Current alpha candidate | Project init and runtime boundaries | `scripts/hyperagent.sh init`, `.hyperagent`, `docs/config.md` | Land merge if checks pass; keep local project artifacts separate from global runtime files. |
 | DAN-196 Forge audit | Merging | Current alpha candidate | Forge process health | `templates/forge-review.md`, `forge/process/quality-rubric.md`, `scripts/verify-forge-review.sh` | Land merge if checks pass, then decide whether audit output changes Workshop process. |
-| DAN-197 Suit-not-scaffold gate | Backlog | Future/current alpha guardrail | Product strategy and review gate | `docs/hyperagent-prd.md` strategic positioning | Add a review gate that rejects brittle scaffolding while preserving durable Suit infrastructure. |
+| DAN-197 Suit-not-scaffold gate | In Progress | Current alpha guardrail | Product strategy and review gate | `docs/hyperagent-prd.md` strategic positioning, `CONTRIBUTING.md`, `.github/pull_request_template.md`, `templates/upgrade-proposal.md` | Use the review gate to route new work to core Suit infrastructure, adapter-specific conveniences, examples, or experiments. |
 
 ## Current Focus
 
 - Keep the current alpha Codex-first: Mark I, local Mission -> Workshop -> Forge, local config, mission closeout, safety checks, and Codex Mac distribution.
 - Move implemented-but-unaccepted surfaces through explicit human review before calling them accepted capabilities.
+- Route task-specific conveniences into examples, adapters, or experiments instead of core Suit infrastructure.
 - Preserve `docs/roadmap.md` as the concise product-state index and keep README high level.
 - Use DAN-193 as the release gate once DAN-192, DAN-195, DAN-196, and safety/roadmap work are reviewed.
 

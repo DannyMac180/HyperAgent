@@ -25,6 +25,14 @@
 - Expected impact:
 - Transferability:
 
+## Suit Not Scaffold Review
+
+- Durable-agency pillar strengthened: sensing / verification / memory / safety / capability discovery / upgrade flow / adapter boundary
+- Feature home: core Suit infrastructure / adapter-specific convenience / example / experiment
+- Why this belongs in that home:
+- If task-specific, documented home outside core:
+- Product-creep risk and guardrail:
+
 ## Implementation Plan
 
 - Highest-priority plan step:

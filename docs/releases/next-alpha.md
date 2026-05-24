@@ -87,11 +87,11 @@ Record the release-candidate verification here before tagging.
 
 | Check | Status | Evidence |
 | --- | --- | --- |
-| `sh scripts/verify-mvp.sh` | Passed on 2026-05-24 | Ran from branch `dan-193-next-alpha-release-prep`; output: `HyperAgent MVP artifact verification passed.` |
-| `sh evals/smoke-loop.sh` | Passed on 2026-05-24 | Ran from branch `dan-193-next-alpha-release-prep`; output: `HyperAgent smoke loop passed.` |
-| `sh evals/init-smoke.sh` | Passed on 2026-05-24 | Ran from branch `dan-193-next-alpha-release-prep`; output: `HyperAgent init smoke passed.` |
-| `sh evals/sense-smoke.sh` | Passed on 2026-05-24 | Ran from branch `dan-193-next-alpha-release-prep`; output: `HyperAgent sense smoke passed.` |
+| `sh scripts/verify-mvp.sh` | Passed on 2026-05-24 | Ran from branch `dan-193-next-alpha-release-prep` after merging `origin/main` into the release-prep branch; output: `HyperAgent MVP artifact verification passed.` |
+| `sh evals/smoke-loop.sh` | Passed on 2026-05-24 | Ran from branch `dan-193-next-alpha-release-prep` after merging `origin/main` into the release-prep branch; output: `HyperAgent smoke loop passed.` |
+| `sh evals/init-smoke.sh` | Passed on 2026-05-24 | Ran from branch `dan-193-next-alpha-release-prep` after merging `origin/main` into the release-prep branch; output: `HyperAgent init smoke passed.` |
+| `sh evals/sense-smoke.sh` | Passed on 2026-05-24 | Ran from branch `dan-193-next-alpha-release-prep` after merging `origin/main` into the release-prep branch; output: `HyperAgent sense smoke passed.` |
 | `sh evals/ui-smoke.sh` | Not applicable | No `evals/ui-smoke.sh` exists in this repo and no interactive product UI is shipped. |
 | Remote clean-clone install test | Blocked on 2026-05-24 | `git clone https://github.com/DannyMac180/HyperAgent.git` failed with `Could not resolve host: github.com` in the sandbox. |
-| Local clean-clone install test | Passed on 2026-05-24 | Cloned branch `dan-193-next-alpha-release-prep` into a temp directory from the reviewed docs commit; `verify-mvp`, `smoke-loop`, and temp skill install passed. |
+| Local clean-clone install test | Passed on 2026-05-24 | Cloned branch `dan-193-next-alpha-release-prep` into a temp directory after merging `origin/main`; `verify-mvp`, `smoke-loop`, and temp skill install passed. |
 | Manual Codex Desktop clean-install UAT | Pending / manual | Use `docs/clean-install-uat.md`; record the result there or in the release PR. |

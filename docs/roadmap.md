@@ -1,6 +1,6 @@
 # HyperAgent Roadmap And Product State
 
-This page is the repo source of truth for what HyperAgent has shipped, what is accepted, what is in review, and what is intentionally deferred.
+This page is the repo source of truth for what HyperAgent has shipped, what is accepted, what is in review, what is intentionally deferred, and which issue owns the next decision.
 
 State definitions:
 
@@ -14,13 +14,13 @@ Default activation mode remains `human review required`. Do not treat an impleme
 
 ## PRD Milestone Map
 
-| PRD milestone | Current state | Evidence | Linear / issue evidence | Proposal / decision | Registry entry |
-| --- | --- | --- | --- | --- | --- |
-| Mark I | Shipped / partially accepted | `skills/codex-hyperagent/SKILL.md`, `hyperagent/operating-prompt.md`, `templates/mission-record.md`, `templates/upgrade-proposal.md`, `missions/2026-05-01-2108-mark-i-build.md`, `scripts/verify-mvp.sh` | Initial Mark I build evidence in mission record | `workshop/proposals/2026-05-01-2108-codex-skill-installer.md`; `workshop/decisions/2026-05-16-accepted-codex-skill-installer.md` | `codex-skill-installer` |
-| Workshop | Shipped / accepted for local loop helper | `scripts/hyperagent.sh`, `workshop/backlog.md`, `workshop/rubric.md`, `templates/upgrade-decision.md`, `evals/smoke-loop.sh`, `missions/2026-05-16-1216-prd-fulfillment-working-product.md` | PRD fulfillment mission evidence | `workshop/proposals/2026-05-16-1216-local-loop-helper-and-smoke-eval.md`; `workshop/decisions/2026-05-16-accepted-local-loop-helper-and-smoke-eval.md` | `local-loop-helper` |
-| Forge | Shipped / in review for strengthened quantitative process | `templates/forge-review.md`, `forge/process/quality-rubric.md`, `scripts/verify-forge-review.sh`, `forge/reviews/2026-05-16-1216-workshop-quality-review.md`, `missions/2026-05-20-1556-dan-177-strengthen-forge.md`, `missions/2026-05-22-1535-dan-177-quantitative-forge-rework.md` | DAN-177 mission evidence | No decision record yet for the strengthened quantitative Forge work | In review only |
-| Codex Mac App Distribution | Shipped / in review | `README.md`, `docs/quickstart.md`, `docs/clean-install-uat.md`, `scripts/install-codex-skill.sh`, `scripts/update-codex-skill.sh`, `missions/2026-05-22-1547-readme-codex-installer-flow.md` | README onboarding and installer flow mission evidence | Installer accepted; README Codex prompt and clean-install UAT are in review | `codex-skill-installer`; newer onboarding flow in review |
-| Multi-Platform Suit | Deferred | PRD target remains in `docs/hyperagent-prd.md`; no Claude Code, OpenClaw, Cursor, platform registry, or shared cross-agent memory adapter is implemented | No implementation issue accepted here | None | None |
+| PRD milestone | Alpha scope | Current state | Owner / source issue | Evidence | Next action | Registry / decision |
+| --- | --- | --- | --- | --- | --- | --- |
+| Mark I | Current alpha | Shipped / partially accepted | DAN-181 product-state reconciliation; DAN-183 validated config contract; DAN-184 mission closeout automation | `skills/codex-hyperagent/SKILL.md`, `hyperagent/operating-prompt.md`, `templates/mission-record.md`, `templates/upgrade-proposal.md`, `missions/2026-05-01-2108-mark-i-build.md`, `missions/2026-05-23-2234-dan-181-product-state-reconciliation.md`, `missions/2026-05-23-2236-dan-183-validated-config-contract.md`, `missions/2026-05-23-2006-dan-184-mission-closeout-automation.md`, `scripts/verify-mvp.sh` | Keep Mark I local, inspectable, and Codex-first while reviewer decisions promote or defer newer surfaces. | Accepted: `codex-skill-installer`; in review: project config and closeout automation until decision records promote them. |
+| Workshop | Current alpha | Shipped / accepted for local loop helper; cadence work in progress | DAN-185 cadence audits; DAN-190 accepted-capability surfacing | `scripts/hyperagent.sh`, `workshop/backlog.md`, `workshop/rubric.md`, `templates/upgrade-decision.md`, `evals/smoke-loop.sh`, `missions/2026-05-16-1216-prd-fulfillment-working-product.md` | Use cadence evidence to move proposals through backlog/decision/registry rather than leaving them as mission notes. | Accepted: `local-loop-helper`; DAN-185 and DAN-190 remain in review/backlog. |
+| Forge | Current alpha | Shipped / in review for strengthened quantitative process | DAN-196 Forge audit; prior DAN-177 quantitative Forge work | `templates/forge-review.md`, `forge/process/quality-rubric.md`, `scripts/verify-forge-review.sh`, `forge/reviews/2026-05-16-1216-workshop-quality-review.md`, `missions/2026-05-20-1556-dan-177-strengthen-forge.md`, `missions/2026-05-22-1535-dan-177-quantitative-forge-rework.md` | Land/review the Forge audit work, then decide whether quantitative Forge review becomes an accepted capability. | No decision record yet for the strengthened quantitative Forge work. |
+| Codex Mac App Distribution | Current alpha | Shipped / in review | DAN-192 one-command Codex setup; DAN-193 next alpha release | `README.md`, `docs/quickstart.md`, `docs/clean-install-uat.md`, `scripts/install-codex-skill.sh`, `scripts/update-codex-skill.sh`, `missions/2026-05-22-1547-readme-codex-installer-flow.md` | Finish one-command setup review, then prepare a clean reviewed next-alpha release. | Accepted: `codex-skill-installer`; README prompt, clean-install UAT, and one-command setup remain in review. |
+| Multi-Platform Suit | Future work | Deferred by design | DAN-189 Codex adapter boundary before non-Codex platforms | PRD target remains in `docs/hyperagent-prd.md`; no Claude Code, OpenClaw, Cursor, platform registry, or shared cross-agent memory adapter is implemented | Design the Codex adapter boundary before adding any non-Codex platform support. | None. Do not add non-Codex adapters in the current alpha. |
 
 ## Implemented Surfaces
 
@@ -35,6 +35,44 @@ Default activation mode remains `human review required`. Do not treat an impleme
 | Quantitative Forge review checks | In review | `templates/forge-review.md`, `scripts/verify-forge-review.sh` | `missions/2026-05-20-1556-dan-177-strengthen-forge.md`, `missions/2026-05-22-1535-dan-177-quantitative-forge-rework.md` | Adds anchored 0-5 scores, evidence fields, deterministic gates, and payoff counters. |
 | README architecture diagram maintenance | In review | `docs/architecture/hyperagent.mmd`, `docs/assets/hyperagent-architecture.svg`, PR checklist | `missions/2026-05-21-1329-readme-architecture-diagram.md` | Reviewed when user-visible modules change; SVG rendering is still manual. |
 | Static architecture visual | Shipped / in review | README image asset | `docs/assets/hyperagent-architecture.svg` | This is not an interactive product UI. HyperAgent still has no dashboard or polished application UI. |
+
+## PRD Faithfulness Improvement Map
+
+This section keeps the 17 review improvements visible without requiring chat history. Linear state is a planning signal, not an acceptance signal; accepted capabilities still require a decision record and registry entry.
+
+| Issue | Current Linear state | Alpha classification | Roadmap area | Evidence / source | Next action |
+| --- | --- | --- | --- | --- | --- |
+| DAN-181 Reconcile product state | Done | Current alpha | Roadmap, release notes, registry, backlog | `missions/2026-05-23-2234-dan-181-product-state-reconciliation.md`, `docs/roadmap.md`, `docs/releases/next-alpha.md`, `hyperagent/capability-registry.md`, `workshop/backlog.md` | Keep roadmap as the canonical product-state page; add automation only if drift recurs. |
+| DAN-182 Simplify CLI into five flows | Backlog | Current alpha candidate | CLI ergonomics | `scripts/hyperagent.sh`, `docs/quickstart.md` | Decide the five primary commands and update docs/evals without breaking existing helper subcommands. |
+| DAN-183 Validated `.hyperagent` contract | Done | Current alpha | Project config | `missions/2026-05-23-2236-dan-183-validated-config-contract.md`, `.hyperagent`, `docs/config.md` | Review for acceptance and registry promotion if the contract should become an accepted capability. |
+| DAN-184 Mission closeout automation | Done | Current alpha | Mission telemetry | `missions/2026-05-23-2006-dan-184-mission-closeout-automation.md`, `scripts/hyperagent.sh`, `templates/mission-record.md` | Review for acceptance and keep strict mission verification green. |
+| DAN-185 Workshop/Forge cadence audits | In Progress | Current alpha candidate | Workshop and Forge process | `workshop/backlog.md`, mission evidence under `missions/` | Convert recurring mission evidence into backlog movement and reviewer-visible cadence checks. |
+| DAN-186 Score real mission evidence | In Progress | Current alpha candidate | Reliability evals | `evals/reliability-gains.sh`, `evals/reliability-rubric.md`, `missions/2026-05-20-1554-dan-176-reliability-gains-eval.md` | Extend reliability scoring beyond curated fixtures while preserving deterministic local checks. |
+| DAN-187 Optional local UI cockpit | Backlog | Future work | UI/dashboard | `docs/hyperagent-prd.md` MVP non-goals, `README.md` current limits | Keep UI optional and subordinate to markdown truth; do not build a hosted dashboard for this alpha. |
+| DAN-188 Public evidence boundaries | Backlog | Current alpha candidate | Privacy and sample logs | Mission records under `missions/` | Define which evidence can be public sample material and which dogfooding logs stay private. |
+| DAN-189 Codex adapter boundary | Backlog | Future work | Multi-platform Suit | `docs/hyperagent-prd.md` target-user and adapter language | Design the Codex adapter before implementing Claude Code, Cursor, OpenClaw, or other adapters. |
+| DAN-190 Accepted capabilities in status/sense/closeout | Backlog | Current alpha candidate | Capability registry visibility | `hyperagent/capability-registry.md`, `scripts/hyperagent.sh status`, `scripts/hyperagent.sh sense` | Surface accepted vs in-review capability state in local commands and closeout artifacts. |
+| DAN-191 Safety and authority verifier checks | In Progress | Current alpha candidate | Safety boundary | `README.md`, `SECURITY.md`, `scripts/verify-mvp.sh`, `hyperagent/operating-prompt.md` | Add local checks that preserve `human review required` and reject authority-boundary regressions. |
+| DAN-192 One-command Codex setup | Rework | Current alpha candidate | Codex Mac distribution | `README.md`, `docs/quickstart.md`, `scripts/install-codex-skill.sh`, `scripts/update-codex-skill.sh` | Address rework feedback, push the PR, and keep setup opt-in for project initialization. |
+| DAN-193 Next alpha release | In Progress | Current alpha release gate | Release readiness | `docs/releases/next-alpha.md`, `docs/release-checklist.md` | Prepare the next alpha only after the product tree is clean and reviewed. |
+| DAN-194 PRD milestone roadmap | In Progress | Current alpha | Roadmap | `docs/roadmap.md`, `CONTRIBUTING.md`, `scripts/verify-mvp.sh` | Keep this file reviewer-maintainable with status, owner/source issue, evidence, and next action columns. |
+| DAN-195 Init drift separation | Merging | Current alpha candidate | Project init and runtime boundaries | `scripts/hyperagent.sh init`, `.hyperagent`, `docs/config.md` | Land merge if checks pass; keep local project artifacts separate from global runtime files. |
+| DAN-196 Forge audit | Merging | Current alpha candidate | Forge process health | `templates/forge-review.md`, `forge/process/quality-rubric.md`, `scripts/verify-forge-review.sh` | Land merge if checks pass, then decide whether audit output changes Workshop process. |
+| DAN-197 Suit-not-scaffold gate | Backlog | Future/current alpha guardrail | Product strategy and review gate | `docs/hyperagent-prd.md` strategic positioning | Add a review gate that rejects brittle scaffolding while preserving durable Suit infrastructure. |
+
+## Current Focus
+
+- Keep the current alpha Codex-first: Mark I, local Mission -> Workshop -> Forge, local config, mission closeout, safety checks, and Codex Mac distribution.
+- Move implemented-but-unaccepted surfaces through explicit human review before calling them accepted capabilities.
+- Preserve `docs/roadmap.md` as the concise product-state index and keep README high level.
+- Use DAN-193 as the release gate once DAN-192, DAN-195, DAN-196, and safety/roadmap work are reviewed.
+
+## Deferred By Design
+
+- Multi-platform adapters are deferred until DAN-189 defines the Codex adapter boundary.
+- Interactive UI/dashboard work is deferred unless DAN-187 keeps markdown artifacts as the source of truth.
+- Hosted services, hidden databases, autonomous self-modification, and broadened account/network authority remain out of scope for this alpha.
+- Non-Codex platform support should not be added as an implementation shortcut before the current Codex-first flow stabilizes.
 
 ## Current Limits
 

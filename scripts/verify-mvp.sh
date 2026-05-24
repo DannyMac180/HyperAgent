@@ -66,6 +66,7 @@ require_file evals/reliability-gains.sh
 require_file evals/reliability-rubric.md
 require_file evals/fixtures/reliability/baseline-no-suit.md
 require_file evals/fixtures/reliability/hyperagent-suit.md
+require_file evals/fixtures/reliability-traces/workbench-trace-case.md
 require_file evals/sense-smoke.sh
 require_file evals/fixtures/forge-audit/good-proposal.md
 require_file evals/fixtures/forge-audit/weak-proposal.md
@@ -247,8 +248,16 @@ require_text evals/init-smoke.sh "HyperAgent init smoke passed."
 require_text evals/init-smoke.sh "init copied the runtime operating prompt into the target"
 require_text evals/init-smoke.sh "--update kept copied runtime helper"
 require_text evals/reliability-gains.sh "HyperAgent reliability gains eval passed."
+require_text evals/reliability-gains.sh "--missions"
+require_text evals/reliability-gains.sh "--traces"
+require_text evals/reliability-gains.sh "Evidence source type"
+require_text evals/reliability-gains.sh "mission-derived"
+require_text evals/reliability-gains.sh "trace-derived"
 require_text evals/reliability-rubric.md "Missed Verification"
+require_text evals/reliability-rubric.md "Mission-Derived Cases"
+require_text evals/reliability-rubric.md "Trace-Derived Cases"
 require_text evals/fixtures/reliability/hyperagent-suit.md "Condition: with-hyperagent"
+require_text evals/fixtures/reliability-traces/workbench-trace-case.md "Evidence source type: trace-derived"
 require_text evals/README.md "Sense Smoke Eval"
 require_text evals/smoke-loop.sh "HyperAgent smoke loop passed."
 require_text evals/smoke-loop.sh "Evidence source type: forge review"

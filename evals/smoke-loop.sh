@@ -59,6 +59,24 @@ grep -F "Recent Commands And Checks" "$closeout" >/dev/null || fail "closeout mi
 grep -F "sh scripts/hyperagent.sh status" "$closeout" >/dev/null || fail "closeout missing recorded check"
 grep -F "Candidate upgrades: None" "$closeout" >/dev/null || fail "closeout missing candidate upgrades"
 sh scripts/hyperagent.sh verify-mission --strict "$closeout" >/dev/null
+sh scripts/hyperagent.sh verify-mission --strict docs/examples/missions/public-safe-mission.md >/dev/null
+sh scripts/hyperagent.sh mission redact-check docs/examples/missions/public-safe-mission.md >/dev/null
+
+bad_mission="$tmpdir/private-mission.md"
+cat >"$bad_mission" <<'EOF'
+# Mission Record
+
+- Mission ID: mission-private-path
+- User request: Example
+- Final outcome: Example
+- Unresolved risks: Example
+- Verification status: Example
+- Changed files: Example
+- Repo path: /Users/example/private-repo
+EOF
+if sh scripts/hyperagent.sh mission redact-check "$bad_mission" >/dev/null 2>&1; then
+  fail "redact-check accepted a mission with a private local path"
+fi
 
 proposal=$(sh scripts/hyperagent.sh propose-upgrade \
   --mission "$mission" \

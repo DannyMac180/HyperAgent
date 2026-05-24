@@ -42,6 +42,9 @@ Commands:
   verify-mission [--strict] PATH
       Check a mission record. Strict mode fails placeholder closeout text.
 
+  mission redact-check PATH...
+      Flag mission evidence that should be redacted before public commit.
+
   propose-upgrade (--mission PATH | --forge-review PATH) --title TEXT --problem TEXT [--slug SLUG]
       Create a Workshop proposal in workshop/proposals/ from mission evidence or Forge review evidence.
 
@@ -2011,6 +2014,48 @@ verify_mission() {
   printf 'Mission verification passed: %s\n' "$file"
 }
 
+redact_check_file() {
+  file="$1"
+  test -f "$file" || fail "redact-check path is not a file: $file"
+
+  findings=$(
+    grep -nE '(/Users/[^[:space:]`)]+|/private/(tmp|var)/[^[:space:]`)]+|/var/folders/[^[:space:]`)]+|/tmp/[^[:space:]`)]+|https://linear\.app/[^[:space:]`)]+|[A-Z][A-Z0-9]+-[0-9]+|\.hyperagent-evidence/|workbench/traces\.jsonl|api[_-]?key|access[_-]?key|private[_-]?key|bearer[[:space:]]+[A-Za-z0-9._~+/-]+|token[=:][^[:space:]`)]+|secret[=:][^[:space:]`)]+|password[=:][^[:space:]`)]+)' "$file" 2>/dev/null || true
+  )
+
+  if [ -n "$findings" ]; then
+    printf 'Redaction check failed: %s\n' "$file" >&2
+    printf '%s\n' "$findings" >&2
+    return 1
+  fi
+
+  printf 'Redaction check passed: %s\n' "$file"
+}
+
+mission_command() {
+  subcommand=${1:-help}
+  if [ "$#" -gt 0 ]; then
+    shift
+  fi
+
+  case "$subcommand" in
+    redact-check)
+      test "$#" -gt 0 || fail "mission redact-check requires at least one path"
+      failed=0
+      for file in "$@"; do
+        redact_check_file "$file" || failed=1
+      done
+      test "$failed" -eq 0 || fail "mission redaction check found public-safety findings"
+      ;;
+    help|-h|--help)
+      usage
+      ;;
+    *)
+      usage >&2
+      fail "unknown mission subcommand: $subcommand"
+      ;;
+  esac
+}
+
 safety_field_value() {
   file="$1"
   label="$2"
@@ -3089,6 +3134,9 @@ case "$command" in
     ;;
   verify-mission)
     verify_mission "$@"
+    ;;
+  mission)
+    mission_command "$@"
     ;;
   propose-upgrade)
     create_proposal "$@"

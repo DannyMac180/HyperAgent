@@ -24,6 +24,7 @@ The repo is release-candidate ready only after all of these are true:
 - Reliability gains eval with deterministic baseline and HyperAgent fixture records.
 - Strengthened Forge review template, rubric, structured summary, anchored 0-5 scores, deterministic gates, payoff counters, and `scripts/verify-forge-review.sh`.
 - README Codex Mac copy-paste setup prompt and clean-install UAT checklist.
+- Developer dogfooding guide for two-week fresh-install PRD faithfulness review.
 - README architecture diagram source and rendered asset maintenance guardrails.
 - Product-state roadmap in `docs/roadmap.md`.
 
@@ -65,6 +66,7 @@ The following are in review until a human decision record promotes or rejects th
 - Reliability gains eval.
 - Quantitative Forge checks.
 - README Codex Mac onboarding prompt and clean-install UAT.
+- Two-week dogfooding guide and PRD faithfulness UAT.
 - Architecture diagram maintenance.
 - Product-state roadmap and reconciliation checklist.
 

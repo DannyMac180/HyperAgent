@@ -41,6 +41,7 @@ require_file docs/config.md
 require_file docs/article-outline.md
 require_file docs/quickstart.md
 require_file docs/clean-install-uat.md
+require_file docs/dogfooding.md
 require_file docs/release-checklist.md
 require_file docs/roadmap.md
 require_file docs/releases/v0.1.0-alpha.md
@@ -196,6 +197,7 @@ require_text README.md "docs/config.md"
 require_text README.md "adapters/contract.md"
 require_text README.md "adapters/codex.md"
 require_text README.md "docs/clean-install-uat.md"
+require_text README.md "docs/dogfooding.md"
 require_text README.md "sh scripts/update-codex-skill.sh"
 require_text README.md "docs/release-checklist.md"
 require_text README.md "docs/roadmap.md"
@@ -246,6 +248,12 @@ require_text docs/clean-install-uat.md "Try HyperAgent In Codex Mac"
 require_text docs/clean-install-uat.md "Command Path Test Flow"
 require_text docs/clean-install-uat.md "~/.codex/skills/codex-hyperagent/SKILL.md"
 require_text docs/clean-install-uat.md "Codex does not edit global Codex custom instructions"
+require_text docs/dogfooding.md "HyperAgent Dogfooding Guide"
+require_text docs/dogfooding.md "Fresh Install Baseline"
+require_text docs/dogfooding.md "Two-Week Operating Rule"
+require_text docs/dogfooding.md "Per-Task Mission Checklist"
+require_text docs/dogfooding.md "PRD Faithfulness Checklist"
+require_text docs/dogfooding.md "human review required"
 require_text docs/release-checklist.md "Update And Upgrade Model"
 require_text docs/release-checklist.md "Forge Readiness"
 require_text docs/release-checklist.md "Forge review flow"

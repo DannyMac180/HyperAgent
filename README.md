@@ -93,6 +93,8 @@ For the project config contract, see `docs/config.md`.
 
 For clean-install acceptance testing, see `docs/clean-install-uat.md`.
 
+For two-week developer dogfooding from a fresh install, see `docs/dogfooding.md`.
+
 For early release readiness, see `docs/release-checklist.md`.
 
 ## Updating
@@ -124,6 +126,7 @@ Restart Codex Desktop or open a fresh thread after updating the installed skill.
 - `adapters/contract.md`: generic adapter contract for future platform work.
 - `adapters/codex.md`: Codex-specific adapter responsibilities for the current alpha.
 - `docs/clean-install-uat.md`: repeatable clean-install acceptance test for the README prompt.
+- `docs/dogfooding.md`: two-week fresh-install dogfooding guide for PRD faithfulness review.
 - `docs/evidence-policy.md`: committed-versus-local mission evidence policy, redaction checklist, and public example rules.
 - `docs/release-checklist.md`: alpha release criteria, clean-clone test, and update model.
 - `docs/releases/v0.1.0-alpha.md`: first alpha release notes.

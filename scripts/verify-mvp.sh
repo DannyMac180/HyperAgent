@@ -55,12 +55,15 @@ require_file templates/forge-review.md
 require_file templates/upgrade-decision.md
 require_file evals/README.md
 require_file evals/smoke-loop.sh
+require_file evals/forge-audit-smoke.sh
 require_file evals/init-smoke.sh
 require_file evals/reliability-gains.sh
 require_file evals/reliability-rubric.md
 require_file evals/fixtures/reliability/baseline-no-suit.md
 require_file evals/fixtures/reliability/hyperagent-suit.md
 require_file evals/sense-smoke.sh
+require_file evals/fixtures/forge-audit/good-proposal.md
+require_file evals/fixtures/forge-audit/weak-proposal.md
 require_file workshop/backlog.md
 require_file workshop/rubric.md
 require_file forge/process/quality-rubric.md
@@ -100,6 +103,7 @@ require_text scripts/hyperagent.sh "HyperAgent Project Upgrade Backlog"
 require_text scripts/hyperagent.sh "decide-upgrade"
 require_text scripts/hyperagent.sh "sense [--format markdown|json]"
 require_text scripts/hyperagent.sh "doctor [--workbench-trace-log PATH]"
+require_text scripts/hyperagent.sh "forge audit [--write-proposal]"
 require_text scripts/hyperagent.sh "record-check --command TEXT"
 require_text scripts/hyperagent.sh "Does not inspect file contents"
 require_text scripts/hyperagent.sh ".hyperagent-evidence/commands.log"
@@ -115,6 +119,7 @@ require_text .hyperagent 'project_instructions = "AGENTS.md"'
 require_text .hyperagent 'evidence_log = ".hyperagent-evidence/commands.log"'
 require_text .hyperagent 'workbench_trace_log = ".hyperagent-evidence/workbench/traces.jsonl"'
 require_text .hyperagent 'codex = true'
+require_text .hyperagent 'sh evals/forge-audit-smoke.sh'
 require_text README.md "v0.1.0-alpha"
 require_text README.md "docs/releases/v0.1.0-alpha.md"
 require_text README.md "Try HyperAgent In Codex Mac"
@@ -151,7 +156,9 @@ require_text docs/release-checklist.md "Clean-Clone Test"
 require_text docs/releases/v0.1.0-alpha.md "Forge Review Flow"
 require_text docs/releases/v0.1.0-alpha.md "Persistent behavior changes require human review."
 require_text docs/quickstart.md "--forge-review"
+require_text docs/quickstart.md "sh scripts/hyperagent.sh forge audit"
 require_text evals/README.md "Installer Smoke Eval"
+require_text evals/README.md "Forge Audit Smoke Eval"
 require_text evals/README.md "Init Smoke Eval"
 require_text evals/README.md "Reliability Gains Eval"
 require_text evals/smoke-loop.sh "HyperAgent smoke loop passed."
@@ -165,6 +172,8 @@ require_text evals/README.md "Sense Smoke Eval"
 require_text evals/smoke-loop.sh "HyperAgent smoke loop passed."
 require_text evals/smoke-loop.sh "Evidence source type: forge review"
 require_text evals/smoke-loop.sh "verify-forge-review.sh"
+require_text evals/forge-audit-smoke.sh "HyperAgent Forge audit smoke passed."
+require_text evals/forge-audit-smoke.sh "[weak-proposal]"
 require_text evals/init-smoke.sh "HyperAgent init smoke passed."
 require_text evals/sense-smoke.sh "HyperAgent sense smoke passed."
 require_text evals/sense-smoke.sh "Workbench trace status"
@@ -172,6 +181,7 @@ require_text hyperagent/operating-prompt.md "human review required"
 require_text hyperagent/operating-prompt.md "relevance triage"
 require_text hyperagent/operating-prompt.md "workshop/decisions"
 require_text hyperagent/operating-prompt.md "--forge-review"
+require_text hyperagent/operating-prompt.md "forge audit"
 require_text hyperagent/capability-registry.md "human review required"
 require_text hyperagent/capability-registry.md "codex-skill-installer"
 require_text templates/mission-record.md "Mission ID"
@@ -204,7 +214,9 @@ require_text forge/process/quality-rubric.md "Eval Quality Metrics"
 require_text forge/process/quality-rubric.md "Safety Quality Metrics"
 require_text forge/process/quality-rubric.md "Score Scale"
 require_text forge/process/quality-rubric.md "Deterministic Gates"
+require_text forge/process/quality-rubric.md "sh scripts/hyperagent.sh forge audit"
 require_text scripts/hyperagent.sh "--forge-review"
+require_text scripts/hyperagent.sh "registry-traceability"
 
 sh scripts/hyperagent.sh status >/dev/null
 

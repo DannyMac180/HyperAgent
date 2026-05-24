@@ -162,6 +162,18 @@ You can check a completed review before using it as proposal evidence:
 sh scripts/verify-forge-review.sh forge/reviews/2026-05-16-1216-workshop-quality-review.md
 ```
 
+For a compact process-health report across proposals, decisions, registry entries, and audit eval coverage:
+
+```bash
+sh scripts/hyperagent.sh forge audit
+```
+
+The audit identifies weak proposals, proposals missing decisions, accepted capabilities with incomplete traceability, and missing Forge audit eval coverage. It is read-only by default. When the findings are concrete enough to justify a process improvement, draft a normal human-review-required Workshop proposal explicitly:
+
+```bash
+sh scripts/hyperagent.sh forge audit --write-proposal
+```
+
 The Forge should improve the Workshop process, not silently activate new capabilities. If the review finds a concrete process improvement, create a normal Workshop proposal linked to the Forge review:
 
 ```bash
@@ -177,6 +189,7 @@ sh scripts/hyperagent.sh propose-upgrade \
 sh scripts/verify-mvp.sh
 sh evals/init-smoke.sh
 sh evals/sense-smoke.sh
+sh evals/forge-audit-smoke.sh
 sh evals/smoke-loop.sh
 ```
 

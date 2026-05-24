@@ -45,6 +45,8 @@ Use Forge Mode when the problem is not a missing capability, but a weak improvem
 
 Review recent proposals, decisions, accepted capabilities, evals, and behavior evidence. Judge outcome quality, proposal quality, eval quality, safety quality, and process bloat. Write Forge reviews in `forge/reviews/` using `templates/forge-review.md` and score the process with `forge/process/quality-rubric.md`.
 
+Use `sh scripts/hyperagent.sh forge audit` when you need an opinionated process-health check before or after a Forge review. The audit should surface stale decisions, weak proposal fields, missing registry traceability, and weak eval coverage without silently accepting or installing process changes.
+
 When the Forge finds process friction worth fixing, generate a process-improvement proposal in `workshop/proposals/` with `sh scripts/hyperagent.sh propose-upgrade --forge-review PATH --title "..." --problem "..."`. Keep the proposal in `human review required` mode.
 
 ## Authority Boundary

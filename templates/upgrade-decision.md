@@ -13,6 +13,8 @@
 - Human approval recorded:
 - Silent activation allowed: no
 - Permission or secrets changes approved:
+- Filesystem authority approved:
+- Network or account authority approved:
 
 ## Outcome
 
@@ -20,4 +22,3 @@
 - Verification:
 - Registry update:
 - Rollback path:
-

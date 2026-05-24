@@ -1,8 +1,8 @@
 # Upgrade Proposal
 
-- Upgrade title:
-- Proposal ID:
-- Date/time:
+- Upgrade title: Weak Forge audit fixture
+- Proposal ID: proposal-forge-audit-weak-fixture
+- Date/time: 2026-05-23 10:01 EDT
 - Related mission record:
 - Related Forge review:
 - Evidence source type:
@@ -13,7 +13,7 @@
 
 ## Problem
 
-- Problem observed:
+- Problem observed: The audit must catch proposals that are too vague to review.
 - Evidence from mission records:
 - Evidence from Forge reviews:
 - Why the current Suit was insufficient:
@@ -36,9 +36,6 @@
 
 - Safety risk:
 - Permission or authority changes:
-- Filesystem impact:
-- Network or account impact:
-- Secrets handling impact:
 - Human approval required before activation: yes
 
 ## Evaluation

@@ -4,6 +4,7 @@
 - Proposal ID: proposal-2026-05-16-1216-local-loop-helper-and-smoke-eval
 - Date/time: 2026-05-16 12:16 EDT
 - Related mission record: `missions/2026-05-16-1216-prd-fulfillment-working-product.md`
+- Evidence source type: mission
 - Proposed activation mode: human review required
 - Allowed activation modes: suggest only; draft files only; human review required; auto-install low risk
 - Backlog priority: P0
@@ -33,6 +34,9 @@
 
 - Safety risk: Low. The helper writes local markdown artifacts and appends accepted capability entries only after an explicit `decide-upgrade` command.
 - Permission or authority changes: None. It does not broaden filesystem, shell, network, account, deployment, or secrets access.
+- Filesystem impact: Writes local mission, proposal, decision, Forge review, evidence, and registry markdown files in the repository.
+- Network or account impact: None.
+- Secrets handling impact: None.
 - Human approval required before activation: yes
 
 ## Evaluation
@@ -46,4 +50,3 @@
 - Recommended decision: accepted
 - Decision record path: `workshop/decisions/2026-05-16-accepted-local-loop-helper-and-smoke-eval.md`
 - Capability registry ID if accepted: local-loop-helper
-

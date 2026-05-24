@@ -9,6 +9,9 @@ Commands:
   init [--target DIR] [--force] [--dry-run]
       Create or update HyperAgent project setup files in DIR. Defaults to the current directory.
 
+  setup-codex [options]
+      Clone/update HyperAgent, verify it, install the Codex skill, and optionally init a target project.
+
   status
       Print HyperAgent local product status.
 
@@ -1522,6 +1525,9 @@ fi
 case "$command" in
   init)
     init_project "$@"
+    ;;
+  setup-codex)
+    exec sh "$repo_root/scripts/setup-codex.sh" "$@"
     ;;
   status)
     print_status "$@"

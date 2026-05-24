@@ -70,6 +70,21 @@ The init smoke test creates a temporary repo, runs `sh scripts/hyperagent.sh ini
 - refuses conflicting overwrites unless `--force` is passed,
 - leaves the target untouched during `--dry-run`.
 
+## Codex Setup Smoke Eval
+
+Run:
+
+```bash
+sh evals/setup-codex-smoke.sh
+```
+
+The setup smoke test runs `scripts/setup-codex.sh` against temporary paths and verifies that setup:
+
+- installs `codex-hyperagent` in a temporary Codex skills directory,
+- runs the project init step only after an explicit yes,
+- reports that global Codex custom instructions are unchanged,
+- prints clone/install actions without writing files during `--dry-run`.
+
 ## Sense Smoke Eval
 
 Run:

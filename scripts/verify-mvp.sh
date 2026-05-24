@@ -43,6 +43,7 @@ require_file docs/releases/v0.1.0-alpha.md
 require_file skills/codex-hyperagent/SKILL.md
 require_file skills/codex-hyperagent/agents/openai.yaml
 require_file bin/hyperagent
+require_file scripts/setup-codex.sh
 require_file scripts/install-codex-skill.sh
 require_file scripts/update-codex-skill.sh
 require_file scripts/hyperagent.sh
@@ -55,6 +56,7 @@ require_file templates/forge-review.md
 require_file templates/upgrade-decision.md
 require_file evals/README.md
 require_file evals/smoke-loop.sh
+require_file evals/setup-codex-smoke.sh
 require_file evals/init-smoke.sh
 require_file evals/reliability-gains.sh
 require_file evals/reliability-rubric.md
@@ -92,9 +94,14 @@ require_text docs/assets/hyperagent-architecture.svg "HyperAgent high-level arch
 require_text scripts/install-codex-skill.sh "Usage: sh scripts/install-codex-skill.sh"
 require_text scripts/install-codex-skill.sh "--dry-run"
 require_text scripts/install-codex-skill.sh "--force"
+require_text scripts/setup-codex.sh "Usage: sh scripts/setup-codex.sh"
+require_text scripts/setup-codex.sh "Global Codex custom instructions: unchanged"
+require_text scripts/setup-codex.sh "--init-target"
+require_text scripts/setup-codex.sh 'git -C "$install_dir" pull --ff-only'
 require_text scripts/update-codex-skill.sh "update complete"
 require_text bin/hyperagent "scripts/hyperagent.sh"
 require_text scripts/hyperagent.sh "init [--target DIR] [--force] [--dry-run]"
+require_text scripts/hyperagent.sh "setup-codex [options]"
 require_text scripts/hyperagent.sh "generate_init_config"
 require_text scripts/hyperagent.sh "HyperAgent Project Upgrade Backlog"
 require_text scripts/hyperagent.sh "decide-upgrade"
@@ -120,6 +127,7 @@ require_text README.md "docs/releases/v0.1.0-alpha.md"
 require_text README.md "Try HyperAgent In Codex Mac"
 require_text README.md "https://github.com/DannyMac180/HyperAgent"
 require_text README.md "~/HyperAgent"
+require_text README.md "scripts/setup-codex.sh"
 require_text README.md "Do not modify my global Codex custom instructions"
 require_text README.md "docs/quickstart.md"
 require_text README.md "docs/clean-install-uat.md"
@@ -128,6 +136,8 @@ require_text README.md "docs/release-checklist.md"
 require_text README.md "docs/assets/hyperagent-architecture.svg"
 require_text README.md "docs/architecture/hyperagent.mmd"
 require_text docs/quickstart.md "Manual Quickstart"
+require_text docs/quickstart.md "One-Command Codex Setup"
+require_text docs/quickstart.md 'sh "$HOME/HyperAgent/scripts/setup-codex.sh" --init-target'
 require_text docs/quickstart.md "sh scripts/hyperagent.sh init --target"
 require_text docs/quickstart.md "sh scripts/install-codex-skill.sh"
 require_text docs/quickstart.md "sh scripts/hyperagent.sh status"
@@ -140,6 +150,7 @@ require_text docs/quickstart.md "sh scripts/hyperagent.sh sense --format json --
 require_text docs/quickstart.md "Workbench trace"
 require_text docs/clean-install-uat.md "Clean-Install UAT"
 require_text docs/clean-install-uat.md "Try HyperAgent In Codex Mac"
+require_text docs/clean-install-uat.md "Command Path Test Flow"
 require_text docs/clean-install-uat.md "~/.codex/skills/codex-hyperagent/SKILL.md"
 require_text docs/clean-install-uat.md "Codex does not edit global Codex custom instructions"
 require_text docs/release-checklist.md "Update And Upgrade Model"
@@ -152,9 +163,11 @@ require_text docs/releases/v0.1.0-alpha.md "Forge Review Flow"
 require_text docs/releases/v0.1.0-alpha.md "Persistent behavior changes require human review."
 require_text docs/quickstart.md "--forge-review"
 require_text evals/README.md "Installer Smoke Eval"
+require_text evals/README.md "Codex Setup Smoke Eval"
 require_text evals/README.md "Init Smoke Eval"
 require_text evals/README.md "Reliability Gains Eval"
 require_text evals/smoke-loop.sh "HyperAgent smoke loop passed."
+require_text evals/setup-codex-smoke.sh "HyperAgent setup-codex smoke passed."
 require_text evals/smoke-loop.sh "mission missing repo path"
 require_text evals/smoke-loop.sh "mission missing verification status"
 require_text evals/init-smoke.sh "HyperAgent init smoke passed."

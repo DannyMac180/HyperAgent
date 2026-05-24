@@ -4,6 +4,19 @@ Use this checklist to test the public README flow the way a first-time Codex Mac
 
 The goal is to verify that the README prompt can take a machine from no local HyperAgent install to a working Codex skill and optional project initialization, without requiring the user to understand the internal command sequence first.
 
+## Latest Recorded Result
+
+Status as of 2026-05-24: not yet run for the next alpha candidate from this reviewed branch.
+
+Before tagging the next alpha, record:
+
+- candidate commit,
+- Codex Desktop version or build if available,
+- whether the README prompt completed without manual edits,
+- whether project init required explicit confirmation,
+- whether a restart or fresh thread was needed before the skill appeared,
+- any mismatch between the README, release notes, install flow, and actual shipped surface.
+
 ## What This Test Covers
 
 - The GitHub README is the entry point.

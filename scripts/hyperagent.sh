@@ -5,10 +5,45 @@ usage() {
   cat <<'USAGE'
 Usage: sh scripts/hyperagent.sh COMMAND [options]
 
-Commands:
+Primary flows:
   init [--target DIR] [--update] [--force] [--dry-run]
       Create or update HyperAgent project setup files in DIR. Defaults to the current directory.
 
+  sense [--format markdown|json] [--command-log PATH] [--trace-url URL] [--workbench-trace-log PATH] [--pr auto|off]
+      Understand current repo state, recent checks, changed files, PR status, and local trace health.
+
+  doctor [--workbench-trace-log PATH]
+  sense --doctor [--workbench-trace-log PATH]
+      Run local diagnostics for sensing and Workbench trace enrichment.
+
+  mission new --request TEXT [--slug SLUG] [--commands-run TEXT] [--verification-status TEXT]
+      Start a mission record in missions/.
+
+  mission closeout --request TEXT [--mission PATH] [--slug SLUG] [--outcome TEXT] [--risks TEXT] [--candidate-upgrades TEXT]
+      Close out a mission with sense, checks, changed files, risks, and Workshop prompts.
+
+  mission verify [--strict] PATH
+      Check a mission record. Strict mode fails placeholder closeout text.
+
+  review workshop (--mission PATH | --forge-review PATH) --title TEXT --problem TEXT [--slug SLUG]
+      Create a human-review-required Workshop proposal from mission or Forge evidence.
+
+  review digest [--limit N] [--draft-proposal] [--title TEXT] [--slug SLUG]
+      Review recent mission, Workshop, and Forge artifacts for backlog movement opportunities.
+
+  review forge new [--slug SLUG]
+      Create a Forge review record in forge/reviews/.
+
+  review forge audit [--write-proposal]
+      Audit Workshop proposal quality, decisions, registry traceability, and eval coverage.
+
+  review decide --proposal PATH --decision accepted|rejected --reviewer NAME --reason TEXT [--capability ID]
+      Record a human approval decision. Accepted decisions require --capability.
+
+  ui
+      Open the local HyperAgent cockpit when available. Currently prints local status and roadmap pointers.
+
+Compatibility and diagnostics:
   setup-hyperagent [options]
       Clone/update HyperAgent, verify it, install the Codex skill, and optionally init a target project.
 
@@ -19,13 +54,7 @@ Commands:
       Validate proposal, decision, and accepted capability safety boundaries.
 
   status
-      Print HyperAgent local product status.
-
-  sense [--format markdown|json] [--command-log PATH] [--trace-url URL] [--workbench-trace-log PATH] [--pr auto|off]
-      Print a compact local sensing summary for mission records.
-
-  doctor [--workbench-trace-log PATH]
-      Print local diagnostics for HyperAgent sensing and Workbench trace enrichment.
+      Print legacy local product status diagnostics.
 
   record-check --command TEXT --status passed|failed|retried|skipped [--note TEXT]
       Append an opt-in check or command result to the local evidence log.
@@ -65,7 +94,7 @@ Commands:
       Review recent missions, Workshop proposals, and Forge reviews for backlog movement opportunities.
 
   review-digest [--limit N] [--draft-proposal] [--title TEXT] [--slug SLUG]
-      Alias for workshop-digest.
+      Compatibility alias for review digest.
 
   help
       Show this help.
@@ -703,15 +732,26 @@ Use these files to keep agent work inspectable:
 - Generated config and docs: `.hyperagent`, `hyperagent/README.md`, and this repository's HyperAgent block in `AGENTS.md`.
 - Global runtime dependency: the local `scripts/hyperagent.sh` shim delegates to the installed HyperAgent runtime instead of copying the full runtime helper or operating prompt into this repo.
 
-## Local Commands
+## Five Primary Flows
+
+```bash
+sh scripts/hyperagent.sh init --target /path/to/project
+sh scripts/hyperagent.sh sense
+sh scripts/hyperagent.sh mission closeout --request "Describe the task" --slug task-slug
+sh scripts/hyperagent.sh review workshop --mission missions/MISSION.md --title "Improve the Suit" --problem "Concrete friction from the mission"
+sh scripts/hyperagent.sh review forge audit
+sh scripts/hyperagent.sh ui
+```
+
+Compatibility aliases remain available for at least one release:
 
 ```bash
 sh scripts/hyperagent.sh verify-config
 sh scripts/hyperagent.sh status
-sh scripts/hyperagent.sh sense
 sh scripts/hyperagent.sh record-check --status passed --command "sh scripts/verify-mvp.sh"
 sh scripts/hyperagent.sh doctor
 sh scripts/hyperagent.sh new-mission --request "Describe the task" --slug task-slug
+sh scripts/hyperagent.sh mission-closeout --request "Describe the task" --slug task-slug
 sh scripts/hyperagent.sh workshop-prompt
 sh scripts/hyperagent.sh forge-prompt
 sh scripts/hyperagent.sh propose-upgrade --forge-review forge/reviews/REVIEW.md --title "Improve Workshop quality" --problem "The Workshop process needs a concrete fix"
@@ -725,7 +765,7 @@ For this project, the lightweight check is:
 
 ```bash
 sh scripts/hyperagent.sh verify-config
-sh scripts/hyperagent.sh status
+sh scripts/hyperagent.sh sense
 ```
 
 To capture local task evidence for mission records:
@@ -733,6 +773,7 @@ To capture local task evidence for mission records:
 ```bash
 sh scripts/hyperagent.sh record-check --status passed --command "sh scripts/verify-mvp.sh"
 sh scripts/hyperagent.sh sense
+sh scripts/hyperagent.sh mission closeout --request "Describe the task" --slug task-slug
 ```
 
 The sensing summary reads Git metadata, the opt-in local command log, and local Workbench trace metadata when the default ignored trace log exists. It does not inspect repository file contents or environment values, and command text is redacted for secret-like tokens before storage and output.
@@ -1683,6 +1724,21 @@ print_doctor() {
   printf 'Workbench retention: local ignored evidence; keep only recent mission-relevant traces and prune manually or with your local Workbench policy.\n'
   printf 'Workbench redaction: HyperAgent redacts secret-like tokens before sense output; Workbench may still store local prompts, tool payloads, file paths, and command outputs.\n'
   printf 'Fallback: sense remains usable without Workbench traces.\n'
+}
+
+print_ui() {
+  cat <<'EOF'
+HyperAgent UI
+
+The hosted cockpit is not part of this local alpha yet. Use these local cockpit views:
+
+  sh scripts/hyperagent.sh sense
+  sh scripts/hyperagent.sh review digest
+  sh scripts/hyperagent.sh review forge audit
+
+Product state:
+  docs/roadmap.md
+EOF
 }
 
 create_mission() {
@@ -3070,7 +3126,84 @@ case "$command" in
     print_status "$@"
     ;;
   sense)
-    print_sense "$@"
+    if [ "${1:-}" = "--doctor" ]; then
+      shift
+      print_doctor "$@"
+    else
+      print_sense "$@"
+    fi
+    ;;
+  ui)
+    print_ui "$@"
+    ;;
+  mission)
+    subcommand=${1:-help}
+    if [ "$#" -gt 0 ]; then
+      shift
+    fi
+    case "$subcommand" in
+      new)
+        create_mission "$@"
+        ;;
+      closeout)
+        create_mission_closeout "$@"
+        ;;
+      verify)
+        verify_mission "$@"
+        ;;
+      help|-h|--help)
+        usage
+        ;;
+      *)
+        usage >&2
+        fail "unknown mission subcommand: $subcommand"
+        ;;
+    esac
+    ;;
+  review)
+    subcommand=${1:-help}
+    if [ "$#" -gt 0 ]; then
+      shift
+    fi
+    case "$subcommand" in
+      workshop)
+        create_proposal "$@"
+        ;;
+      digest)
+        print_workshop_digest "$@"
+        ;;
+      forge)
+        forge_subcommand=${1:-help}
+        if [ "$#" -gt 0 ]; then
+          shift
+        fi
+        case "$forge_subcommand" in
+          new)
+            create_forge_review "$@"
+            ;;
+          audit)
+            run_forge_audit "$@"
+            ;;
+          help|-h|--help)
+            usage
+            ;;
+          *)
+            usage >&2
+            fail "unknown review forge subcommand: $forge_subcommand"
+            ;;
+        esac
+        ;;
+      decide)
+        record_decision "$@"
+        ;;
+      help|-h|--help)
+        usage
+        ;;
+      *)
+        usage >&2
+        fail "unknown review subcommand: $subcommand"
+        ;;
+    esac
     ;;
   doctor)
     print_doctor "$@"

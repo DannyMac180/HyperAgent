@@ -44,6 +44,7 @@ These are implemented or documented surfaces with mission evidence but no explic
 | P1 | In review | Quantitative Forge review checks | `missions/2026-05-20-1556-dan-177-strengthen-forge.md`; `missions/2026-05-22-1535-dan-177-quantitative-forge-rework.md`; `scripts/verify-forge-review.sh` | Reviewer decides whether to accept, reject, or require JSON-aware validation follow-up. |
 | P2 | In review | README architecture diagram maintenance | `missions/2026-05-21-1329-readme-architecture-diagram.md`; `docs/architecture/hyperagent.mmd`; `docs/assets/hyperagent-architecture.svg` | Keep PR checklist guardrail; consider rendering automation if manual sync recurs. |
 | P2 | In review | Product-state roadmap and reconciliation checklist | `docs/roadmap.md`; `docs/releases/next-alpha.md`; DAN-181 | Use this roadmap as source of truth; add a `product-state` check only if drift recurs. |
+| P2 | In review | Suit Not Scaffold review gate | `docs/hyperagent-prd.md`; DAN-197; `CONTRIBUTING.md`; `.github/pull_request_template.md`; `templates/upgrade-proposal.md` | Reviewer decides whether the gate is short enough for every PR and strong enough to keep task-specific conveniences outside core. |
 
 ## Deferred PRD Work
 

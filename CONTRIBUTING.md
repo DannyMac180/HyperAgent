@@ -16,8 +16,27 @@ HyperAgent is an early alpha, Codex-first, file-based project. Contributions sho
 2. Create a proposal in `workshop/proposals/` using `templates/upgrade-proposal.md`.
 3. Score the proposal with `workshop/rubric.md`.
 4. Add the proposal to `workshop/backlog.md` if it is worth tracking.
-5. Include an acceptance test and rollback plan.
-6. Keep the activation mode `human review required`.
+5. Complete the Suit Not Scaffold review gate.
+6. Include an acceptance test and rollback plan.
+7. Keep the activation mode `human review required`.
+
+## Suit Not Scaffold Review Gate
+
+Before adding a feature, decide whether it strengthens durable agency infrastructure or only patches a narrow workflow. The allowed durable-agency pillars are: sensing, verification, memory, safety, capability discovery, upgrade flow, and adapter boundary.
+
+Answer these questions in the proposal and PR:
+
+- Which durable-agency pillar does this strengthen?
+- Is the feature core Suit infrastructure, an adapter-specific convenience, an example, or an experiment?
+- If it is task-specific, why does it belong outside core?
+- What evidence or local verification will show the feature prevents product creep instead of adding it?
+
+Use these homes:
+
+- Core Suit infrastructure belongs in the local Mission -> Workshop -> Forge loop, shared templates, verification, safety boundaries, memory shape, or capability discovery surfaces.
+- Adapter-specific conveniences belong under adapter-owned docs, config, scripts, or examples until the adapter boundary is accepted.
+- Examples belong in docs, fixtures, eval fixtures, or sample artifacts that do not become required product behavior.
+- Experiments belong in Workshop proposals, backlog candidates, or clearly marked future work until a human decision accepts them.
 
 Accepted upgrades require:
 

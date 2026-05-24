@@ -5,10 +5,11 @@ Mark I evals are local checks for the Mission -> Workshop loop. They are intenti
 Run:
 
 ```bash
+sh scripts/hyperagent.sh verify-config
 sh scripts/verify-mvp.sh
 ```
 
-The verifier checks whether the repo contains the artifacts required by the PRD for the Codex-first prototype.
+The config verifier checks the root `.hyperagent` project contract. The artifact verifier checks whether the repo contains the artifacts required by the PRD for the Codex-first prototype.
 
 ## Loop Smoke Eval
 
@@ -21,6 +22,9 @@ sh evals/smoke-loop.sh
 The smoke loop copies the repo to a temporary directory, then verifies that the local helper can:
 
 - create a mission record in `missions/` with repo evidence, command evidence, verification status, and closeout placeholders,
+- run `hyperagent check` and record command status automatically,
+- create or update a closeout mission record with sense snapshot, recent checks, changed files, verification status, unresolved risks, and candidate upgrades,
+- fail strict mission verification when draft placeholders remain,
 - create a proposal linked to that mission in `workshop/proposals/`,
 - create a Forge review in `forge/reviews/`,
 - create a process-improvement proposal linked to that Forge review,
@@ -64,6 +68,8 @@ The init smoke test creates a temporary repo, runs `sh scripts/hyperagent.sh ini
 
 - creates `missions/`, `workshop/proposals/`, `workshop/decisions/`, and `forge/reviews/`,
 - creates `.hyperagent` as the machine-readable project anchor for version, install mode, paths, adapters, verification commands, and instruction links,
+- validates the generated `.hyperagent` contract,
+- fails with an actionable error when a core config field is missing,
 - copies templates and rubrics,
 - generates a blank project backlog, a project capability registry, local setup docs, and a `scripts/hyperagent.sh` project shim,
 - keeps global runtime files such as the full helper and operating prompt out of the initialized repo by default,

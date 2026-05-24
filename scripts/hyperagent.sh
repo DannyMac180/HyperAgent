@@ -9,6 +9,9 @@ Commands:
   init [--target DIR] [--update] [--force] [--dry-run]
       Create or update HyperAgent project setup files in DIR. Defaults to the current directory.
 
+  verify-config
+      Validate the root .hyperagent project contract.
+
   status
       Print HyperAgent local product status.
 
@@ -21,8 +24,17 @@ Commands:
   record-check --command TEXT --status passed|failed|retried|skipped [--note TEXT]
       Append an opt-in check or command result to the local evidence log.
 
+  check [--note TEXT] [--command-log PATH] -- COMMAND [ARG...]
+      Run a command and automatically record its pass/fail status.
+
   new-mission --request TEXT [--slug SLUG] [--commands-run TEXT] [--verification-status TEXT]
       Create a mission record in missions/.
+
+  mission-closeout --request TEXT [--mission PATH] [--slug SLUG] [--outcome TEXT] [--risks TEXT] [--candidate-upgrades TEXT]
+      Create or update a near-final mission record with current sense, checks, changed files, and review prompts.
+
+  verify-mission [--strict] PATH
+      Check a mission record. Strict mode fails placeholder closeout text.
 
   propose-upgrade (--mission PATH | --forge-review PATH) --title TEXT --problem TEXT [--slug SLUG]
       Create a Workshop proposal in workshop/proposals/ from mission evidence or Forge review evidence.
@@ -52,15 +64,120 @@ fail() {
 script_dir=$(CDPATH= cd "$(dirname "$0")" && pwd)
 runtime_root=$(CDPATH= cd "$script_dir/.." && pwd)
 repo_root=${HYPERAGENT_PROJECT_ROOT:-$runtime_root}
+config_file="$repo_root/.hyperagent"
 
-mission_dir="$repo_root/missions"
-proposal_dir="$repo_root/workshop/proposals"
-decision_dir="$repo_root/workshop/decisions"
-forge_dir="$repo_root/forge/reviews"
-registry_file="$repo_root/hyperagent/capability-registry.md"
-default_evidence_dir="$repo_root/.hyperagent-evidence"
-default_command_log="$default_evidence_dir/commands.log"
-default_workbench_trace_log="$default_evidence_dir/workbench/traces.jsonl"
+strip_toml_value() {
+  sed 's/^[[:space:]]*//; s/[[:space:]]*$//; s/^"//; s/"$//'
+}
+
+config_raw_value() {
+  want_section="$1"
+  want_key="$2"
+  test -f "$config_file" || return 0
+  awk -v want_section="$want_section" -v want_key="$want_key" '
+    BEGIN { section = "" }
+    /^[[:space:]]*($|#)/ { next }
+    /^[[:space:]]*\[[^]]+\][[:space:]]*$/ {
+      section = $0
+      sub(/^[[:space:]]*\[/, "", section)
+      sub(/\][[:space:]]*$/, "", section)
+      next
+    }
+    section == want_section {
+      line = $0
+      sub(/[[:space:]]+#.*/, "", line)
+      split(line, parts, "=")
+      key = parts[1]
+      sub(/^[[:space:]]*/, "", key)
+      sub(/[[:space:]]*$/, "", key)
+      if (key == want_key) {
+        sub(/^[^=]*=/, "", line)
+        print line
+        exit
+      }
+    }
+  ' "$config_file"
+}
+
+config_string_value() {
+  config_raw_value "$1" "$2" | strip_toml_value
+}
+
+config_value_or_default() {
+  value=$(config_string_value "$1" "$2")
+  if [ -n "$value" ]; then
+    printf '%s\n' "$value"
+  else
+    printf '%s\n' "$3"
+  fi
+}
+
+config_array_values() {
+  want_section="$1"
+  want_key="$2"
+  test -f "$config_file" || return 0
+  awk -v want_section="$want_section" -v want_key="$want_key" '
+    function emit_strings(s) {
+      while (match(s, /"[^"]*"/)) {
+        print substr(s, RSTART + 1, RLENGTH - 2)
+        s = substr(s, RSTART + RLENGTH)
+      }
+    }
+    BEGIN { section = ""; capture = 0 }
+    /^[[:space:]]*($|#)/ { next }
+    /^[[:space:]]*\[[^]]+\][[:space:]]*$/ {
+      section = $0
+      sub(/^[[:space:]]*\[/, "", section)
+      sub(/\][[:space:]]*$/, "", section)
+      next
+    }
+    section == want_section && capture == 0 {
+      line = $0
+      sub(/[[:space:]]+#.*/, "", line)
+      key = line
+      sub(/=.*/, "", key)
+      sub(/^[[:space:]]*/, "", key)
+      sub(/[[:space:]]*$/, "", key)
+      if (key == want_key) {
+        capture = 1
+        sub(/^[^=]*=/, "", line)
+        emit_strings(line)
+        if (line ~ /\]/) {
+          exit
+        }
+        next
+      }
+    }
+    section == want_section && capture == 1 {
+      line = $0
+      sub(/[[:space:]]+#.*/, "", line)
+      emit_strings(line)
+      if (line ~ /\]/) {
+        exit
+      }
+    }
+  ' "$config_file"
+}
+
+resolve_project_path() {
+  case "$1" in
+    /*) printf '%s\n' "$1" ;;
+    *) printf '%s/%s\n' "$repo_root" "$1" ;;
+  esac
+}
+
+config_path_or_default() {
+  resolve_project_path "$(config_value_or_default paths "$1" "$2")"
+}
+
+mission_dir=$(config_path_or_default missions "missions")
+proposal_dir=$(config_path_or_default workshop_proposals "workshop/proposals")
+decision_dir=$(config_path_or_default workshop_decisions "workshop/decisions")
+forge_dir=$(config_path_or_default forge_reviews "forge/reviews")
+registry_file=$(config_path_or_default capability_registry "hyperagent/capability-registry.md")
+default_command_log=$(config_path_or_default evidence_log ".hyperagent-evidence/commands.log")
+default_evidence_dir=$(dirname "$default_command_log")
+default_workbench_trace_log=$(config_path_or_default workbench_trace_log ".hyperagent-evidence/workbench/traces.jsonl")
 
 now_stamp() {
   date '+%Y-%m-%d-%H%M'
@@ -451,7 +568,10 @@ codex = true
 
 [verification]
 commands = [
+  "sh scripts/hyperagent.sh verify-config",
   "sh scripts/hyperagent.sh status",
+  "sh scripts/hyperagent.sh sense --pr off",
+  "sh scripts/hyperagent.sh doctor",
 ]
 EOF
 }
@@ -520,6 +640,7 @@ Use these files to keep agent work inspectable:
 ## Local Commands
 
 ```bash
+sh scripts/hyperagent.sh verify-config
 sh scripts/hyperagent.sh status
 sh scripts/hyperagent.sh sense
 sh scripts/hyperagent.sh record-check --status passed --command "sh scripts/verify-mvp.sh"
@@ -537,6 +658,7 @@ Run Forge reviews after proposal decisions, eval changes, release-readiness chec
 For this project, the lightweight check is:
 
 ```bash
+sh scripts/hyperagent.sh verify-config
 sh scripts/hyperagent.sh status
 ```
 
@@ -588,11 +710,14 @@ Use these files to keep agent work inspectable:
 ## Local Commands
 
 ```bash
+sh scripts/hyperagent.sh verify-config
 sh scripts/hyperagent.sh status
 sh scripts/hyperagent.sh sense
+sh scripts/hyperagent.sh check -- sh scripts/verify-mvp.sh
 sh scripts/hyperagent.sh record-check --status passed --command "sh scripts/verify-mvp.sh"
 sh scripts/hyperagent.sh doctor
-sh scripts/hyperagent.sh new-mission --request "Describe the task" --slug task-slug
+sh scripts/hyperagent.sh mission-closeout --request "Describe the task" --slug task-slug
+sh scripts/hyperagent.sh verify-mission --strict missions/MISSION.md
 sh scripts/hyperagent.sh workshop-prompt
 sh scripts/hyperagent.sh forge-prompt
 sh scripts/hyperagent.sh propose-upgrade --forge-review forge/reviews/REVIEW.md --title "Improve Workshop quality" --problem "The Workshop process needs a concrete fix"
@@ -605,14 +730,18 @@ Run Forge reviews after proposal decisions, eval changes, release-readiness chec
 For this project, the lightweight check is:
 
 ```bash
+sh scripts/hyperagent.sh verify-config
 sh scripts/hyperagent.sh status
 ```
 
 To capture local task evidence for mission records:
 
 ```bash
+sh scripts/hyperagent.sh check -- sh scripts/verify-mvp.sh
 sh scripts/hyperagent.sh record-check --status passed --command "sh scripts/verify-mvp.sh"
 sh scripts/hyperagent.sh sense
+sh scripts/hyperagent.sh mission-closeout --request "Describe the task" --slug task-slug
+sh scripts/hyperagent.sh verify-mission --strict missions/MISSION.md
 ```
 
 The sensing summary reads Git metadata, the opt-in local command log, and local Workbench trace metadata when the default ignored trace log exists. It does not inspect repository file contents or environment values, and command text is redacted for secret-like tokens before storage and output.
@@ -822,7 +951,156 @@ init_project() {
   init_update_agents "$target_root" "$force" "$dry_run"
 
   init_log "HyperAgent init complete."
-  init_log "Next: inspect AGENTS.md, add project-specific verification commands, then run: sh scripts/hyperagent.sh status"
+  init_log "Next: inspect AGENTS.md, add project-specific verification commands, then run: sh scripts/hyperagent.sh verify-config"
+}
+
+config_errors=0
+
+config_error() {
+  config_errors=$((config_errors + 1))
+  printf 'ERROR: %s\n' "$1" >&2
+}
+
+config_require_scalar() {
+  section="$1"
+  key="$2"
+  label="$3"
+  value=$(config_string_value "$section" "$key")
+  if [ -z "$value" ]; then
+    if [ -n "$section" ]; then
+      config_error "missing required field [$section].$key in .hyperagent"
+    else
+      config_error "missing required field $key in .hyperagent"
+    fi
+    return 1
+  fi
+  printf '%s\n' "$value"
+  return 0
+}
+
+config_require_path() {
+  key="$1"
+  kind="$2"
+  value=$(config_string_value paths "$key")
+  if [ -z "$value" ]; then
+    config_error "missing required field [paths].$key in .hyperagent"
+    return 1
+  fi
+  case "$value" in
+    /*)
+      config_error "[paths].$key must be project-relative, got absolute path: $value"
+      return 1
+      ;;
+    *../*|../*|*/..)
+      config_error "[paths].$key must stay inside the project, got: $value"
+      return 1
+      ;;
+  esac
+  resolved=$(resolve_project_path "$value")
+  case "$kind" in
+    file)
+      test -f "$resolved" || config_error "configured file for [paths].$key is missing: $resolved"
+      ;;
+    dir)
+      test -d "$resolved" || config_error "configured directory for [paths].$key is missing: $resolved"
+      ;;
+    writable-file)
+      parent=$(dirname "$resolved")
+      test -d "$parent" || test ! -e "$parent" || config_error "configured parent path is not a directory for [paths].$key: $parent"
+      ;;
+    *)
+      config_error "internal verifier error: unknown path kind for [paths].$key"
+      ;;
+  esac
+}
+
+config_array_contains() {
+  section="$1"
+  key="$2"
+  expected="$3"
+  config_array_values "$section" "$key" | awk -v expected="$expected" '$0 == expected { found = 1 } END { exit(found ? 0 : 1) }'
+}
+
+config_array_count() {
+  config_array_values "$1" "$2" | wc -l | tr -d ' '
+}
+
+verify_config() {
+  config_errors=0
+
+  if [ ! -f "$config_file" ]; then
+    config_error "missing project config: $config_file"
+    printf 'HyperAgent config verification failed: %s error(s)\n' "$config_errors" >&2
+    return 1
+  fi
+
+  hyperagent_version=$(config_string_value "" hyperagent_version)
+  config_version=$(config_string_value "" config_version)
+  install_mode=$(config_string_value "" install_mode)
+
+  test -n "$hyperagent_version" || config_error "missing required field hyperagent_version in .hyperagent"
+  test -n "$config_version" || config_error "missing required field config_version in .hyperagent"
+  test -n "$install_mode" || config_error "missing required field install_mode in .hyperagent"
+
+  if [ -n "$hyperagent_version" ] && [ "$hyperagent_version" != "v0.1.0-alpha" ]; then
+    config_error "stale hyperagent_version: expected v0.1.0-alpha, got $hyperagent_version"
+  fi
+  if [ -n "$config_version" ] && [ "$config_version" != "1" ]; then
+    config_error "unsupported config_version: expected 1, got $config_version"
+  fi
+  case "$install_mode" in
+    ""|copy|symlink|global-runtime) ;;
+    *) config_error "unsupported install_mode: expected copy, symlink, or global-runtime, got $install_mode" ;;
+  esac
+
+  config_require_path project_instructions file
+  config_require_path missions dir
+  config_require_path workshop_proposals dir
+  config_require_path workshop_decisions dir
+  config_require_path workshop_backlog file
+  config_require_path workshop_rubric file
+  config_require_path forge_reviews dir
+  config_require_path forge_quality_rubric file
+  config_require_path templates dir
+  if [ "$install_mode" = "global-runtime" ]; then
+    runtime_helper=$(config_string_value runtime helper)
+    runtime_prompt=$(config_string_value runtime operating_prompt)
+    runtime_override=$(config_string_value runtime override_env)
+    test -n "$runtime_helper" || config_error "missing required field [runtime].helper in .hyperagent"
+    test -n "$runtime_prompt" || config_error "missing required field [runtime].operating_prompt in .hyperagent"
+    test -n "$runtime_override" || config_error "missing required field [runtime].override_env in .hyperagent"
+  else
+    config_require_path operating_prompt file
+  fi
+  config_require_path capability_registry file
+  config_require_path project_readme file
+  config_require_path local_helper file
+  config_require_path evidence_log writable-file
+  config_require_path workbench_trace_log writable-file
+
+  codex_adapter=$(config_string_value adapters codex)
+  case "$codex_adapter" in
+    true) ;;
+    "") config_error "missing required field [adapters].codex in .hyperagent" ;;
+    *) config_error "unsupported [adapters].codex value: expected true, got $codex_adapter" ;;
+  esac
+
+  command_count=$(config_array_count verification commands)
+  if [ "$command_count" -eq 0 ] 2>/dev/null; then
+    config_error "missing required non-empty [verification].commands array in .hyperagent"
+  fi
+  config_array_contains verification commands "sh scripts/hyperagent.sh verify-config" \
+    || config_error "[verification].commands must include: sh scripts/hyperagent.sh verify-config"
+  config_array_contains verification commands "sh scripts/hyperagent.sh status" \
+    || config_error "[verification].commands must include: sh scripts/hyperagent.sh status"
+
+  if [ "$config_errors" -gt 0 ]; then
+    printf 'HyperAgent config verification failed: %s error(s)\n' "$config_errors" >&2
+    return 1
+  fi
+
+  printf 'HyperAgent config verification passed.\n'
+  printf 'Config: %s\n' "$config_file"
 }
 
 count_markdown_files() {
@@ -871,6 +1149,7 @@ git_changed_files() {
 }
 
 print_status() {
+  verify_config >/dev/null
   ensure_dirs
   printf 'HyperAgent status\n'
   printf 'Repo: %s\n' "$repo_root"
@@ -884,6 +1163,8 @@ print_status() {
 }
 
 record_check() {
+  verify_config >/dev/null
+
   command_text=
   status=
   note=
@@ -929,6 +1210,64 @@ record_check() {
   safe_note=$(redact_text "$note")
   printf '%s\t%s\t%s\t%s\n' "$(now_readable)" "$status" "$safe_command" "$safe_note" >>"$log_file"
   printf '%s\n' "$log_file"
+}
+
+run_check() {
+  note=
+  log_file="$default_command_log"
+
+  while [ "$#" -gt 0 ]; do
+    case "$1" in
+      --note)
+        shift
+        test "$#" -gt 0 || fail "--note requires text"
+        note=$1
+        ;;
+      --command-log)
+        shift
+        test "$#" -gt 0 || fail "--command-log requires a path"
+        log_file=$1
+        ;;
+      --)
+        shift
+        break
+        ;;
+      *)
+        break
+        ;;
+    esac
+    shift
+  done
+
+  test "$#" -gt 0 || fail "check requires a command after --"
+  command_text=
+  for arg in "$@"; do
+    if [ -n "$command_text" ]; then
+      command_text="$command_text $arg"
+    else
+      command_text=$arg
+    fi
+  done
+
+  set +e
+  "$@"
+  status_code=$?
+  set -e
+
+  if [ "$status_code" -eq 0 ]; then
+    check_status=passed
+  else
+    check_status=failed
+    if [ -n "$note" ]; then
+      note="$note; exit $status_code"
+    else
+      note="exit $status_code"
+    fi
+  fi
+
+  record_check --command "$command_text" --status "$check_status" --note "$note" --command-log "$log_file" >/dev/null
+  printf 'HyperAgent check recorded: %s `%s`\n' "$check_status" "$(redact_text "$command_text")"
+  return "$status_code"
 }
 
 git_value() {
@@ -1182,6 +1521,8 @@ print_sense_json() {
 }
 
 print_sense() {
+  verify_config >/dev/null
+
   format=markdown
   command_log="$default_command_log"
   trace_url=
@@ -1232,6 +1573,8 @@ print_sense() {
 }
 
 print_doctor() {
+  verify_config >/dev/null
+
   workbench_trace_log_override=
 
   while [ "$#" -gt 0 ]; do
@@ -1270,6 +1613,8 @@ print_doctor() {
 }
 
 create_mission() {
+  verify_config >/dev/null
+
   request=
   slug=
   commands_run='Not captured by helper. Add commands manually during mission closeout.'
@@ -1376,7 +1721,226 @@ EOF
   printf '%s\n' "$file"
 }
 
+create_mission_closeout() {
+  request=
+  mission_path=
+  slug=
+  outcome="Task completed; review the evidence below for exact scope."
+  risks="No unresolved risks recorded by closeout. Human reviewer should confirm before activation or merge."
+  candidate_upgrades="None recorded by closeout."
+  command_log="$default_command_log"
+  trace_url=
+  pr_mode=auto
+  workbench_trace_log_override=
+
+  while [ "$#" -gt 0 ]; do
+    case "$1" in
+      --request)
+        shift
+        test "$#" -gt 0 || fail "--request requires text"
+        request=$1
+        ;;
+      --slug)
+        shift
+        test "$#" -gt 0 || fail "--slug requires text"
+        slug=$(slugify "$1")
+        ;;
+      --mission)
+        shift
+        test "$#" -gt 0 || fail "--mission requires a path"
+        mission_path=$1
+        ;;
+      --outcome)
+        shift
+        test "$#" -gt 0 || fail "--outcome requires text"
+        outcome=$1
+        ;;
+      --risks)
+        shift
+        test "$#" -gt 0 || fail "--risks requires text"
+        risks=$1
+        ;;
+      --candidate-upgrades)
+        shift
+        test "$#" -gt 0 || fail "--candidate-upgrades requires text"
+        candidate_upgrades=$1
+        ;;
+      --command-log)
+        shift
+        test "$#" -gt 0 || fail "--command-log requires a path"
+        command_log=$1
+        ;;
+      --trace-url)
+        shift
+        test "$#" -gt 0 || fail "--trace-url requires a URL or local trace reference"
+        trace_url=$1
+        ;;
+      --workbench-trace-log)
+        shift
+        test "$#" -gt 0 || fail "--workbench-trace-log requires a path"
+        workbench_trace_log_override=$1
+        ;;
+      --pr)
+        shift
+        test "$#" -gt 0 || fail "--pr requires auto or off"
+        pr_mode=$1
+        ;;
+      *)
+        fail "unknown mission-closeout option: $1"
+        ;;
+    esac
+    shift
+  done
+
+  test -n "$request" || fail "mission-closeout requires --request"
+  test -n "$slug" || slug=$(slugify "$request")
+  test -n "$slug" || slug=mission-closeout
+
+  ensure_dirs
+  stamp=$(now_stamp)
+  if [ -n "$mission_path" ]; then
+    file=$mission_path
+    case "$file" in
+      */*) mkdir -p "$(dirname "$file")" ;;
+    esac
+  else
+    file="$mission_dir/$stamp-$slug.md"
+    test ! -e "$file" || fail "mission already exists: $file"
+  fi
+
+  workbench_trace_log=$(workbench_trace_log_path "$workbench_trace_log_override")
+  branch=$(git_branch)
+  git_status=$(git_status_short)
+  changed_files=$(git_changed_files)
+  recent_commands=$(read_recent_commands "$command_log")
+  failure_commands=$(read_failure_commands "$command_log")
+  status_counts=$(git_status_counts)
+  workbench_status=$(workbench_trace_status "$workbench_trace_log")
+  sense_snapshot=$(mktemp)
+  print_sense_markdown "$command_log" "$trace_url" "$pr_mode" "$workbench_trace_log" >"$sense_snapshot"
+
+  if [ -n "$recent_commands" ]; then
+    verification_status="Recent check evidence captured below. Review failed/retried entries before merge."
+  else
+    verification_status="No recorded checks found in $command_log. Run hyperagent check or record-check before review."
+  fi
+
+  cat >"$file" <<EOF
+# Mission Record
+
+- Mission ID: mission-$stamp-$slug
+- Date/time: $(now_readable)
+- Agent identity: Codex wearing the HyperAgent Suit
+- Environment: \`$repo_root\`
+- User request: $request
+
+## Auto-Filled Evidence
+
+- Repo path: \`$repo_root\`
+- Branch: \`$branch\`
+- Git status counts: \`$status_counts\`
+- Command log: \`$command_log\`
+- Workbench trace status: \`$workbench_status\`
+
+### Git Status
+
+~~~text
+$git_status
+~~~
+
+### Changed Files
+
+~~~text
+$changed_files
+~~~
+
+### Recent Commands And Checks
+
+~~~text
+${recent_commands:-no command log entries found}
+~~~
+
+### Failures And Retries
+
+~~~text
+${failure_commands:-none recorded}
+~~~
+
+### Sense Snapshot
+
+EOF
+  cat "$sense_snapshot" >>"$file"
+  rm -f "$sense_snapshot"
+  cat >>"$file" <<EOF
+
+## Agent Judgment
+
+- Final outcome: $outcome
+- Completion evidence: Auto-filled evidence captured git status, changed files, recent checks, failures/retries, and current sense snapshot.
+- Verification status: $verification_status
+- Unresolved risks: $risks
+- Candidate upgrades: $candidate_upgrades
+
+## Actions
+
+- Agent plan: Review the user request, make focused changes, run checks through \`hyperagent check\` or record them with \`record-check\`, then run closeout.
+- Summary of actions taken: See changed files, command evidence, and final response.
+- Tools used: HyperAgent helper, local shell, git, and project verification commands.
+- Files or systems changed: See changed files.
+- Verification performed: See recent commands and checks.
+
+## Workshop Handoff
+
+- Upgrade proposal paths: None created by closeout.
+- Follow-up owner: Human reviewer
+- Review prompts:
+  - Confirm failed or retried checks are resolved or intentionally accepted.
+  - Confirm unresolved risks are explicit enough for Human Review.
+  - Create a Workshop proposal only if the evidence shows reusable Suit friction.
+EOF
+
+  printf '%s\n' "$file"
+}
+
+verify_mission() {
+  strict=0
+  file=
+
+  while [ "$#" -gt 0 ]; do
+    case "$1" in
+      --strict)
+        strict=1
+        ;;
+      *)
+        test -z "$file" || fail "verify-mission accepts one mission path"
+        file=$1
+        ;;
+    esac
+    shift
+  done
+
+  test -n "$file" || fail "verify-mission requires a mission path"
+  test -f "$file" || fail "mission record not found: $file"
+
+  grep -F "Mission ID:" "$file" >/dev/null || fail "mission missing Mission ID"
+  grep -F "User request:" "$file" >/dev/null || fail "mission missing User request"
+  grep -F "Final outcome:" "$file" >/dev/null || fail "mission missing Final outcome"
+  grep -F "Unresolved risks:" "$file" >/dev/null || fail "mission missing Unresolved risks"
+  grep -F "Changed Files" "$file" >/dev/null || grep -F "Changed files:" "$file" >/dev/null || fail "mission missing changed files evidence"
+  grep -F "Verification status:" "$file" >/dev/null || fail "mission missing Verification status"
+
+  if [ "$strict" -eq 1 ]; then
+    if grep -E 'Pending final outcome|Pending unresolved risk review|Replace during mission closeout|Pending verification|Not captured by helper|TODO|TBD|FIXME' "$file" >/dev/null; then
+      fail "strict mission verification found placeholder text: $file"
+    fi
+  fi
+
+  printf 'Mission verification passed: %s\n' "$file"
+}
+
 create_proposal() {
+  verify_config >/dev/null
+
   mission=
   forge_review=
   title=
@@ -1512,6 +2076,8 @@ EOF
 }
 
 create_forge_review() {
+  verify_config >/dev/null
+
   slug=
 
   while [ "$#" -gt 0 ]; do
@@ -1669,6 +2235,8 @@ EOF
 }
 
 record_decision() {
+  verify_config >/dev/null
+
   proposal=
   decision=
   reviewer=
@@ -1777,6 +2345,9 @@ case "$command" in
   init)
     init_project "$@"
     ;;
+  verify-config)
+    verify_config "$@"
+    ;;
   status)
     print_status "$@"
     ;;
@@ -1789,8 +2360,17 @@ case "$command" in
   record-check)
     record_check "$@"
     ;;
+  check)
+    run_check "$@"
+    ;;
   new-mission)
     create_mission "$@"
+    ;;
+  mission-closeout)
+    create_mission_closeout "$@"
+    ;;
+  verify-mission)
+    verify_mission "$@"
     ;;
   propose-upgrade)
     create_proposal "$@"

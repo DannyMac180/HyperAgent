@@ -28,15 +28,17 @@ Use this skill when the user asks Codex to operate as HyperAgent, run a HyperAge
 1. Read `hyperagent/operating-prompt.md`.
 2. Run HyperAgent relevance triage.
 3. If the task is relevant, run it as a Mission. Keep scope tight and verify the result.
-4. Before final response on relevant tasks, create a mission record in `missions/` from `templates/mission-record.md`.
-5. If the mission exposed friction, create at least one Workshop proposal in `workshop/proposals/` from `templates/upgrade-proposal.md`.
-6. Every Workshop proposal must include an `Implementation Plan` section that names the single highest-priority plan step first, then lists implementation steps, files or instructions likely to change, and verification for that first step.
-7. Score proposal priority with `workshop/rubric.md` before recommending implementation.
-8. If the friction is about the quality of the Workshop process itself, create a Forge review in `forge/reviews/` from `templates/forge-review.md`.
-9. Do not mark a proposal accepted unless there is an explicit human approval decision in `workshop/decisions/`.
-10. Report the triage decision, mission outcome, verification, record path, proposal path if any, decision path if any, and unresolved risk to the user.
+4. Run verification through `sh scripts/hyperagent.sh check -- COMMAND` when possible so evidence is recorded automatically.
+5. Before final response on relevant tasks, create or update a mission record with `sh scripts/hyperagent.sh mission-closeout --request "..." --slug "..." --outcome "..." --risks "..."`.
+6. Run `sh scripts/hyperagent.sh verify-mission --strict missions/MISSION.md` before using the mission as Workshop evidence.
+7. If the mission exposed friction, create at least one Workshop proposal in `workshop/proposals/` from `templates/upgrade-proposal.md`.
+8. Every Workshop proposal must include an `Implementation Plan` section that names the single highest-priority plan step first, then lists implementation steps, files or instructions likely to change, and verification for that first step.
+9. Score proposal priority with `workshop/rubric.md` before recommending implementation.
+10. If the friction is about the quality of the Workshop process itself, create a Forge review in `forge/reviews/` from `templates/forge-review.md`.
+11. Do not mark a proposal accepted unless there is an explicit human approval decision in `workshop/decisions/`.
+12. Report the triage decision, mission outcome, verification, record path, proposal path if any, decision path if any, and unresolved risk to the user.
 
-Use `sh scripts/hyperagent.sh status` to inspect local loop state. Use the helper commands when they make artifact creation more reliable, but fill in evidence, verification, and judgment yourself.
+Use `sh scripts/hyperagent.sh status` to inspect local loop state. Prefer `check`, `sense`, `mission-closeout`, and `verify-mission --strict` when they make artifact creation more reliable, but fill in final outcome and risk judgment yourself.
 
 ## Relevance Triage
 

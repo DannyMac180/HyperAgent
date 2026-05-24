@@ -12,9 +12,11 @@ HyperAgent starts with OpenAI Codex in the Codex Mac app. The first prototype is
 
 HyperAgent is currently `v0.1.0-alpha`: a developer preview for testing the local Mission -> Workshop -> Forge loop.
 
-This alpha is ready for early open-source use by Codex users who are comfortable with local markdown artifacts and shell scripts. It is not a hosted service, does not provide a polished UI, does not support every agent platform, and does not autonomously modify itself.
+This alpha is ready for early open-source use by Codex users who are comfortable with local markdown artifacts and shell scripts. It is not a hosted service, does not provide an interactive product UI or dashboard, does not support every agent platform, and does not autonomously modify itself.
 
 Release notes: `docs/releases/v0.1.0-alpha.md`
+
+Current product state and roadmap: `docs/roadmap.md`
 
 ## Architecture
 
@@ -67,6 +69,8 @@ The MVP is file-based on purpose. There is no hosted service, no database, and n
 
 For the manual command path, see `docs/quickstart.md`.
 
+For the project config contract, see `docs/config.md`.
+
 For clean-install acceptance testing, see `docs/clean-install-uat.md`.
 
 For early release readiness, see `docs/release-checklist.md`.
@@ -96,9 +100,12 @@ Restart Codex Desktop or open a fresh thread after updating the installed skill.
 
 - `docs/hyperagent-prd.md`: product requirements and milestone plan.
 - `docs/concepts.md`: the Suit, Mission, Workshop, and Forge mental model.
+- `docs/config.md`: `.hyperagent` schema, stable fields, adapter-owned fields, and verification command contract.
 - `docs/clean-install-uat.md`: repeatable clean-install acceptance test for the README prompt.
 - `docs/release-checklist.md`: alpha release criteria, clean-clone test, and update model.
 - `docs/releases/v0.1.0-alpha.md`: first alpha release notes.
+- `docs/releases/next-alpha.md`: unreleased next-alpha notes.
+- `docs/roadmap.md`: product-state source of truth for shipped, accepted, in-review, deferred, and stale surfaces.
 - `docs/article-outline.md`: public essay outline for the Iron Man Suit thesis.
 - `skills/codex-hyperagent/`: Codex skill instructions.
 - `bin/hyperagent`: small command wrapper for `scripts/hyperagent.sh`.
@@ -129,10 +136,11 @@ Agents may propose upgrades freely and draft local, low-risk files when asked. T
 Run the local MVP verifier:
 
 ```bash
+sh scripts/hyperagent.sh verify-config
 sh scripts/verify-mvp.sh
 ```
 
-The verifier checks that the Codex skill, installer, operating prompt, local memory directories, templates, documentation, capability registry, and safety defaults are present.
+The config verifier checks the root `.hyperagent` contract. The MVP verifier checks that the Codex skill, installer, operating prompt, local memory directories, templates, documentation, capability registry, and safety defaults are present.
 
 Run the end-to-end local smoke loop:
 
@@ -160,7 +168,9 @@ The sensing smoke test records passed and failed checks, verifies changed-file d
 
 ## Current Limits
 
-HyperAgent Mark I is a working local prototype. It does not provide a UI, autonomously modify itself, or support every agent platform yet. The point of this version is to prove the Mission -> Workshop -> Forge loop with durable local artifacts and explicit human review.
+HyperAgent Mark I is a working local prototype. It includes a static README architecture visual and local markdown/shell workflows, but it does not provide an interactive product UI, autonomously modify itself, or support every agent platform yet. The point of this version is to prove the Mission -> Workshop -> Forge loop with durable local artifacts and explicit human review.
+
+For the current status of `init`, `sense`, reliability evals, Forge checks, and other newer surfaces, see `docs/roadmap.md`.
 
 ## License
 

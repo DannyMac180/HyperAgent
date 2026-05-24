@@ -146,6 +146,10 @@ if path_is_unsafe "$install_dir"; then
   fail "unsafe install dir: $install_dir"
 fi
 
+if path_is_unsafe "$skills_dir"; then
+  fail "unsafe skills dir: $skills_dir"
+fi
+
 info "HyperAgent Codex setup"
 info "Install dir: $install_dir"
 info "Skills dir: $skills_dir"
@@ -227,13 +231,15 @@ fi
 info "Setup complete."
 if [ "$dry_run" -eq 1 ]; then
   info "Changed: none; dry run only."
+  info "Passed: git/sh availability checks."
+  info "Dry run: verification and install checks were not executed."
 else
   info "Changed: HyperAgent repo cloned or updated when needed; Codex skill installed or updated at $skills_dir/codex-hyperagent."
-fi
-info "Passed: git/sh availability checks, MVP verification, and selected install checks."
-if [ "$skip_smoke" -eq 0 ]; then
-  info "Passed: init smoke and Mission -> Workshop smoke loop."
-else
-  info "Skipped: smoke evals because --skip-smoke was set."
+  info "Passed: git/sh availability checks, MVP verification, and selected install checks."
+  if [ "$skip_smoke" -eq 0 ]; then
+    info "Passed: init smoke and Mission -> Workshop smoke loop."
+  else
+    info "Skipped: smoke evals because --skip-smoke was set."
+  fi
 fi
 info "Next: restart Codex Desktop or open a fresh thread if the skill does not appear."

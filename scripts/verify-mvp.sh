@@ -98,6 +98,8 @@ require_text scripts/setup-codex.sh "Usage: sh scripts/setup-codex.sh"
 require_text scripts/setup-codex.sh "Global Codex custom instructions: unchanged"
 require_text scripts/setup-codex.sh "--init-target"
 require_text scripts/setup-codex.sh 'git -C "$install_dir" pull --ff-only'
+require_text scripts/setup-codex.sh "unsafe skills dir"
+require_text scripts/setup-codex.sh "Dry run: verification and install checks were not executed."
 require_text scripts/update-codex-skill.sh "update complete"
 require_text bin/hyperagent "scripts/hyperagent.sh"
 require_text scripts/hyperagent.sh "init [--target DIR] [--force] [--dry-run]"

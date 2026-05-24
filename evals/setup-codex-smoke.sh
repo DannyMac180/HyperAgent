@@ -69,5 +69,16 @@ test ! -e "$tmpdir/DryHyperAgent" || fail "dry run created install dir"
 test ! -e "$tmpdir/dry-skills" || fail "dry run created skills dir"
 require_text "$dry_log" "Would clone:"
 require_text "$dry_log" "Would run: sh"
+require_text "$dry_log" "Dry run: verification and install checks were not executed."
+
+unsafe_log="$tmpdir/unsafe.log"
+if sh "$repo_root/scripts/setup-codex.sh" \
+  --install-dir "$repo_root" \
+  --skills-dir / \
+  --skip-smoke \
+  --no-update >"$unsafe_log" 2>&1; then
+  fail "setup accepted unsafe skills dir"
+fi
+require_text "$unsafe_log" "unsafe skills dir: /"
 
 printf 'HyperAgent setup-codex smoke passed.\n'

@@ -143,6 +143,20 @@ sh scripts/hyperagent.sh workshop-prompt
 
 Then have Codex follow the printed prompt. Proposals belong in `workshop/proposals/`.
 
+After several missions, run a digest before writing another standalone proposal:
+
+```bash
+sh scripts/hyperagent.sh workshop-digest --limit 12
+```
+
+The digest scans recent mission records for friction evidence that lacks proposal handoff, lists stale proposals without decisions, surfaces weak proposal evidence that may deserve Forge review, and recommends one next backlog action. To draft a proposal from the highest-value missing handoff without accepting anything:
+
+```bash
+sh scripts/hyperagent.sh workshop-digest --limit 12 --draft-proposal
+```
+
+Drafted digest proposals remain `human review required` and do not create decision records.
+
 To create a proposal shell:
 
 ```bash

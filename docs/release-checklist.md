@@ -4,6 +4,8 @@ This checklist defines the bar for an early open-source HyperAgent release.
 
 Release posture: `v0.1.0-alpha`, developer preview, Codex-first, markdown-first, local, inspectable, human-review-required.
 
+For the next alpha candidate after `v0.1.0-alpha`, use this checklist together with `docs/releases/next-alpha.md` and `docs/roadmap.md`. Do not tag or update public claims from a dirty tree.
+
 ## Release Claim
 
 HyperAgent Mark I should be released only as an early alpha that proves the Mission -> Workshop -> Forge loop.
@@ -46,6 +48,46 @@ Before tagging an alpha release:
 - [x] The release notes explain that the Forge improves the improvement process, not the user's code directly.
 - [x] The README states the current limits plainly.
 - [x] The release notes state that persistent behavior changes require human review.
+
+## Next Alpha Pre-Release Review
+
+Use this section before tagging any alpha after `v0.1.0-alpha`.
+
+Release candidate status as of 2026-05-24: not tagged; validation and clean-install UAT must be recorded from the reviewed branch before public release.
+
+Done:
+
+- [x] README states that HyperAgent is local, markdown-first, and has no hosted service, dashboard, autonomous self-modification, or broad platform support.
+- [x] README links to `docs/roadmap.md` for the current state of `init`, `sense`, reliability evals, Forge checks, and newer surfaces.
+- [x] `docs/releases/v0.1.0-alpha.md` identifies the first-alpha shipped surface and points newer surfaces to `docs/releases/next-alpha.md`.
+- [x] `docs/releases/next-alpha.md` distinguishes done, deferred, not shipped, and candidate verification status.
+- [x] `docs/roadmap.md` distinguishes accepted capabilities from in-review capabilities.
+
+Required before tag:
+
+- [ ] The release branch or `main` is clean and up to date with the reviewed PR.
+- [ ] `sh scripts/verify-mvp.sh` passes.
+- [ ] `sh evals/smoke-loop.sh` passes.
+- [ ] `sh evals/init-smoke.sh` passes.
+- [ ] `sh evals/sense-smoke.sh` passes.
+- [ ] Clean-clone verification passes using the command sequence below.
+- [ ] Clean-install Codex Desktop UAT is attempted using `docs/clean-install-uat.md`.
+- [ ] Manual UAT result is recorded in `docs/clean-install-uat.md`, `docs/releases/next-alpha.md`, or the release PR.
+
+Deferred:
+
+- [ ] Human decision records for `project-init`, `local-sensing`, `reliability-gains-eval`, `quantitative-forge-review`, `readme-architecture-maintenance`, and `product-state-roadmap`.
+- [ ] Trace/replay-backed reliability eval cases.
+- [ ] Automated Mermaid-to-SVG rendering for architecture diagram updates.
+- [ ] Multi-platform adapter design.
+
+Not shipped:
+
+- Hosted service, hosted memory, or hidden database.
+- Interactive product UI or dashboard. The README architecture image is static documentation.
+- Autonomous self-modification or automatic activation of persistent behavior changes.
+- Automatic upgrades across every user project.
+- Production-grade safety automation.
 
 ## Forge Readiness
 
@@ -139,6 +181,8 @@ tmpskills=$(mktemp -d)
 sh scripts/install-codex-skill.sh "$tmpskills"
 test -f "$tmpskills/codex-hyperagent/SKILL.md"
 ```
+
+Record the date, commit, command output summary, and any cleanup performed in the release PR or `docs/releases/next-alpha.md`.
 
 ## Suggested Release Sequence
 

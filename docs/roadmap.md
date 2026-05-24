@@ -34,7 +34,8 @@ Default activation mode remains `human review required`. Do not treat an impleme
 | Reliability gains eval | In review | `evals/reliability-gains.sh` | `missions/2026-05-20-1554-dan-176-reliability-gains-eval.md`, `evals/reliability-rubric.md` | Deterministic fixture-based eval; live trace/replay ingestion is future work. |
 | Quantitative Forge review checks | In review | `templates/forge-review.md`, `scripts/verify-forge-review.sh` | `missions/2026-05-20-1556-dan-177-strengthen-forge.md`, `missions/2026-05-22-1535-dan-177-quantitative-forge-rework.md` | Adds anchored 0-5 scores, evidence fields, deterministic gates, and payoff counters. |
 | README architecture diagram maintenance | In review | `docs/architecture/hyperagent.mmd`, `docs/assets/hyperagent-architecture.svg`, PR checklist | `missions/2026-05-21-1329-readme-architecture-diagram.md` | Reviewed when user-visible modules change; SVG rendering is still manual. |
-| Static architecture visual | Shipped / in review | README image asset | `docs/assets/hyperagent-architecture.svg` | This is not an interactive product UI. HyperAgent still has no dashboard or polished application UI. |
+| Static architecture visual | Shipped / in review | README image asset | `docs/assets/hyperagent-architecture.svg` | This is a documentation asset, not a product cockpit. |
+| Optional local UI cockpit | In review | `hyperagent ui` when present in a checkout | `docs/ui-architecture.md` | Local-only, read-mostly cockpit over markdown and evidence logs; no hosted service, hidden database, or silent activation. |
 
 ## PRD Faithfulness Improvement Map
 
@@ -48,7 +49,7 @@ This section keeps the 17 review improvements visible without requiring chat his
 | DAN-184 Mission closeout automation | Done | Current alpha | Mission telemetry | `missions/2026-05-23-2006-dan-184-mission-closeout-automation.md`, `scripts/hyperagent.sh`, `templates/mission-record.md` | Review for acceptance and keep strict mission verification green. |
 | DAN-185 Workshop/Forge cadence audits | In Progress | Current alpha candidate | Workshop and Forge process | `workshop/backlog.md`, mission evidence under `missions/` | Convert recurring mission evidence into backlog movement and reviewer-visible cadence checks. |
 | DAN-186 Score real mission evidence | In Progress | Current alpha candidate | Reliability evals | `evals/reliability-gains.sh`, `evals/reliability-rubric.md`, `missions/2026-05-20-1554-dan-176-reliability-gains-eval.md` | Extend reliability scoring beyond curated fixtures while preserving deterministic local checks. |
-| DAN-187 Optional local UI cockpit | Backlog | Future work | UI/dashboard | `docs/hyperagent-prd.md` MVP non-goals, `README.md` current limits | Keep UI optional and subordinate to markdown truth; do not build a hosted dashboard for this alpha. |
+| DAN-187 Optional local UI cockpit | Merging | Current alpha candidate | UI/dashboard | `docs/hyperagent-prd.md` MVP non-goals, `README.md` current limits, `docs/ui-architecture.md` | Keep UI optional and subordinate to markdown truth; do not build a hosted dashboard for this alpha. |
 | DAN-188 Public evidence boundaries | In review | Current alpha candidate | Privacy and sample logs | `docs/evidence-policy.md`, `docs/examples/missions/public-safe-mission.md`, `scripts/hyperagent.sh mission redact-check` | Defines committed-vs-local evidence boundaries, public sample location, and a quick redaction preflight. |
 | DAN-189 Codex adapter boundary | In Progress | Future work | Multi-platform Suit | `docs/hyperagent-prd.md` target-user and adapter language; `adapters/contract.md`; `adapters/codex.md` | Review the Codex adapter boundary before implementing Claude Code, Cursor, OpenClaw, or other adapters. |
 | DAN-190 Accepted capabilities in status/sense/closeout | Backlog | Current alpha candidate | Capability registry visibility | `hyperagent/capability-registry.md`, `scripts/hyperagent.sh status`, `scripts/hyperagent.sh sense` | Surface accepted vs in-review capability state in local commands and closeout artifacts. |
@@ -71,13 +72,13 @@ This section keeps the 17 review improvements visible without requiring chat his
 ## Deferred By Design
 
 - Multi-platform adapters are deferred. DAN-189 defines the Codex adapter boundary in docs only; it does not ship Claude Code, Cursor, OpenClaw, or other platform support.
-- Interactive UI/dashboard work is deferred unless DAN-187 keeps markdown artifacts as the source of truth.
+- A local UI cockpit is allowed only as an optional read-mostly layer over markdown artifacts and evidence logs.
 - Hosted services, hidden databases, autonomous self-modification, and broadened account/network authority remain out of scope for this alpha.
 - Non-Codex platform support should not be added as an implementation shortcut before the current Codex-first flow stabilizes.
 
 ## Current Limits
 
-HyperAgent Mark I is a working local alpha. It has a README architecture visual and markdown/shell workflows, but no interactive product UI, hosted service, hidden database, autonomous self-modification, multi-platform adapter suite, or production-grade safety automation.
+HyperAgent Mark I is a working local alpha. It has a README architecture visual, markdown/shell workflows, and may include an optional local cockpit for inspecting those files. It has no polished hosted dashboard, hosted service, hidden database, autonomous self-modification, multi-platform adapter suite, or production-grade safety automation.
 
 The current repo can answer "what should I work on next?" through:
 

@@ -24,7 +24,7 @@ The release should not claim:
 
 - autonomous self-modification,
 - hosted memory,
-- an interactive product UI or dashboard,
+- a polished hosted dashboard,
 - multi-platform support beyond Codex,
 - automatic upgrades across every user project,
 - production-grade safety automation.

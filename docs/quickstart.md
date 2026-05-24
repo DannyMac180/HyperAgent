@@ -6,6 +6,8 @@ If you only want to try HyperAgent in the Codex Mac app, start with the copy-pas
 
 Use this guide when you want to inspect or run the setup commands yourself. It proves the Mark I loop locally: install the Codex skill, run a mission, write telemetry, propose an upgrade, and record an explicit human decision.
 
+HyperAgent is markdown-first. If your checkout includes `hyperagent ui`, use it as an optional local cockpit for inspecting the same mission records, Workshop artifacts, Forge reviews, capabilities, and local evidence described below. The cockpit is not a hosted service, does not use a hidden database, and must not silently activate upgrades. See `docs/ui-architecture.md` for the boundary.
+
 ## 1. One-Command HyperAgent Setup
 
 From a machine that has `git` and `sh`, run:

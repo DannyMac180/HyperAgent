@@ -51,6 +51,13 @@ scripts/verify-mvp.sh
 - Additional commands run: `sh -n scripts/setup-codex.sh`; `sh -n evals/setup-codex-smoke.sh`; `sh -n scripts/verify-mvp.sh`; `sh evals/setup-codex-smoke.sh`; `sh scripts/verify-mvp.sh`; `tmpdir=$(mktemp -d) && sh scripts/install-codex-skill.sh "$tmpdir" && test -f "$tmpdir/codex-hyperagent/SKILL.md" && rm -rf "$tmpdir"`; `sh evals/init-smoke.sh`; `sh evals/smoke-loop.sh`; `git diff --check`.
 - Verification status: passed.
 
+## Handoff Verification Evidence
+
+- Date/time: 2026-05-24.
+- Git status: clean before this mission-record refresh; branch `danmacideas/dan-192-setup-codex-command` was pushed at `46d5eee`.
+- Additional commands run: `sh -n scripts/setup-codex.sh`; `sh -n evals/setup-codex-smoke.sh`; `sh -n scripts/hyperagent.sh`; `git diff --check`; `sh evals/setup-codex-smoke.sh`; `sh scripts/verify-mvp.sh`; `tmpdir=$(mktemp -d) && sh scripts/install-codex-skill.sh "$tmpdir" && test -f "$tmpdir/codex-hyperagent/SKILL.md" && rm -rf "$tmpdir"`; `sh evals/init-smoke.sh`; `sh evals/smoke-loop.sh`.
+- Verification status: passed.
+
 ## Outcome
 
 - Final outcome: Added a documented `scripts/setup-codex.sh` setup path and `bin/hyperagent setup-codex` wrapper route that clone/update HyperAgent, run verification, install/update the Codex skill, and optionally initialize a target project only after confirmation. Follow-up hardening also refuses unsafe skills directories, makes dry-run summary output avoid claiming verification/install checks ran, and keeps custom `HYPERAGENT_HOME` command-path installs on the same resolved clone path.

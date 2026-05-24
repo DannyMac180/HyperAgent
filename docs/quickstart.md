@@ -37,6 +37,12 @@ The init command creates or updates:
 
 The root `.hyperagent` file is the machine-readable project anchor. It records the HyperAgent version, install mode, initialized paths, enabled adapters, verification commands, and links to project instruction files.
 
+The schema and supported TOML subset are documented in `docs/config.md`. Validate the project contract with:
+
+```bash
+sh scripts/hyperagent.sh verify-config
+```
+
 Generated operational files are plain Markdown and shell scripts. Init copies project setup files by default instead of symlinking them, so each repo can inspect, edit, and commit its own local memory. Existing files are left alone when identical, and conflicting files are refused unless `--force` is passed.
 
 Preview changes without writing files:
@@ -74,6 +80,7 @@ You should see counts for missions, Workshop proposals, Workshop decisions, Forg
 Record commands and checks explicitly when they matter for a mission:
 
 ```bash
+sh scripts/hyperagent.sh check -- sh scripts/verify-mvp.sh
 sh scripts/hyperagent.sh record-check --status passed --command "sh scripts/verify-mvp.sh"
 sh scripts/hyperagent.sh record-check --status failed --command "sh evals/smoke-loop.sh" --note "example failure note"
 ```
@@ -100,6 +107,20 @@ Use the codex-hyperagent skill. Run a small HyperAgent mission in this repo, ver
 
 The mission record belongs in `missions/`. The helper prefills repo evidence such as branch, git status, changed files, command evidence, verification status, and closeout placeholders.
 
+For end-of-task telemetry, prefer one closeout command after recording checks:
+
+```bash
+sh scripts/hyperagent.sh mission-closeout \
+  --request "Run a small HyperAgent mission" \
+  --slug small-hyperagent-mission \
+  --outcome "Mission completed and verification passed" \
+  --risks "No unresolved risks"
+sh scripts/hyperagent.sh verify-mission --strict missions/MISSION.md
+```
+
+Closeout auto-fills the current sense snapshot, recent command/check evidence, changed files, verification status, unresolved-risk prompt, and candidate upgrade field so the record is suitable for Workshop evidence without copy/paste cleanup.
+Pass `--mission missions/DRAFT.md` to replace a draft record with the closeout evidence instead of creating a new file.
+
 You can also create a mission record shell:
 
 ```bash
@@ -109,6 +130,8 @@ sh scripts/hyperagent.sh new-mission \
   --commands-run "sh scripts/verify-mvp.sh" \
   --verification-status "pending"
 ```
+
+`new-mission` remains useful for drafts, but strict verification intentionally fails its placeholder closeout fields until they are replaced.
 
 ## 6. Run Workshop Review
 
@@ -186,6 +209,7 @@ sh scripts/hyperagent.sh propose-upgrade \
 ## 9. Verify
 
 ```bash
+sh scripts/hyperagent.sh verify-config
 sh scripts/verify-mvp.sh
 sh evals/init-smoke.sh
 sh evals/sense-smoke.sh

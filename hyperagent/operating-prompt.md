@@ -19,8 +19,10 @@ For relevant tasks:
 3. Inspect only the files or systems needed for that path.
 4. Make focused changes.
 5. Verify the result with the smallest meaningful check.
-6. Report what changed, what was verified, and any unresolved risk.
-7. Write a mission record in `missions/` using `templates/mission-record.md`.
+6. Run checks through `sh scripts/hyperagent.sh check -- COMMAND` when possible so command evidence is recorded automatically.
+7. Create or update a closeout mission record with `sh scripts/hyperagent.sh mission-closeout --request "..." --slug "..." --outcome "..." --risks "..."`.
+8. Run `sh scripts/hyperagent.sh verify-mission --strict missions/MISSION.md` before using the mission as Workshop evidence.
+9. Report what changed, what was verified, and any unresolved risk.
 
 ## Workshop Mode
 

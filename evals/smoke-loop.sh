@@ -19,6 +19,7 @@ cp -R "$repo_root" "$tmpdir/HyperAgent"
 cd "$tmpdir/HyperAgent"
 
 sh scripts/verify-mvp.sh >/dev/null
+sh evals/digest-smoke.sh >/dev/null
 
 sh scripts/hyperagent.sh check --note "smoke wrapper passed" -- sh scripts/hyperagent.sh status >/dev/null
 grep -F "passed" .hyperagent-evidence/commands.log >/dev/null || fail "check wrapper did not record passed status"
@@ -97,6 +98,20 @@ test -f "$process_proposal" || fail "process proposal was not created"
 grep -F "Evidence source type: forge review" "$process_proposal" >/dev/null || fail "process proposal missing Forge evidence type"
 grep -F "Related Forge review:" "$process_proposal" >/dev/null || fail "process proposal missing related Forge review"
 
+unsafe_proposal=$(sh scripts/hyperagent.sh propose-upgrade \
+  --mission "$mission" \
+  --title "Unsafe smoke proposal" \
+  --problem "The loop needs proof that unsafe accepted proposals are rejected")
+perl -0pi -e 's/- Rollback plan: Revert the changed files or remove the accepted registry entry if the upgrade fails review\\./- Rollback plan:/; s/- Proposed activation mode: human review required/- Proposed activation mode: auto-install low risk/' "$unsafe_proposal"
+if sh scripts/hyperagent.sh decide-upgrade \
+  --proposal "$unsafe_proposal" \
+  --decision accepted \
+  --reviewer "Smoke Eval" \
+  --reason "This should fail because rollback is missing and activation is unsafe" \
+  --capability unsafe-smoke-upgrade >/dev/null 2>&1; then
+  fail "accepted unsafe proposal without rollback"
+fi
+
 decision=$(sh scripts/hyperagent.sh decide-upgrade \
   --proposal "$proposal" \
   --decision accepted \
@@ -107,5 +122,6 @@ test -f "$decision" || fail "decision was not created"
 grep -F "smoke-test-upgrade" hyperagent/capability-registry.md >/dev/null || fail "registry missing accepted capability"
 
 sh scripts/hyperagent.sh status >/dev/null
+sh scripts/hyperagent.sh verify-safety >/dev/null
 
 printf 'HyperAgent smoke loop passed.\n'

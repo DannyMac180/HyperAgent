@@ -4,7 +4,9 @@
 - Proposal ID: proposal-2026-05-01-2108-codex-skill-installer
 - Date/time: 2026-05-01 21:08 EDT
 - Related mission record: `missions/2026-05-01-2108-mark-i-build.md`
+- Evidence source type: mission
 - Proposed activation mode: human review required
+- Allowed activation modes: suggest only; draft files only; human review required; auto-install low risk
 
 ## Problem
 
@@ -29,6 +31,9 @@
 
 - Safety risk: Low. The script writes local skill files only to a user-provided directory.
 - Permission or authority changes: None by default. It should not broaden filesystem, shell, network, account, deployment, or secrets access.
+- Filesystem impact: Writes only to the user-provided local skills directory.
+- Network or account impact: None.
+- Secrets handling impact: None.
 - Human approval required before activation: yes
 
 ## Evaluation

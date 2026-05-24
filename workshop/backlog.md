@@ -12,6 +12,8 @@ Default activation mode: `human review required`.
 - Accepted items require a decision record in `workshop/decisions/`.
 - Accepted Suit capabilities are recorded in `hyperagent/capability-registry.md`.
 - Implemented surfaces without a proposal or decision belong in `Review Candidates` until a reviewer decides whether to write a proposal, accept/reject the surface, or defer it.
+- Run `sh scripts/hyperagent.sh workshop-digest --limit 12` after several missions or before release-readiness review to find recurring friction, stale proposals, weak proposal evidence, and Forge cadence needs.
+- Digest-generated proposals are drafts only. They must stay `human review required` and cannot be moved to accepted backlog status without a decision record.
 
 ## Priority Rubric
 
@@ -26,6 +28,7 @@ Score each item with `workshop/rubric.md`.
 
 | Priority | Status | Proposal | Evidence | Next action |
 | --- | --- | --- | --- | --- |
+| P3 | Proposed | `workshop/proposals/2026-05-24-0652-scoped-rename-safety.md` | `missions/2026-05-24-0652-dan-192-setup-hyperagent-rework.md` | Keep as draft unless scoped rename friction repeats; first step would add a short checklist to `hyperagent/operating-prompt.md`. |
 | P0 | Accepted | `workshop/proposals/2026-05-16-1216-local-loop-helper-and-smoke-eval.md` | `missions/2026-05-16-1216-prd-fulfillment-working-product.md` | Loop helper and smoke eval implemented; keep covered by `scripts/verify-mvp.sh` and `evals/smoke-loop.sh`. |
 | P1 | Accepted | `workshop/proposals/2026-05-01-2108-codex-skill-installer.md` | `missions/2026-05-01-2108-mark-i-build.md` | Installer implemented; keep covered by smoke evals. |
 

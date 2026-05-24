@@ -20,6 +20,7 @@ The repo is release-candidate ready only after all of these are true:
 
 - `hyperagent init` project setup with `.hyperagent`, local templates, generated project backlog, capability registry, and `AGENTS.md` instructions.
 - Local sensing through `scripts/hyperagent.sh sense`, `record-check`, and `doctor`, including redacted command/check evidence, changed-file summaries, optional PR/CI lookup, and local Workbench trace enrichment when available.
+- Simplified CLI help around five primary flows: `init`, `sense`, `mission`, `review`, and `ui`, with grouped mission/review commands and compatibility aliases for the older flat helper commands.
 - Reliability gains eval with deterministic baseline and HyperAgent fixture records.
 - Strengthened Forge review template, rubric, structured summary, anchored 0-5 scores, deterministic gates, payoff counters, and `scripts/verify-forge-review.sh`.
 - README Codex Mac copy-paste setup prompt and clean-install UAT checklist.

@@ -5,21 +5,56 @@ usage() {
   cat <<'USAGE'
 Usage: sh scripts/hyperagent.sh COMMAND [options]
 
-Commands:
-  init [--target DIR] [--force] [--dry-run]
+Primary flows:
+  init [--target DIR] [--update] [--force] [--dry-run]
       Create or update HyperAgent project setup files in DIR. Defaults to the current directory.
+
+  sense [--format markdown|json] [--command-log PATH] [--trace-url URL] [--workbench-trace-log PATH] [--pr auto|off]
+      Understand current repo state, recent checks, changed files, PR status, and local trace health.
+
+  doctor [--workbench-trace-log PATH]
+  sense --doctor [--workbench-trace-log PATH]
+      Run local diagnostics for sensing and Workbench trace enrichment.
+
+  mission new --request TEXT [--slug SLUG] [--commands-run TEXT] [--verification-status TEXT]
+      Start a mission record in missions/.
+
+  mission closeout --request TEXT [--mission PATH] [--slug SLUG] [--outcome TEXT] [--risks TEXT] [--candidate-upgrades TEXT]
+      Close out a mission with sense, checks, changed files, risks, and Workshop prompts.
+
+  mission verify [--strict] PATH
+      Check a mission record. Strict mode fails placeholder closeout text.
+
+  review workshop (--mission PATH | --forge-review PATH) --title TEXT --problem TEXT [--slug SLUG]
+      Create a human-review-required Workshop proposal from mission or Forge evidence.
+
+  review digest [--limit N] [--draft-proposal] [--title TEXT] [--slug SLUG]
+      Review recent mission, Workshop, and Forge artifacts for backlog movement opportunities.
+
+  review forge new [--slug SLUG]
+      Create a Forge review record in forge/reviews/.
+
+  review forge audit [--write-proposal]
+      Audit Workshop proposal quality, decisions, registry traceability, and eval coverage.
+
+  review decide --proposal PATH --decision accepted|rejected --reviewer NAME --reason TEXT [--capability ID]
+      Record a human approval decision. Accepted decisions require --capability.
+
+  ui
+      Open the local HyperAgent cockpit when available. Currently prints local status and roadmap pointers.
+
+Compatibility and diagnostics:
+  setup-hyperagent [options]
+      Clone/update HyperAgent, verify it, install the Codex skill, and optionally init a target project.
 
   verify-config
       Validate the root .hyperagent project contract.
 
+  verify-safety
+      Validate proposal, decision, and accepted capability safety boundaries.
+
   status
-      Print HyperAgent local product status.
-
-  sense [--format markdown|json] [--command-log PATH] [--trace-url URL] [--workbench-trace-log PATH] [--pr auto|off]
-      Print a compact local sensing summary for mission records.
-
-  doctor [--workbench-trace-log PATH]
-      Print local diagnostics for HyperAgent sensing and Workbench trace enrichment.
+      Print legacy local product status diagnostics.
 
   record-check --command TEXT --status passed|failed|retried|skipped [--note TEXT]
       Append an opt-in check or command result to the local evidence log.
@@ -45,11 +80,21 @@ Commands:
   new-forge-review [--slug SLUG]
       Create a Forge review record in forge/reviews/.
 
+  forge audit [--write-proposal]
+  forge-audit [--write-proposal]
+      Audit Workshop proposals, decisions, registry traceability, and eval coverage.
+
   forge-prompt
       Print the repeatable Forge review prompt.
 
   decide-upgrade --proposal PATH --decision accepted|rejected --reviewer NAME --reason TEXT [--capability ID]
       Record a human approval decision. Accepted decisions require --capability and are added to the capability registry.
+
+  workshop-digest [--limit N] [--draft-proposal] [--title TEXT] [--slug SLUG]
+      Review recent missions, Workshop proposals, and Forge reviews for backlog movement opportunities.
+
+  review-digest [--limit N] [--draft-proposal] [--title TEXT] [--slug SLUG]
+      Compatibility alias for review digest.
 
   help
       Show this help.
@@ -62,7 +107,8 @@ fail() {
 }
 
 script_dir=$(CDPATH= cd "$(dirname "$0")" && pwd)
-repo_root=$(CDPATH= cd "$script_dir/.." && pwd)
+runtime_root=$(CDPATH= cd "$script_dir/.." && pwd)
+repo_root=${HYPERAGENT_PROJECT_ROOT:-$runtime_root}
 config_file="$repo_root/.hyperagent"
 
 strip_toml_value() {
@@ -177,6 +223,7 @@ registry_file=$(config_path_or_default capability_registry "hyperagent/capabilit
 default_command_log=$(config_path_or_default evidence_log ".hyperagent-evidence/commands.log")
 default_evidence_dir=$(dirname "$default_command_log")
 default_workbench_trace_log=$(config_path_or_default workbench_trace_log ".hyperagent-evidence/workbench/traces.jsonl")
+eval_dir="$repo_root/evals"
 
 now_stamp() {
   date '+%Y-%m-%d-%H%M'
@@ -223,6 +270,55 @@ redact_text() {
   printf '%s\n' "$1" | redact_stream
 }
 
+trim_text() {
+  sed 's/^[[:space:]]*//; s/[[:space:]]*$//'
+}
+
+field_value() {
+  file="$1"
+  label="$2"
+  awk -v label="$label" '
+    index($0, "- " label ":") == 1 {
+      sub("^- " label ":[[:space:]]*", "")
+      print
+      exit
+    }
+  ' "$file" | trim_text
+}
+
+meaningful_value() {
+  value=$(printf '%s' "$1" | trim_text)
+  case "$value" in
+    ''|'-'|'`'|'``'|'yes/no'|'ready/not ready'|'PATH'|'PATH '*|'Pending '*|'pending')
+      return 1
+      ;;
+    *)
+      return 0
+      ;;
+  esac
+}
+
+strip_ticks() {
+  printf '%s' "$1" | sed 's/^`//; s/`$//'
+}
+
+repo_relative_path() {
+  path="$1"
+  case "$path" in
+    "$repo_root"/*) printf '%s\n' "${path#$repo_root/}" ;;
+    *) printf '%s\n' "$path" ;;
+  esac
+}
+
+path_exists_from_repo() {
+  raw_path=$(strip_ticks "$1")
+  meaningful_value "$raw_path" || return 1
+  case "$raw_path" in
+    /*) test -f "$raw_path" ;;
+    *) test -f "$repo_root/$raw_path" ;;
+  esac
+}
+
 json_escape() {
   awk '
     BEGIN { ORS = "" }
@@ -254,6 +350,16 @@ init_parent_dir() {
 
 init_same_file() {
   test -f "$1" && test -f "$2" && cmp -s "$1" "$2"
+}
+
+shell_single_quote() {
+  printf "%s" "$1" | sed "s/'/'\\\\''/g; 1s/^/'/; \$s/\$/'/"
+}
+
+init_is_runtime_helper_copy() {
+  test -f "$1" \
+    && grep -F "generate_init_config()" "$1" >/dev/null 2>&1 \
+    && grep -F "init_project()" "$1" >/dev/null 2>&1
 }
 
 init_install_file() {
@@ -292,6 +398,8 @@ init_write_generated() {
   force="$2"
   dry_run="$3"
   generator="$4"
+  update="${5:-0}"
+  legacy_generator="${6:-}"
   tmp=$(mktemp)
   "$generator" >"$tmp"
 
@@ -300,6 +408,22 @@ init_write_generated() {
       init_log "up to date: $dest"
       rm -f "$tmp"
       return 0
+    fi
+    if [ "$update" -eq 1 ] && [ -n "$legacy_generator" ]; then
+      legacy_tmp=$(mktemp)
+      "$legacy_generator" >"$legacy_tmp"
+      if cmp -s "$legacy_tmp" "$dest"; then
+        if [ "$dry_run" -eq 1 ]; then
+          init_log "would update generated file: $dest"
+          rm -f "$tmp" "$legacy_tmp"
+          return 0
+        fi
+        cp "$tmp" "$dest"
+        init_log "updated generated file: $dest"
+        rm -f "$tmp" "$legacy_tmp"
+        return 0
+      fi
+      rm -f "$legacy_tmp"
     fi
     test "$force" -eq 1 || {
       rm -f "$tmp"
@@ -345,6 +469,114 @@ init_touch_file() {
   mkdir -p "$(init_parent_dir "$dest")"
   : >"$dest"
   init_log "created: $dest"
+}
+
+generate_init_project_helper() {
+  runtime_hint=$(shell_single_quote "$runtime_root")
+  cat <<EOF
+#!/bin/sh
+set -eu
+
+script_dir=\$(CDPATH= cd "\$(dirname "\$0")" && pwd)
+project_root=\$(CDPATH= cd "\$script_dir/.." && pwd)
+runtime_root_hint=$runtime_hint
+
+if [ -n "\${HYPERAGENT_RUNTIME_ROOT:-}" ]; then
+  runtime_helper="\$HYPERAGENT_RUNTIME_ROOT/scripts/hyperagent.sh"
+elif [ -n "\$runtime_root_hint" ] && [ -f "\$runtime_root_hint/scripts/hyperagent.sh" ]; then
+  runtime_helper="\$runtime_root_hint/scripts/hyperagent.sh"
+else
+  runtime_helper=
+fi
+
+if [ -n "\$runtime_helper" ] && [ -f "\$runtime_helper" ]; then
+  HYPERAGENT_PROJECT_ROOT="\$project_root" exec sh "\$runtime_helper" "\$@"
+fi
+
+if command -v hyperagent >/dev/null 2>&1; then
+  HYPERAGENT_PROJECT_ROOT="\$project_root" exec hyperagent "\$@"
+fi
+
+printf 'FAIL: HyperAgent runtime not found. Set HYPERAGENT_RUNTIME_ROOT or put hyperagent on PATH.\\n' >&2
+exit 1
+EOF
+}
+
+init_write_project_helper() {
+  dest="$1"
+  force="$2"
+  dry_run="$3"
+  update="$4"
+  tmp=$(mktemp)
+  generate_init_project_helper >"$tmp"
+
+  if [ -e "$dest" ]; then
+    if cmp -s "$tmp" "$dest"; then
+      init_log "up to date: $dest"
+      rm -f "$tmp"
+      return 0
+    fi
+    if [ "$update" -eq 1 ] && init_is_runtime_helper_copy "$dest"; then
+      if [ "$dry_run" -eq 1 ]; then
+        init_log "would replace copied runtime helper with project shim: $dest"
+        rm -f "$tmp"
+        return 0
+      fi
+      cp "$tmp" "$dest"
+      chmod +x "$dest"
+      init_log "replaced copied runtime helper with project shim: $dest"
+      rm -f "$tmp"
+      return 0
+    fi
+    test "$force" -eq 1 || {
+      rm -f "$tmp"
+      fail "refusing to overwrite existing file without --force: $dest"
+    }
+    if [ "$dry_run" -eq 1 ]; then
+      init_log "would replace: $dest"
+      rm -f "$tmp"
+      return 0
+    fi
+    cp "$tmp" "$dest"
+    chmod +x "$dest"
+    init_log "replaced: $dest"
+    rm -f "$tmp"
+    return 0
+  fi
+
+  if [ "$dry_run" -eq 1 ]; then
+    init_log "would create: $dest"
+    rm -f "$tmp"
+    return 0
+  fi
+
+  mkdir -p "$(init_parent_dir "$dest")"
+  cp "$tmp" "$dest"
+  chmod +x "$dest"
+  init_log "created: $dest"
+  rm -f "$tmp"
+}
+
+init_migrate_runtime_prompt() {
+  dest="$1"
+  force="$2"
+  dry_run="$3"
+  update="$4"
+
+  [ -e "$dest" ] || return 0
+  [ "$update" -eq 1 ] || return 0
+
+  if init_same_file "$runtime_root/hyperagent/operating-prompt.md" "$dest" || [ "$force" -eq 1 ]; then
+    if [ "$dry_run" -eq 1 ]; then
+      init_log "would remove copied runtime prompt: $dest"
+    else
+      rm -f "$dest"
+      init_log "removed copied runtime prompt: $dest"
+    fi
+    return 0
+  fi
+
+  fail "refusing to remove changed legacy runtime file without --force: $dest"
 }
 
 generate_init_registry() {
@@ -403,6 +635,48 @@ generate_init_config() {
 
 hyperagent_version = "v0.1.0-alpha"
 config_version = 1
+install_mode = "global-runtime"
+
+[paths]
+project_instructions = "AGENTS.md"
+missions = "missions"
+workshop_proposals = "workshop/proposals"
+workshop_decisions = "workshop/decisions"
+workshop_backlog = "workshop/backlog.md"
+workshop_rubric = "workshop/rubric.md"
+forge_reviews = "forge/reviews"
+forge_quality_rubric = "forge/process/quality-rubric.md"
+templates = "templates"
+capability_registry = "hyperagent/capability-registry.md"
+project_readme = "hyperagent/README.md"
+local_helper = "scripts/hyperagent.sh"
+evidence_log = ".hyperagent-evidence/commands.log"
+workbench_trace_log = ".hyperagent-evidence/workbench/traces.jsonl"
+
+[runtime]
+helper = "scripts/hyperagent.sh"
+operating_prompt = "hyperagent/operating-prompt.md"
+override_env = "HYPERAGENT_RUNTIME_ROOT"
+
+[adapters]
+codex = true
+
+[verification]
+commands = [
+  "sh scripts/hyperagent.sh verify-config",
+  "sh scripts/hyperagent.sh status",
+  "sh scripts/hyperagent.sh sense --pr off",
+  "sh scripts/hyperagent.sh doctor",
+]
+EOF
+}
+
+generate_init_config_legacy_copy() {
+  cat <<'EOF'
+# HyperAgent project config
+
+hyperagent_version = "v0.1.0-alpha"
+config_version = 1
 install_mode = "copy"
 
 [paths]
@@ -427,15 +701,100 @@ codex = true
 
 [verification]
 commands = [
-  "sh scripts/hyperagent.sh verify-config",
   "sh scripts/hyperagent.sh status",
-  "sh scripts/hyperagent.sh sense --pr off",
-  "sh scripts/hyperagent.sh doctor",
 ]
 EOF
 }
 
 generate_init_readme() {
+  cat <<'EOF'
+# HyperAgent Project Setup
+
+This repository has local HyperAgent memory and workflow files.
+
+The root `.hyperagent` file is the machine-readable project anchor. Scripts and
+adapters can read it to find the HyperAgent version, install mode, initialized
+paths, enabled adapters, verification commands, and instruction files.
+
+Use these files to keep agent work inspectable:
+
+- `missions/`: mission records from meaningful tasks.
+- `workshop/proposals/`: proposed improvements backed by mission or Forge review evidence.
+- `workshop/decisions/`: explicit human approvals or rejections.
+- `forge/reviews/`: reviews of Workshop proposal quality.
+- `templates/`: markdown templates for records, proposals, decisions, and Forge reviews.
+- `hyperagent/capability-registry.md`: accepted local capabilities.
+
+## Init Output Categories
+
+- Project-local artifacts: `missions/`, `workshop/proposals/`, `workshop/decisions/`, `forge/reviews/`, `AGENTS.md`, `workshop/backlog.md`, and `hyperagent/capability-registry.md`.
+- Copied templates and rubrics: `templates/`, `workshop/rubric.md`, and `forge/process/quality-rubric.md`.
+- Generated config and docs: `.hyperagent`, `hyperagent/README.md`, and this repository's HyperAgent block in `AGENTS.md`.
+- Global runtime dependency: the local `scripts/hyperagent.sh` shim delegates to the installed HyperAgent runtime instead of copying the full runtime helper or operating prompt into this repo.
+
+## Five Primary Flows
+
+```bash
+sh scripts/hyperagent.sh init --target /path/to/project
+sh scripts/hyperagent.sh sense
+sh scripts/hyperagent.sh mission closeout --request "Describe the task" --slug task-slug
+sh scripts/hyperagent.sh review workshop --mission missions/MISSION.md --title "Improve the Suit" --problem "Concrete friction from the mission"
+sh scripts/hyperagent.sh review forge audit
+sh scripts/hyperagent.sh ui
+```
+
+Compatibility aliases remain available for at least one release:
+
+```bash
+sh scripts/hyperagent.sh verify-config
+sh scripts/hyperagent.sh status
+sh scripts/hyperagent.sh record-check --status passed --command "sh scripts/verify-mvp.sh"
+sh scripts/hyperagent.sh doctor
+sh scripts/hyperagent.sh new-mission --request "Describe the task" --slug task-slug
+sh scripts/hyperagent.sh mission-closeout --request "Describe the task" --slug task-slug
+sh scripts/hyperagent.sh workshop-prompt
+sh scripts/hyperagent.sh forge-prompt
+sh scripts/hyperagent.sh propose-upgrade --forge-review forge/reviews/REVIEW.md --title "Improve Workshop quality" --problem "The Workshop process needs a concrete fix"
+```
+
+## Verification
+
+Run Forge reviews after proposal decisions, eval changes, release-readiness checks, or repeated vague Workshop output. Forge process improvements should become normal Workshop proposals linked to the Forge review and remain `human review required`.
+
+For this project, the lightweight check is:
+
+```bash
+sh scripts/hyperagent.sh verify-config
+sh scripts/hyperagent.sh sense
+```
+
+To capture local task evidence for mission records:
+
+```bash
+sh scripts/hyperagent.sh record-check --status passed --command "sh scripts/verify-mvp.sh"
+sh scripts/hyperagent.sh sense
+sh scripts/hyperagent.sh mission closeout --request "Describe the task" --slug task-slug
+```
+
+The sensing summary reads Git metadata, the opt-in local command log, and local Workbench trace metadata when the default ignored trace log exists. It does not inspect repository file contents or environment values, and command text is redacted for secret-like tokens before storage and output.
+
+Add any project-specific build, test, lint, or smoke commands to `AGENTS.md` so future agents know the strongest relevant verification path.
+
+## Copy And Symlink Behavior
+
+`hyperagent init` copies stable markdown templates and rubrics into the target repository. It generates blank project-local backlog and capability registry files, and it installs a small `scripts/hyperagent.sh` shim that runs the global HyperAgent runtime against this project.
+
+If you installed the global Codex skill with `scripts/install-codex-skill.sh --symlink`, only the Codex skill install is symlinked. Project-local files created by `hyperagent init` are still normal files.
+
+Existing files are left alone when they are identical. Conflicting generated files are not overwritten unless `--force` is passed.
+
+## Updating Existing Projects
+
+Run `hyperagent init --target /path/to/project --update` after updating the HyperAgent install. Update mode migrates older initialized repos from copied runtime files to the project shim when the files match the known generated runtime copies. Locally changed runtime copies are refused unless `--force` is passed.
+EOF
+}
+
+generate_init_readme_legacy_copy() {
   cat <<'EOF'
 # HyperAgent Project Setup
 
@@ -469,6 +828,7 @@ sh scripts/hyperagent.sh verify-mission --strict missions/MISSION.md
 sh scripts/hyperagent.sh workshop-prompt
 sh scripts/hyperagent.sh forge-prompt
 sh scripts/hyperagent.sh propose-upgrade --forge-review forge/reviews/REVIEW.md --title "Improve Workshop quality" --problem "The Workshop process needs a concrete fix"
+sh scripts/hyperagent.sh forge audit
 ```
 
 ## Verification
@@ -623,6 +983,7 @@ init_project() {
   target=.
   force=0
   dry_run=0
+  update=0
 
   while [ "$#" -gt 0 ]; do
     case "$1" in
@@ -633,6 +994,9 @@ init_project() {
         ;;
       --force)
         force=1
+        ;;
+      --update)
+        update=1
         ;;
       --dry-run)
         dry_run=1
@@ -679,19 +1043,19 @@ init_project() {
   init_touch_file "$target_root/workshop/decisions/.gitkeep" "$dry_run"
   init_touch_file "$target_root/forge/reviews/.gitkeep" "$dry_run"
 
-  init_install_file "$repo_root/templates/mission-record.md" "$target_root/templates/mission-record.md" "$force" "$dry_run"
-  init_install_file "$repo_root/templates/upgrade-proposal.md" "$target_root/templates/upgrade-proposal.md" "$force" "$dry_run"
-  init_install_file "$repo_root/templates/upgrade-decision.md" "$target_root/templates/upgrade-decision.md" "$force" "$dry_run"
-  init_install_file "$repo_root/templates/forge-review.md" "$target_root/templates/forge-review.md" "$force" "$dry_run"
-  init_install_file "$repo_root/workshop/rubric.md" "$target_root/workshop/rubric.md" "$force" "$dry_run"
-  init_install_file "$repo_root/forge/process/quality-rubric.md" "$target_root/forge/process/quality-rubric.md" "$force" "$dry_run"
-  init_install_file "$repo_root/hyperagent/operating-prompt.md" "$target_root/hyperagent/operating-prompt.md" "$force" "$dry_run"
-  init_install_file "$repo_root/scripts/hyperagent.sh" "$target_root/scripts/hyperagent.sh" "$force" "$dry_run"
+  init_install_file "$runtime_root/templates/mission-record.md" "$target_root/templates/mission-record.md" "$force" "$dry_run"
+  init_install_file "$runtime_root/templates/upgrade-proposal.md" "$target_root/templates/upgrade-proposal.md" "$force" "$dry_run"
+  init_install_file "$runtime_root/templates/upgrade-decision.md" "$target_root/templates/upgrade-decision.md" "$force" "$dry_run"
+  init_install_file "$runtime_root/templates/forge-review.md" "$target_root/templates/forge-review.md" "$force" "$dry_run"
+  init_install_file "$runtime_root/workshop/rubric.md" "$target_root/workshop/rubric.md" "$force" "$dry_run"
+  init_install_file "$runtime_root/forge/process/quality-rubric.md" "$target_root/forge/process/quality-rubric.md" "$force" "$dry_run"
+  init_migrate_runtime_prompt "$target_root/hyperagent/operating-prompt.md" "$force" "$dry_run" "$update"
+  init_write_project_helper "$target_root/scripts/hyperagent.sh" "$force" "$dry_run" "$update"
 
-  init_write_generated "$target_root/.hyperagent" "$force" "$dry_run" generate_init_config
-  init_write_generated "$target_root/workshop/backlog.md" "$force" "$dry_run" generate_init_backlog
-  init_write_generated "$target_root/hyperagent/capability-registry.md" "$force" "$dry_run" generate_init_registry
-  init_write_generated "$target_root/hyperagent/README.md" "$force" "$dry_run" generate_init_readme
+  init_write_generated "$target_root/.hyperagent" "$force" "$dry_run" generate_init_config "$update" generate_init_config_legacy_copy
+  init_write_generated "$target_root/workshop/backlog.md" "$force" "$dry_run" generate_init_backlog "$update"
+  init_write_generated "$target_root/hyperagent/capability-registry.md" "$force" "$dry_run" generate_init_registry "$update"
+  init_write_generated "$target_root/hyperagent/README.md" "$force" "$dry_run" generate_init_readme "$update" generate_init_readme_legacy_copy
   init_update_agents "$target_root" "$force" "$dry_run"
 
   init_log "HyperAgent init complete."
@@ -793,8 +1157,8 @@ verify_config() {
     config_error "unsupported config_version: expected 1, got $config_version"
   fi
   case "$install_mode" in
-    ""|copy|symlink) ;;
-    *) config_error "unsupported install_mode: expected copy or symlink, got $install_mode" ;;
+    ""|copy|symlink|global-runtime) ;;
+    *) config_error "unsupported install_mode: expected copy, symlink, or global-runtime, got $install_mode" ;;
   esac
 
   config_require_path project_instructions file
@@ -806,7 +1170,16 @@ verify_config() {
   config_require_path forge_reviews dir
   config_require_path forge_quality_rubric file
   config_require_path templates dir
-  config_require_path operating_prompt file
+  if [ "$install_mode" = "global-runtime" ]; then
+    runtime_helper=$(config_string_value runtime helper)
+    runtime_prompt=$(config_string_value runtime operating_prompt)
+    runtime_override=$(config_string_value runtime override_env)
+    test -n "$runtime_helper" || config_error "missing required field [runtime].helper in .hyperagent"
+    test -n "$runtime_prompt" || config_error "missing required field [runtime].operating_prompt in .hyperagent"
+    test -n "$runtime_override" || config_error "missing required field [runtime].override_env in .hyperagent"
+  else
+    config_require_path operating_prompt file
+  fi
   config_require_path capability_registry file
   config_require_path project_readme file
   config_require_path local_helper file
@@ -841,6 +1214,12 @@ verify_config() {
 count_markdown_files() {
   dir="$1"
   find "$dir" -maxdepth 1 -type f -name '*.md' 2>/dev/null | wc -l | tr -d ' '
+}
+
+recent_markdown_files() {
+  dir="$1"
+  limit="$2"
+  find "$dir" -maxdepth 1 -type f -name '*.md' 2>/dev/null | sort -r | awk -v limit="$limit" 'limit <= 0 || NR <= limit'
 }
 
 is_git_repo() {
@@ -1347,6 +1726,21 @@ print_doctor() {
   printf 'Fallback: sense remains usable without Workbench traces.\n'
 }
 
+print_ui() {
+  cat <<'EOF'
+HyperAgent UI
+
+The hosted cockpit is not part of this local alpha yet. Use these local cockpit views:
+
+  sh scripts/hyperagent.sh sense
+  sh scripts/hyperagent.sh review digest
+  sh scripts/hyperagent.sh review forge audit
+
+Product state:
+  docs/roadmap.md
+EOF
+}
+
 create_mission() {
   verify_config >/dev/null
 
@@ -1673,6 +2067,184 @@ verify_mission() {
   printf 'Mission verification passed: %s\n' "$file"
 }
 
+safety_field_value() {
+  file="$1"
+  label="$2"
+  grep -F -- "- $label:" "$file" | head -n 1 | sed 's/^[^:]*:[[:space:]]*//'
+}
+
+safety_require_nonempty_field() {
+  file="$1"
+  label="$2"
+  value=$(safety_field_value "$file" "$label")
+  test -n "$value" || fail "missing required safety field in $file: $label"
+}
+
+safety_require_field_value() {
+  file="$1"
+  label="$2"
+  expected="$3"
+  value=$(safety_field_value "$file" "$label")
+  test "$value" = "$expected" || fail "invalid $label in $file: expected '$expected', got '$value'"
+}
+
+safety_path_from_field() {
+  file="$1"
+  label="$2"
+  safety_field_value "$file" "$label" | sed 's/`//g'
+}
+
+safety_require_existing_path_field() {
+  file="$1"
+  label="$2"
+  path=$(safety_path_from_field "$file" "$label")
+  test -n "$path" || fail "missing required path field in $file: $label"
+  test -f "$path" || test -f "$repo_root/$path" || fail "path field in $file does not exist: $label=$path"
+}
+
+safety_require_field_prompt() {
+  file="$1"
+  label="$2"
+  grep -F -- "- $label:" "$file" >/dev/null || fail "missing safety prompt in $file: $label"
+}
+
+verify_proposal_template_safety() {
+  file="$1"
+  test -f "$file" || fail "proposal template not found: $file"
+  safety_require_field_prompt "$file" "Proposed activation mode"
+  safety_require_field_prompt "$file" "Allowed activation modes"
+  safety_require_field_prompt "$file" "Verification for the first step"
+  safety_require_field_prompt "$file" "Safety risk"
+  safety_require_field_prompt "$file" "Permission or authority changes"
+  safety_require_field_prompt "$file" "Filesystem impact"
+  safety_require_field_prompt "$file" "Network or account impact"
+  safety_require_field_prompt "$file" "Secrets handling impact"
+  safety_require_field_prompt "$file" "Human approval required before activation"
+  safety_require_field_prompt "$file" "Eval or acceptance test"
+  safety_require_field_prompt "$file" "Rollback plan"
+}
+
+verify_decision_template_safety() {
+  file="$1"
+  test -f "$file" || fail "decision template not found: $file"
+  safety_require_field_prompt "$file" "Proposal"
+  safety_require_field_prompt "$file" "Decision"
+  safety_require_field_prompt "$file" "Human approval recorded"
+  safety_require_field_prompt "$file" "Silent activation allowed"
+  safety_require_field_prompt "$file" "Permission or secrets changes approved"
+  safety_require_field_prompt "$file" "Filesystem authority approved"
+  safety_require_field_prompt "$file" "Network or account authority approved"
+  safety_require_field_prompt "$file" "Verification"
+  safety_require_field_prompt "$file" "Rollback path"
+}
+
+verify_proposal_safety() {
+  proposal="$1"
+  test -f "$proposal" || fail "proposal not found: $proposal"
+
+  safety_require_nonempty_field "$proposal" "Evidence source type"
+  safety_require_nonempty_field "$proposal" "Proposed activation mode"
+  safety_require_nonempty_field "$proposal" "Allowed activation modes"
+  safety_require_nonempty_field "$proposal" "Verification for the first step"
+  safety_require_nonempty_field "$proposal" "Safety risk"
+  safety_require_nonempty_field "$proposal" "Permission or authority changes"
+  safety_require_nonempty_field "$proposal" "Filesystem impact"
+  safety_require_nonempty_field "$proposal" "Network or account impact"
+  safety_require_nonempty_field "$proposal" "Secrets handling impact"
+  safety_require_field_value "$proposal" "Human approval required before activation" "yes"
+  safety_require_nonempty_field "$proposal" "Eval or acceptance test"
+  safety_require_nonempty_field "$proposal" "Rollback plan"
+
+  activation=$(safety_field_value "$proposal" "Proposed activation mode")
+  case "$activation" in
+    "suggest only"|"draft files only"|"human review required"|"auto-install low risk") ;;
+    *) fail "invalid proposed activation mode in $proposal: $activation" ;;
+  esac
+}
+
+verify_accepted_proposal_safety() {
+  proposal="$1"
+  verify_proposal_safety "$proposal"
+  safety_require_field_value "$proposal" "Proposed activation mode" "human review required"
+}
+
+verify_decision_safety() {
+  decision_file="$1"
+  test -f "$decision_file" || fail "decision record not found: $decision_file"
+
+  safety_require_existing_path_field "$decision_file" "Proposal"
+  safety_require_nonempty_field "$decision_file" "Decision"
+  safety_require_nonempty_field "$decision_file" "Reviewer"
+  safety_require_nonempty_field "$decision_file" "Reason"
+  safety_require_field_value "$decision_file" "Human approval recorded" "yes"
+  safety_require_field_value "$decision_file" "Silent activation allowed" "no"
+  safety_require_nonempty_field "$decision_file" "Permission or secrets changes approved"
+  safety_require_nonempty_field "$decision_file" "Filesystem authority approved"
+  safety_require_nonempty_field "$decision_file" "Network or account authority approved"
+  safety_require_nonempty_field "$decision_file" "Verification"
+  safety_require_nonempty_field "$decision_file" "Rollback path"
+}
+
+verify_registry_safety() {
+  test -f "$registry_file" || fail "missing capability registry: $registry_file"
+  tmp="${TMPDIR:-/tmp}/hyperagent-registry-safety-$$.tsv"
+  awk '
+    /^## / {
+      if (in_entry) {
+        print title "\t" status "\t" proposal "\t" decision "\t" activation "\t" verification "\t" rollback
+      }
+      in_entry = 1
+      title = $0
+      sub(/^## /, "", title)
+      status = proposal = decision = activation = verification = rollback = ""
+      next
+    }
+    in_entry && /^- Status:/ { status = $0; sub(/^- Status:[[:space:]]*/, "", status) }
+    in_entry && /^- Source proposal:/ { proposal = $0; sub(/^- Source proposal:[[:space:]]*/, "", proposal) }
+    in_entry && /^- Proposal:/ { proposal = $0; sub(/^- Proposal:[[:space:]]*/, "", proposal) }
+    in_entry && /^- Decision record:/ { decision = $0; sub(/^- Decision record:[[:space:]]*/, "", decision) }
+    in_entry && /^- Activation mode:/ { activation = $0; sub(/^- Activation mode:[[:space:]]*/, "", activation) }
+    in_entry && /^- Verification:/ { verification = $0; sub(/^- Verification:[[:space:]]*/, "", verification) }
+    in_entry && /^- Rollback:/ { rollback = $0; sub(/^- Rollback:[[:space:]]*/, "", rollback) }
+    END {
+      if (in_entry) {
+        print title "\t" status "\t" proposal "\t" decision "\t" activation "\t" verification "\t" rollback
+      }
+    }
+  ' "$registry_file" >"$tmp"
+
+  while IFS="$(printf '\t')" read -r title status proposal decision activation verification rollback; do
+    case "$status" in
+      accepted) ;;
+      *) continue ;;
+    esac
+
+    test -n "$proposal" || fail "accepted capability missing source proposal: $title"
+    test -n "$decision" || fail "accepted capability missing decision record: $title"
+    test "$activation" = "human review required" || fail "accepted capability has unsafe activation mode: $title"
+    test -n "$verification" || fail "accepted capability missing verification evidence: $title"
+    test -n "$rollback" || fail "accepted capability missing rollback plan: $title"
+
+    proposal_path=$(printf '%s' "$proposal" | sed 's/`//g')
+    decision_path=$(printf '%s' "$decision" | sed 's/`//g')
+    test -f "$proposal_path" || test -f "$repo_root/$proposal_path" || fail "accepted capability proposal path missing: $title -> $proposal_path"
+    test -f "$decision_path" || test -f "$repo_root/$decision_path" || fail "accepted capability decision path missing: $title -> $decision_path"
+    verify_accepted_proposal_safety "$proposal_path"
+    verify_decision_safety "$decision_path"
+  done <"$tmp"
+  rm -f "$tmp"
+}
+
+verify_safety() {
+  verify_config >/dev/null
+
+  verify_proposal_template_safety templates/upgrade-proposal.md
+  verify_decision_template_safety templates/upgrade-decision.md
+  verify_registry_safety
+
+  printf 'HyperAgent safety verification passed.\n'
+}
+
 create_proposal() {
   verify_config >/dev/null
 
@@ -1778,18 +2350,21 @@ create_proposal() {
 - Highest-priority plan step:
 - Implementation steps:
 - Files or instructions likely to change:
-- Verification for the first step:
+- Verification for the first step: Run the smallest local check that proves the proposed behavior before requesting acceptance.
 
 ## Safety
 
-- Safety risk:
-- Permission or authority changes:
+- Safety risk: Pending reviewer assessment before acceptance.
+- Permission or authority changes: Document any filesystem, shell, network, deployment, account, or persistent behavior authority changes before acceptance.
+- Filesystem impact: None proposed unless listed in the implementation plan.
+- Network or account impact: None proposed unless explicitly listed here.
+- Secrets handling impact: None proposed; do not add or alter secrets handling without human approval.
 - Human approval required before activation: yes
 
 ## Evaluation
 
-- Eval or acceptance test:
-- Rollback plan:
+- Eval or acceptance test: Add or run a local verification command before acceptance.
+- Rollback plan: Revert the changed files or remove the accepted registry entry if the upgrade fails review.
 - Open questions:
 
 ## Decision Handoff
@@ -1800,6 +2375,170 @@ create_proposal() {
 EOF
 
   printf '%s\n' "$file"
+}
+
+proposal_has_decision() {
+  proposal="$1"
+  test -d "$decision_dir" || return 1
+  for decision_file in "$decision_dir"/*.md; do
+    test -f "$decision_file" || continue
+    grep -F -e "$proposal" -e "$(basename "$proposal")" "$decision_file" >/dev/null 2>&1 && return 0
+  done
+  return 1
+}
+
+mission_has_proposal_handoff() {
+  mission="$1"
+  test -d "$proposal_dir" || return 1
+  grep -R -F "$mission" "$proposal_dir"/*.md >/dev/null 2>&1 && return 0
+  grep -R -F "$(basename "$mission")" "$proposal_dir"/*.md >/dev/null 2>&1
+}
+
+mission_has_friction() {
+  mission="$1"
+  grep -Ei '^- (Candidate upgrades|Unresolved risks|Suit friction observed):' "$mission" \
+    | grep -Eiv 'Candidate upgrades:[[:space:]]*(None|None recorded by closeout\.?)\.?$|Unresolved risks:[[:space:]]*(No unresolved|None)|No additional.*friction|No .*friction' >/dev/null 2>&1
+}
+
+proposal_is_weak() {
+  proposal="$1"
+  grep -E 'Eval or acceptance test:[[:space:]]*$|Rollback plan:[[:space:]]*$|Highest-priority plan step:[[:space:]]*$|Recommended decision:[[:space:]]*$' "$proposal" >/dev/null 2>&1
+}
+
+print_workshop_digest() {
+  verify_config >/dev/null
+
+  limit=12
+  draft_proposal=0
+  title="Convert recurring mission friction into a Workshop proposal"
+  slug=
+
+  while [ "$#" -gt 0 ]; do
+    case "$1" in
+      --limit)
+        shift
+        test "$#" -gt 0 || fail "--limit requires a number"
+        limit=$1
+        ;;
+      --draft-proposal)
+        draft_proposal=1
+        ;;
+      --title)
+        shift
+        test "$#" -gt 0 || fail "--title requires text"
+        title=$1
+        ;;
+      --slug)
+        shift
+        test "$#" -gt 0 || fail "--slug requires text"
+        slug=$(slugify "$1")
+        ;;
+      *)
+        fail "unknown workshop-digest option: $1"
+        ;;
+    esac
+    shift
+  done
+
+  ensure_dirs
+  tmp_friction=$(mktemp)
+  tmp_missing=$(mktemp)
+  tmp_stale=$(mktemp)
+  tmp_weak=$(mktemp)
+  tmp_keyword=$(mktemp)
+  recent_markdown_files "$mission_dir" "$limit" | while IFS= read -r mission; do
+    if mission_has_friction "$mission"; then
+      printf '%s\n' "$mission" >>"$tmp_friction"
+      if ! mission_has_proposal_handoff "$mission"; then
+        printf '%s\n' "$mission" >>"$tmp_missing"
+      fi
+      grep -Ei '^- (Candidate upgrades|Unresolved risks|Suit friction observed):' "$mission" \
+        | grep -Eiv 'Candidate upgrades:[[:space:]]*(None|None recorded by closeout\.?)\.?$|Unresolved risks:[[:space:]]*(No unresolved|None)|No additional.*friction|No .*friction' \
+        | grep -Eio 'friction|brittle|manual|missing proposal|unresolved risk|repeated|weak|stale|proposal handoff|graveyard' \
+        | tr '[:upper:]' '[:lower:]' >>"$tmp_keyword" || true
+    fi
+  done
+
+  recent_markdown_files "$proposal_dir" 0 | while IFS= read -r proposal; do
+    if ! proposal_has_decision "$proposal"; then
+      printf '%s\n' "$proposal" >>"$tmp_stale"
+    fi
+    if proposal_is_weak "$proposal"; then
+      printf '%s\n' "$proposal" >>"$tmp_weak"
+    fi
+  done
+
+  friction_count=$(wc -l <"$tmp_friction" | tr -d ' ')
+  missing_count=$(wc -l <"$tmp_missing" | tr -d ' ')
+  stale_count=$(wc -l <"$tmp_stale" | tr -d ' ')
+  weak_count=$(wc -l <"$tmp_weak" | tr -d ' ')
+  proposal_count=$(count_markdown_files "$proposal_dir")
+  decision_count=$(count_markdown_files "$decision_dir")
+  forge_count=$(count_markdown_files "$forge_dir")
+  top_keyword=$(sort "$tmp_keyword" | uniq -c | sort -rn | awk 'NR == 1 { print $2 }')
+  test -n "$top_keyword" || top_keyword="mission friction"
+
+  printf '# HyperAgent Workshop Digest\n\n'
+  printf '%s\n' "- Recent mission limit: $limit"
+  printf '%s\n' "- Missions with friction evidence: $friction_count"
+  printf '%s\n' "- Friction missions without proposal handoff: $missing_count"
+  printf '%s\n' "- Workshop proposals without decision records: $stale_count"
+  printf '%s\n' "- Weak proposal process evidence: $weak_count"
+  printf '%s\n\n' "- Mission/proposal/decision/Forge counts: $(count_markdown_files "$mission_dir")/$proposal_count/$decision_count/$forge_count"
+
+  printf '## Recent Missions Missing Proposal Handoff\n\n'
+  if [ "$missing_count" -eq 0 ]; then
+    printf '%s\n\n' "- None found."
+  else
+    sed 's/^/- `/' "$tmp_missing" | sed 's/$/`/' | head -5
+    printf '\n'
+  fi
+
+  printf '## Workshop And Forge Cadence\n\n'
+  if [ "$stale_count" -gt 0 ]; then
+    printf '%s\n' "- Stale proposals need human accept/reject/defer decisions before any capability is treated as accepted."
+  fi
+  if [ "$weak_count" -gt 0 ]; then
+    printf '%s\n' "- Forge cadence is due: at least one proposal lacks rollback, eval, decision, or first-step specificity."
+  fi
+  if [ "$missing_count" -gt 0 ]; then
+    printf '%s\n' "- Workshop cadence is due: recent mission friction exists without proposal handoff."
+  fi
+  if [ "$stale_count" -eq 0 ] && [ "$weak_count" -eq 0 ] && [ "$missing_count" -eq 0 ]; then
+    printf '%s\n' "- Cadence looks current for the scanned window."
+  fi
+  printf '\n'
+
+  printf '## Recommended Next Actions\n\n'
+  if [ "$missing_count" -gt 0 ]; then
+    first_mission=$(sed -n '1p' "$tmp_missing")
+    printf '1. Draft one Workshop proposal for `%s`, focused on recurring `%s` evidence. Keep activation mode `human review required`.\n' "$first_mission" "$top_keyword"
+  elif [ "$stale_count" -gt 0 ]; then
+    first_proposal=$(sed -n '1p' "$tmp_stale")
+    printf '1. Review `%s` and record an explicit accept/reject/defer decision. Do not update the capability registry unless accepted by a human.\n' "$first_proposal"
+  elif [ "$weak_count" -gt 0 ]; then
+    first_weak=$(sed -n '1p' "$tmp_weak")
+    printf '1. Run Forge review on `%s` to tighten proposal specificity, eval coverage, and rollback evidence.\n' "$first_weak"
+  else
+    printf '1. No backlog movement required from this digest window.\n'
+  fi
+  printf '\n'
+
+  if [ "$draft_proposal" -eq 1 ]; then
+    test "$missing_count" -gt 0 || fail "--draft-proposal requires at least one friction mission without proposal handoff"
+    first_mission=$(sed -n '1p' "$tmp_missing")
+    problem="Recent mission evidence shows $top_keyword friction without a Workshop proposal handoff; the digest should move the highest-value repeat pattern into reviewed backlog."
+    if [ -n "$slug" ]; then
+      proposal=$(create_proposal --mission "$first_mission" --title "$title" --problem "$problem" --slug "$slug")
+    else
+      proposal=$(create_proposal --mission "$first_mission" --title "$title" --problem "$problem")
+    fi
+    printf '## Draft Files\n\n'
+    printf '%s\n' "- Draft Workshop proposal: \`$proposal\`"
+    printf '%s\n' "- Activation mode remains \`human review required\`; no decision record was created."
+  fi
+
+  rm -f "$tmp_friction" "$tmp_missing" "$tmp_stale" "$tmp_weak" "$tmp_keyword"
 }
 
 print_workshop_prompt() {
@@ -1969,6 +2708,293 @@ Read recent Workshop proposals in workshop/proposals/, decisions in workshop/dec
 EOF
 }
 
+proposal_has_decision() {
+  proposal="$1"
+  rel=$(repo_relative_path "$proposal")
+  base=$(basename "$proposal")
+  for decision_file in "$decision_dir"/*.md; do
+    test -f "$decision_file" || continue
+    if grep -F -e "\`$rel\`" -e "$rel" -e "\`$proposal\`" -e "$proposal" -e "$base" "$decision_file" >/dev/null 2>&1; then
+      printf '%s\n' "$decision_file"
+      return 0
+    fi
+  done
+  return 1
+}
+
+audit_proposals() {
+  findings_file="$1"
+  find "$proposal_dir" -maxdepth 1 -type f -name '*.md' 2>/dev/null | sort | while IFS= read -r proposal; do
+    rel=$(repo_relative_path "$proposal")
+    missing_quality=
+
+    evidence_missions=$(field_value "$proposal" "Evidence from mission records")
+    evidence_forge=$(field_value "$proposal" "Evidence from Forge reviews")
+    if ! meaningful_value "$evidence_missions" && ! meaningful_value "$evidence_forge"; then
+      missing_quality="${missing_quality} evidence"
+    fi
+
+    proposed_capability=$(field_value "$proposal" "Proposed capability")
+    first_step=$(field_value "$proposal" "Highest-priority plan step")
+    changed_files=$(field_value "$proposal" "Files or instructions likely to change")
+    if ! meaningful_value "$proposed_capability" || ! meaningful_value "$first_step" || ! meaningful_value "$changed_files"; then
+      missing_quality="${missing_quality} specificity"
+    fi
+
+    eval_plan=$(field_value "$proposal" "Eval or acceptance test")
+    if ! meaningful_value "$eval_plan"; then
+      missing_quality="${missing_quality} acceptance-test"
+    fi
+
+    safety_risk=$(field_value "$proposal" "Safety risk")
+    authority_change=$(field_value "$proposal" "Permission or authority changes")
+    human_review=$(field_value "$proposal" "Human approval required before activation")
+    if ! meaningful_value "$safety_risk" || ! meaningful_value "$authority_change" || ! printf '%s' "$human_review" | grep -i 'yes' >/dev/null 2>&1; then
+      missing_quality="${missing_quality} safety"
+    fi
+
+    rollback_plan=$(field_value "$proposal" "Rollback plan")
+    if ! meaningful_value "$rollback_plan"; then
+      missing_quality="${missing_quality} rollback"
+    fi
+
+    recommended_decision=$(field_value "$proposal" "Recommended decision")
+    decision_record_path=$(field_value "$proposal" "Decision record path")
+    capability_id=$(field_value "$proposal" "Capability registry ID if accepted")
+    if ! meaningful_value "$recommended_decision" || ! meaningful_value "$decision_record_path" || ! meaningful_value "$capability_id"; then
+      missing_quality="${missing_quality} decision-handoff"
+    fi
+
+    if [ -n "$missing_quality" ]; then
+      cleaned=$(printf '%s' "$missing_quality" | sed 's/^ //; s/ /, /g')
+      printf '%s\n' "- [weak-proposal] \`$rel\`: missing $cleaned." >>"$findings_file"
+    fi
+
+    decision_match=$(proposal_has_decision "$proposal" | head -n 1)
+    if [ -z "$decision_match" ] && ! path_exists_from_repo "$decision_record_path"; then
+      printf '%s\n' "- [stale-proposal] \`$rel\`: no matching decision record found." >>"$findings_file"
+    fi
+  done
+}
+
+audit_decisions() {
+  findings_file="$1"
+  find "$decision_dir" -maxdepth 1 -type f -name '*.md' 2>/dev/null | sort | while IFS= read -r decision_file; do
+    rel=$(repo_relative_path "$decision_file")
+    proposal_path=$(field_value "$decision_file" "Proposal")
+    decision_value=$(field_value "$decision_file" "Decision")
+    capability=$(field_value "$decision_file" "Capability registry ID")
+
+    if ! path_exists_from_repo "$proposal_path"; then
+      printf '%s\n' "- [decision-link] \`$rel\`: proposal link is missing or points to a missing file." >>"$findings_file"
+    fi
+
+    if [ "$decision_value" = accepted ] && meaningful_value "$capability"; then
+      if ! grep -F "## $capability" "$registry_file" >/dev/null 2>&1; then
+        printf '%s\n' "- [decision-registry] \`$rel\`: accepted capability \`$capability\` is missing from the registry." >>"$findings_file"
+      fi
+    fi
+  done
+}
+
+audit_registry() {
+  findings_file="$1"
+  test -f "$registry_file" || {
+    printf '%s\n' "- [registry-traceability] \`$(repo_relative_path "$registry_file")\`: registry file is missing." >>"$findings_file"
+    return 0
+  }
+
+  awk -v findings_file="$findings_file" -v registry_rel="$(repo_relative_path "$registry_file")" '
+    function emit() {
+      if (cap == "" || cap == "Accepted Capabilities" || cap == "Capability Entry Template") {
+        return
+      }
+      missing = ""
+      if (block !~ /- Source proposal:/) {
+        missing = missing " source-proposal"
+      }
+      if (block !~ /- Decision record:/) {
+        missing = missing " decision-record"
+      }
+      if (block !~ /- Verification:/) {
+        missing = missing " evidence"
+      }
+      if (block !~ /- Rollback:/) {
+        missing = missing " rollback"
+      }
+      if (missing != "") {
+        gsub(/^ /, "", missing)
+        gsub(/ /, ", ", missing)
+        printf "- [registry-traceability] `%s#%s`: missing %s.\n", registry_rel, cap, missing >> findings_file
+      }
+    }
+    /^## / {
+      emit()
+      cap = substr($0, 4)
+      block = $0 "\n"
+      next
+    }
+    cap != "" {
+      block = block $0 "\n"
+    }
+    END {
+      emit()
+    }
+  ' "$registry_file"
+}
+
+audit_evals() {
+  findings_file="$1"
+  if [ ! -f "$eval_dir/forge-audit-smoke.sh" ]; then
+    printf '%s\n' "- [eval-coverage] \`evals/forge-audit-smoke.sh\`: missing Forge audit smoke eval." >>"$findings_file"
+  fi
+  if [ ! -d "$eval_dir/fixtures/forge-audit" ]; then
+    printf '%s\n' "- [eval-coverage] \`evals/fixtures/forge-audit\`: missing good/weak proposal fixtures." >>"$findings_file"
+  fi
+}
+
+generate_forge_audit_report() {
+  findings_file=$(mktemp)
+  audit_proposals "$findings_file"
+  audit_decisions "$findings_file"
+  audit_registry "$findings_file"
+  audit_evals "$findings_file"
+
+  proposal_count=$(count_markdown_files "$proposal_dir")
+  decision_count=$(count_markdown_files "$decision_dir")
+  registry_count=$(grep -c '^## ' "$registry_file" 2>/dev/null || true)
+  eval_check_count=$(find "$eval_dir" -maxdepth 1 -type f -name '*forge-audit*' 2>/dev/null | wc -l | tr -d ' ')
+  finding_count=$(wc -l <"$findings_file" | tr -d ' ')
+  test -n "$finding_count" || finding_count=0
+
+  printf '# Forge Audit\n\n'
+  printf '%s\n' "- Generated: $(now_readable)"
+  printf '%s\n' "- Proposals reviewed: $proposal_count"
+  printf '%s\n' "- Decisions reviewed: $decision_count"
+  printf '%s\n' "- Registry headings reviewed: $registry_count"
+  printf '%s\n' "- Forge audit eval checks found: $eval_check_count"
+  printf '%s\n' "- Finding count: $finding_count"
+  if [ "$finding_count" -eq 0 ] 2>/dev/null; then
+    printf '%s\n' "- Recommendation: no process proposal needed"
+  else
+    printf '%s\n' "- Recommendation: draft or review a human-review-required process proposal"
+  fi
+
+  printf '\n## Findings\n\n'
+  if [ "$finding_count" -eq 0 ] 2>/dev/null; then
+    printf '%s\n' "- none"
+  else
+    cat "$findings_file"
+  fi
+
+  printf '\n## Next Action\n\n'
+  if [ "$finding_count" -eq 0 ] 2>/dev/null; then
+    printf '%s\n' "- Continue using Forge reviews after proposal decisions and eval changes."
+  else
+    printf '%s\n' "- Resolve stale decisions, fill weak proposal fields, repair registry traceability, or run \`sh scripts/hyperagent.sh forge audit --write-proposal\` to draft a process-improvement proposal."
+  fi
+
+  rm -f "$findings_file"
+}
+
+create_forge_audit_process_proposal() {
+  audit_summary="$1"
+  stamp=$(now_stamp)
+  slug=forge-audit-process-health
+  file="$proposal_dir/$stamp-$slug.md"
+  test ! -e "$file" || fail "proposal already exists: $file"
+  finding_line=$(grep -F -- '- Finding count:' "$audit_summary" | head -n 1 | sed 's/^- Finding count: //')
+
+  cat >"$file" <<EOF
+# Upgrade Proposal
+
+- Upgrade title: Improve Forge audit follow-through
+- Proposal ID: proposal-$stamp-$slug
+- Date/time: $(now_readable)
+- Related mission record:
+- Related Forge review:
+- Evidence source type: forge audit
+- Proposed activation mode: human review required
+- Allowed activation modes: suggest only; draft files only; human review required; auto-install low risk
+- Backlog priority: P2
+- Workshop rubric score:
+
+## Problem
+
+- Problem observed: \`forge audit\` found $finding_line proposal, decision, registry, or eval process-health finding(s).
+- Evidence from mission records:
+- Evidence from Forge reviews: Forge audit output generated by \`sh scripts/hyperagent.sh forge audit\`.
+- Why the current Suit was insufficient: The Workshop process needs explicit follow-through on stale decisions, weak proposal fields, registry traceability, and eval coverage.
+
+## Proposed Capability
+
+- Type of upgrade: Process improvement.
+- Proposed capability: Add or tighten the smallest rule, template field, eval, or maintainer checklist item needed to prevent the repeated audit finding.
+- Expected impact: Better proposal quality and traceability without silently accepting or installing process changes.
+- Transferability: Useful across HyperAgent project workspaces that rely on local Markdown proposals, decisions, and registry entries.
+
+## Implementation Plan
+
+- Highest-priority plan step: Triage the audit findings and pick the smallest process change that prevents the most severe recurring issue.
+- Implementation steps: Review audit findings; update the relevant template, rubric, helper, or eval; run \`sh scripts/hyperagent.sh forge audit\`; record a human decision before activation.
+- Files or instructions likely to change: \`templates/upgrade-proposal.md\`, \`forge/process/quality-rubric.md\`, \`evals/\`, \`scripts/hyperagent.sh\`, or maintainer docs depending on the selected finding.
+- Verification for the first step: Re-run \`sh scripts/hyperagent.sh forge audit\` and confirm the selected finding is resolved or intentionally deferred.
+
+## Safety
+
+- Safety risk: Low. This proposal changes local process artifacts only after human review.
+- Permission or authority changes: None. It does not broaden filesystem, shell, network, account, deployment, or secrets access.
+- Human approval required before activation: yes
+
+## Evaluation
+
+- Eval or acceptance test: \`sh scripts/hyperagent.sh forge audit\`; \`sh evals/forge-audit-smoke.sh\`.
+- Rollback plan: Revert the process artifact changes and remove this proposal from the backlog if the audit rule proves too noisy.
+- Open questions: Which finding is recurring enough to justify a template or eval change rather than a one-time cleanup?
+
+## Decision Handoff
+
+- Recommended decision: proposed
+- Decision record path:
+- Capability registry ID if accepted: forge-audit-process-health
+EOF
+
+  printf '%s\n' "$file"
+}
+
+run_forge_audit() {
+  write_proposal=0
+
+  while [ "$#" -gt 0 ]; do
+    case "$1" in
+      --write-proposal)
+        write_proposal=1
+        ;;
+      *)
+        fail "unknown forge audit option: $1"
+        ;;
+    esac
+    shift
+  done
+
+  audit_tmp=$(mktemp)
+  generate_forge_audit_report >"$audit_tmp"
+  cat "$audit_tmp"
+
+  if [ "$write_proposal" -eq 1 ]; then
+    finding_count=$(grep -F -- '- Finding count:' "$audit_tmp" | head -n 1 | sed 's/^- Finding count: //')
+    test -n "$finding_count" || finding_count=0
+    if [ "$finding_count" -gt 0 ] 2>/dev/null; then
+      proposal_path=$(create_forge_audit_process_proposal "$audit_tmp")
+      printf '\n%s\n' "Process proposal created: \`$(repo_relative_path "$proposal_path")\`"
+    else
+      printf '\n%s\n' "Process proposal created: none; no audit findings were strong enough."
+    fi
+  fi
+
+  rm -f "$audit_tmp"
+}
+
 record_decision() {
   verify_config >/dev/null
 
@@ -2022,6 +3048,7 @@ record_decision() {
   test -n "$reason" || fail "decide-upgrade requires --reason"
   if [ "$decision" = accepted ]; then
     test -n "$capability" || fail "accepted decisions require --capability"
+    verify_accepted_proposal_safety "$proposal"
   fi
 
   ensure_dirs
@@ -2046,9 +3073,14 @@ record_decision() {
 - Human approval recorded: yes
 - Silent activation allowed: no
 - Permission or secrets changes approved: no
+- Filesystem authority approved: no
+- Network or account authority approved: no
 
-## Rollback
+## Outcome
 
+- Files or instructions changed: see proposal implementation plan.
+- Verification: reviewer confirmed the proposal verification evidence before acceptance.
+- Registry update: $registry_file
 - Rollback path: follow the proposal rollback plan and remove any registry entry associated with \`$capability\`.
 EOF
 
@@ -2064,6 +3096,7 @@ EOF
 - Accepted by: $reviewer
 - Date/time: $(now_readable)
 - Activation mode: human review required
+- Verification: reviewer confirmed the proposal verification evidence before acceptance.
 - Rollback: remove this registry entry and revert files named by the decision/proposal.
 EOF
   fi
@@ -2080,14 +3113,97 @@ case "$command" in
   init)
     init_project "$@"
     ;;
+  setup-hyperagent)
+    exec sh "$repo_root/scripts/setup-hyperagent.sh" "$@"
+    ;;
   verify-config)
     verify_config "$@"
+    ;;
+  verify-safety)
+    verify_safety "$@"
     ;;
   status)
     print_status "$@"
     ;;
   sense)
-    print_sense "$@"
+    if [ "${1:-}" = "--doctor" ]; then
+      shift
+      print_doctor "$@"
+    else
+      print_sense "$@"
+    fi
+    ;;
+  ui)
+    print_ui "$@"
+    ;;
+  mission)
+    subcommand=${1:-help}
+    if [ "$#" -gt 0 ]; then
+      shift
+    fi
+    case "$subcommand" in
+      new)
+        create_mission "$@"
+        ;;
+      closeout)
+        create_mission_closeout "$@"
+        ;;
+      verify)
+        verify_mission "$@"
+        ;;
+      help|-h|--help)
+        usage
+        ;;
+      *)
+        usage >&2
+        fail "unknown mission subcommand: $subcommand"
+        ;;
+    esac
+    ;;
+  review)
+    subcommand=${1:-help}
+    if [ "$#" -gt 0 ]; then
+      shift
+    fi
+    case "$subcommand" in
+      workshop)
+        create_proposal "$@"
+        ;;
+      digest)
+        print_workshop_digest "$@"
+        ;;
+      forge)
+        forge_subcommand=${1:-help}
+        if [ "$#" -gt 0 ]; then
+          shift
+        fi
+        case "$forge_subcommand" in
+          new)
+            create_forge_review "$@"
+            ;;
+          audit)
+            run_forge_audit "$@"
+            ;;
+          help|-h|--help)
+            usage
+            ;;
+          *)
+            usage >&2
+            fail "unknown review forge subcommand: $forge_subcommand"
+            ;;
+        esac
+        ;;
+      decide)
+        record_decision "$@"
+        ;;
+      help|-h|--help)
+        usage
+        ;;
+      *)
+        usage >&2
+        fail "unknown review subcommand: $subcommand"
+        ;;
+    esac
     ;;
   doctor)
     print_doctor "$@"
@@ -2116,11 +3232,35 @@ case "$command" in
   new-forge-review)
     create_forge_review "$@"
     ;;
+  forge)
+    subcommand=${1:-help}
+    if [ "$#" -gt 0 ]; then
+      shift
+    fi
+    case "$subcommand" in
+      audit)
+        run_forge_audit "$@"
+        ;;
+      help|-h|--help)
+        usage
+        ;;
+      *)
+        usage >&2
+        fail "unknown forge subcommand: $subcommand"
+        ;;
+    esac
+    ;;
+  forge-audit)
+    run_forge_audit "$@"
+    ;;
   forge-prompt)
     print_forge_prompt
     ;;
   decide-upgrade)
     record_decision "$@"
+    ;;
+  workshop-digest|review-digest)
+    print_workshop_digest "$@"
     ;;
   help|-h|--help)
     usage

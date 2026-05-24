@@ -9,6 +9,9 @@ Commands:
   init [--target DIR] [--update] [--force] [--dry-run]
       Create or update HyperAgent project setup files in DIR. Defaults to the current directory.
 
+  setup-hyperagent [options]
+      Clone/update HyperAgent, verify it, install the Codex skill, and optionally init a target project.
+
   verify-config
       Validate the root .hyperagent project contract.
 
@@ -2684,6 +2687,9 @@ fi
 case "$command" in
   init)
     init_project "$@"
+    ;;
+  setup-hyperagent)
+    exec sh "$repo_root/scripts/setup-hyperagent.sh" "$@"
     ;;
   verify-config)
     verify_config "$@"

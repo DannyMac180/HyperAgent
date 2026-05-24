@@ -6,7 +6,41 @@ If you only want to try HyperAgent in the Codex Mac app, start with the copy-pas
 
 Use this guide when you want to inspect or run the setup commands yourself. It proves the Mark I loop locally: install the Codex skill, run a mission, write telemetry, propose an upgrade, and record an explicit human decision.
 
-## 1. Initialize A Project
+## 1. One-Command HyperAgent Setup
+
+From a machine that has `git` and `sh`, run:
+
+```bash
+/bin/sh -c 'set -eu; dest="${HYPERAGENT_HOME:-$HOME/HyperAgent}"; if [ -d "$dest/.git" ]; then git -C "$dest" pull --ff-only; else test ! -e "$dest" || { echo "Refusing to replace non-repo path: $dest" >&2; exit 1; }; git clone https://github.com/DannyMac180/HyperAgent "$dest"; fi; sh "$dest/scripts/setup-hyperagent.sh" --install-dir "$dest"'
+```
+
+The setup command:
+
+- verifies `git` and `sh`,
+- uses `~/HyperAgent` by default,
+- clones or fast-forward updates the HyperAgent repo,
+- runs `sh scripts/verify-mvp.sh` plus smoke evals unless `--skip-smoke` is passed,
+- installs or updates `codex-hyperagent` in `~/.codex/skills`,
+- reports what changed and what passed,
+- leaves global Codex custom instructions untouched.
+
+To ask before initializing a project repo in the same run:
+
+```bash
+sh "$HOME/HyperAgent/scripts/setup-hyperagent.sh" --init-target /path/to/project
+```
+
+The init step is opt-in and waits for a `y` confirmation before writing project-local files. Existing project files keep the normal HyperAgent overwrite refusal unless you also pass `--force-init`.
+
+You can also run the setup path through the wrapper after cloning:
+
+```bash
+bin/hyperagent setup-hyperagent
+```
+
+Restart Codex Desktop or open a fresh thread after setup if the installed skill does not appear immediately.
+
+## 2. Initialize A Project
 
 From the HyperAgent repo:
 
@@ -69,7 +103,7 @@ sh scripts/hyperagent.sh init --target /path/to/project --update
 
 Update mode replaces older copied runtime helpers with the project shim and removes an unchanged copied runtime prompt. Locally changed files are refused unless `--force` is passed.
 
-## 2. Install The Codex Skill
+## 3. Install The Codex Skill
 
 ```bash
 sh scripts/install-codex-skill.sh "$HOME/.codex/skills"
@@ -85,7 +119,7 @@ The default mode is `human review required`.
 
 `--symlink` is only for the global Codex skill install. Project-local files created by `hyperagent init` remain normal files, while the generated project shim delegates to the global runtime.
 
-## 3. Check Local Status
+## 4. Check Local Status
 
 ```bash
 sh scripts/hyperagent.sh status
@@ -93,7 +127,7 @@ sh scripts/hyperagent.sh status
 
 You should see counts for missions, Workshop proposals, Workshop decisions, Forge reviews, and the capability registry path.
 
-## 4. Capture Local Senses
+## 5. Capture Local Senses
 
 Record commands and checks explicitly when they matter for a mission:
 
@@ -115,7 +149,7 @@ The sensing layer summarizes the current branch, upstream, HEAD, git status coun
 
 Workbench trace enrichment is a background sensing subsystem. If Workbench is unavailable, unhealthy, or not initialized yet, `sense` reports that state and continues with the lightweight fallback. Use `doctor` for local diagnostics and retention/redaction reminders before adding trace evidence to a mission record.
 
-## 5. Run A Mission In Codex
+## 6. Run A Mission In Codex
 
 Ask Codex:
 
@@ -149,9 +183,9 @@ sh scripts/hyperagent.sh new-mission \
   --verification-status "pending"
 ```
 
-`new-mission` remains useful for drafts, but strict verification intentionally fails its placeholder closeout fields until they are replaced.
+## 7. Run Workshop Review
 
-## 6. Run Workshop Review
+`new-mission` remains useful for drafts, but strict verification intentionally fails its placeholder closeout fields until they are replaced.
 
 Ask Codex:
 
@@ -170,7 +204,7 @@ sh scripts/hyperagent.sh propose-upgrade \
   --problem "The install step needs a concrete smoke test"
 ```
 
-## 7. Record Human Approval Or Rejection
+## 8. Record Human Approval Or Rejection
 
 Persistent behavior changes are not activated silently.
 
@@ -185,7 +219,7 @@ sh scripts/hyperagent.sh decide-upgrade \
 
 Accepted decisions are recorded in `workshop/decisions/` and appended to `hyperagent/capability-registry.md`.
 
-## 8. Run Forge Review
+## 9. Run Forge Review
 
 Ask Codex:
 
@@ -224,18 +258,19 @@ sh scripts/hyperagent.sh propose-upgrade \
   --problem "Recent proposals are too vague to evaluate safely"
 ```
 
-## 9. Verify
+## 10. Verify
 
 ```bash
 sh scripts/hyperagent.sh verify-config
 sh scripts/verify-mvp.sh
+sh evals/setup-hyperagent-smoke.sh
 sh evals/init-smoke.sh
 sh evals/sense-smoke.sh
 sh evals/forge-audit-smoke.sh
 sh evals/smoke-loop.sh
 ```
 
-## 10. Update Later
+## 11. Update Later
 
 For copy installs:
 

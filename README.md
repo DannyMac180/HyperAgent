@@ -34,7 +34,15 @@ Mission records capture evidence from real work. The Workshop turns that evidenc
 
 ## Try HyperAgent In Codex Mac
 
-Copy this prompt into the Codex Mac app:
+If you want the command path first, run this in Terminal:
+
+```bash
+/bin/sh -c 'set -eu; dest="${HYPERAGENT_HOME:-$HOME/HyperAgent}"; if [ -d "$dest/.git" ]; then git -C "$dest" pull --ff-only; else test ! -e "$dest" || { echo "Refusing to replace non-repo path: $dest" >&2; exit 1; }; git clone https://github.com/DannyMac180/HyperAgent "$dest"; fi; sh "$dest/scripts/setup-hyperagent.sh" --install-dir "$dest"'
+```
+
+This clones or updates HyperAgent, runs local verification, installs or updates the `codex-hyperagent` skill, and leaves global Codex custom instructions untouched. Project initialization is opt-in; pass `--init-target /path/to/project` to `scripts/setup-hyperagent.sh` when you want the script to ask before initializing a target repo.
+
+For the assisted path, copy this prompt into the Codex Mac app:
 
 ```text
 I want to try HyperAgent with Codex.
@@ -67,7 +75,7 @@ Codex should do the setup work for you. It will clone or update this repo, run l
 
 The MVP is file-based on purpose. There is no hosted service, no database, and no autonomous self-modification.
 
-For the manual command path, see `docs/quickstart.md`.
+For the manual and one-command setup paths, see `docs/quickstart.md`.
 
 For the project config contract, see `docs/config.md`.
 
@@ -110,6 +118,7 @@ Restart Codex Desktop or open a fresh thread after updating the installed skill.
 - `skills/codex-hyperagent/`: Codex skill instructions.
 - `bin/hyperagent`: small command wrapper for `scripts/hyperagent.sh`.
 - `.hyperagent`: machine-readable project config for initialized paths, adapters, and verification commands.
+- `scripts/setup-hyperagent.sh`: one-command HyperAgent setup path for clone/update, verification, skill install, and optional project init.
 - `scripts/install-codex-skill.sh`: dependency-free Codex skill installer.
 - `scripts/update-codex-skill.sh`: update helper for copy installs.
 - `scripts/hyperagent.sh`: runtime helper for project init, local sensing, command/check evidence, mission shells, proposals, Forge reviews, Forge audits, approval decisions, and status. Initialized projects get a small shim that delegates to this runtime.
@@ -165,6 +174,14 @@ sh evals/init-smoke.sh
 ```
 
 The init smoke test creates a temporary repo, runs `hyperagent init`, checks the generated markdown-first structure and `.hyperagent` config, verifies that global runtime files are not copied into the target, verifies `--update`, verifies overwrite refusal, verifies `--force`, and confirms `--dry-run` leaves the target untouched.
+
+Run the HyperAgent setup smoke test:
+
+```bash
+sh evals/setup-hyperagent-smoke.sh
+```
+
+The setup smoke test installs the Codex skill into a temporary skills directory, confirms project init only happens after an explicit yes, and checks dry-run clone/install reporting.
 
 Run the sensing smoke test:
 

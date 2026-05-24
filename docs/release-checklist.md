@@ -16,12 +16,13 @@ The release should claim:
 - HyperAgent can create evidence-backed Workshop proposals.
 - HyperAgent records human approval or rejection before persistent behavior changes.
 - HyperAgent can run a local smoke eval for the loop.
+- HyperAgent can audit Forge process health for stale decisions, weak proposals, registry traceability, and eval coverage.
 
 The release should not claim:
 
 - autonomous self-modification,
 - hosted memory,
-- a polished UI,
+- an interactive product UI or dashboard,
 - multi-platform support beyond Codex,
 - automatic upgrades across every user project,
 - production-grade safety automation.
@@ -53,6 +54,7 @@ The Forge is part of the alpha release, but only as a file-based process layer.
 For `v0.1.0-alpha`, the Forge should be able to:
 
 - review recent Workshop proposals,
+- audit proposal quality, missing decisions, registry traceability, and eval coverage with `forge audit`,
 - judge whether proposals are specific, evidence-backed, testable, safe, and worth installing,
 - judge whether accepted upgrades improved behavior and paid off,
 - identify process bloat created by low-value ceremony,
@@ -79,6 +81,7 @@ Before release, verify:
 - [x] `scripts/verify-mvp.sh` fails if the Forge rubric, review template, or review verifier is missing.
 - [x] `scripts/verify-forge-review.sh` checks score range, evidence, structured summary, gate, and payoff fields.
 - [x] `evals/smoke-loop.sh` verifies process-improvement proposals can link to Forge reviews.
+- [x] `evals/forge-audit-smoke.sh` verifies the Forge audit catches one intentionally weak proposal and can draft a human-review-required process proposal on request.
 - [x] `docs/quickstart.md` shows how to run a Forge review prompt.
 - [x] README and release notes describe the Forge as "improves the Workshop."
 

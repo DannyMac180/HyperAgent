@@ -65,19 +65,43 @@ The init command creates or updates:
 - `workshop/backlog.md`
 - `forge/reviews/`
 - `templates/`
-- `hyperagent/`
-- `scripts/hyperagent.sh`
+- `hyperagent/README.md`
+- `hyperagent/capability-registry.md`
+- `scripts/hyperagent.sh` as a project shim
 - a HyperAgent instructions block in `AGENTS.md`
 
 The root `.hyperagent` file is the machine-readable project anchor. It records the HyperAgent version, install mode, initialized paths, enabled adapters, verification commands, and links to project instruction files.
 
-Generated operational files are plain Markdown and shell scripts. Init copies project setup files by default instead of symlinking them, so each repo can inspect, edit, and commit its own local memory. Existing files are left alone when identical, and conflicting files are refused unless `--force` is passed.
+The schema and supported TOML subset are documented in `docs/config.md`. Validate the project contract with:
+
+```bash
+sh scripts/hyperagent.sh verify-config
+```
+
+Generated operational files are plain Markdown and shell scripts. Init separates project-local artifacts from global runtime files so each repo can inspect, edit, and commit its own local memory without receiving unnecessary runtime churn.
+
+Init output categories:
+
+- Project-local artifacts: mission records, Workshop proposals and decisions, Forge reviews, `AGENTS.md`, blank `workshop/backlog.md`, and blank `hyperagent/capability-registry.md`.
+- Copied templates and rubrics: `templates/`, `workshop/rubric.md`, and `forge/process/quality-rubric.md`.
+- Generated config and docs: `.hyperagent`, `hyperagent/README.md`, and the HyperAgent block in `AGENTS.md`.
+- Global runtime dependency: `scripts/hyperagent.sh` is a small project shim that delegates to the installed HyperAgent runtime. The runtime helper and operating prompt are not copied into initialized repos by default.
+
+Existing files are left alone when identical, and conflicting files are refused unless `--force` is passed.
 
 Preview changes without writing files:
 
 ```bash
 sh scripts/hyperagent.sh init --target /path/to/project --dry-run
 ```
+
+After updating your HyperAgent install, migrate an already initialized project:
+
+```bash
+sh scripts/hyperagent.sh init --target /path/to/project --update
+```
+
+Update mode replaces older copied runtime helpers with the project shim and removes an unchanged copied runtime prompt. Locally changed files are refused unless `--force` is passed.
 
 ## 3. Install The Codex Skill
 
@@ -93,7 +117,7 @@ sh scripts/install-codex-skill.sh --symlink "$HOME/.codex/skills"
 
 The default mode is `human review required`.
 
-`--symlink` is only for the global Codex skill install. Project-local files created by `hyperagent init` are copies by default.
+`--symlink` is only for the global Codex skill install. Project-local files created by `hyperagent init` remain normal files, while the generated project shim delegates to the global runtime.
 
 ## 4. Check Local Status
 
@@ -108,6 +132,7 @@ You should see counts for missions, Workshop proposals, Workshop decisions, Forg
 Record commands and checks explicitly when they matter for a mission:
 
 ```bash
+sh scripts/hyperagent.sh check -- sh scripts/verify-mvp.sh
 sh scripts/hyperagent.sh record-check --status passed --command "sh scripts/verify-mvp.sh"
 sh scripts/hyperagent.sh record-check --status failed --command "sh evals/smoke-loop.sh" --note "example failure note"
 ```
@@ -134,6 +159,20 @@ Use the codex-hyperagent skill. Run a small HyperAgent mission in this repo, ver
 
 The mission record belongs in `missions/`. The helper prefills repo evidence such as branch, git status, changed files, command evidence, verification status, and closeout placeholders.
 
+For end-of-task telemetry, prefer one closeout command after recording checks:
+
+```bash
+sh scripts/hyperagent.sh mission-closeout \
+  --request "Run a small HyperAgent mission" \
+  --slug small-hyperagent-mission \
+  --outcome "Mission completed and verification passed" \
+  --risks "No unresolved risks"
+sh scripts/hyperagent.sh verify-mission --strict missions/MISSION.md
+```
+
+Closeout auto-fills the current sense snapshot, recent command/check evidence, changed files, verification status, unresolved-risk prompt, and candidate upgrade field so the record is suitable for Workshop evidence without copy/paste cleanup.
+Pass `--mission missions/DRAFT.md` to replace a draft record with the closeout evidence instead of creating a new file.
+
 You can also create a mission record shell:
 
 ```bash
@@ -145,6 +184,8 @@ sh scripts/hyperagent.sh new-mission \
 ```
 
 ## 7. Run Workshop Review
+
+`new-mission` remains useful for drafts, but strict verification intentionally fails its placeholder closeout fields until they are replaced.
 
 Ask Codex:
 
@@ -196,6 +237,18 @@ You can check a completed review before using it as proposal evidence:
 sh scripts/verify-forge-review.sh forge/reviews/2026-05-16-1216-workshop-quality-review.md
 ```
 
+For a compact process-health report across proposals, decisions, registry entries, and audit eval coverage:
+
+```bash
+sh scripts/hyperagent.sh forge audit
+```
+
+The audit identifies weak proposals, proposals missing decisions, accepted capabilities with incomplete traceability, and missing Forge audit eval coverage. It is read-only by default. When the findings are concrete enough to justify a process improvement, draft a normal human-review-required Workshop proposal explicitly:
+
+```bash
+sh scripts/hyperagent.sh forge audit --write-proposal
+```
+
 The Forge should improve the Workshop process, not silently activate new capabilities. If the review finds a concrete process improvement, create a normal Workshop proposal linked to the Forge review:
 
 ```bash
@@ -208,10 +261,12 @@ sh scripts/hyperagent.sh propose-upgrade \
 ## 10. Verify
 
 ```bash
+sh scripts/hyperagent.sh verify-config
 sh scripts/verify-mvp.sh
 sh evals/setup-hyperagent-smoke.sh
 sh evals/init-smoke.sh
 sh evals/sense-smoke.sh
+sh evals/forge-audit-smoke.sh
 sh evals/smoke-loop.sh
 ```
 

@@ -35,11 +35,14 @@ require_file docs/assets/hyperagent-architecture.svg
 require_file docs/hyperagent-prd.md
 require_file docs/iron-man-suit-essence.md
 require_file docs/concepts.md
+require_file docs/config.md
 require_file docs/article-outline.md
 require_file docs/quickstart.md
 require_file docs/clean-install-uat.md
 require_file docs/release-checklist.md
+require_file docs/roadmap.md
 require_file docs/releases/v0.1.0-alpha.md
+require_file docs/releases/next-alpha.md
 require_file skills/codex-hyperagent/SKILL.md
 require_file skills/codex-hyperagent/agents/openai.yaml
 require_file bin/hyperagent
@@ -57,12 +60,15 @@ require_file templates/upgrade-decision.md
 require_file evals/README.md
 require_file evals/smoke-loop.sh
 require_file evals/setup-hyperagent-smoke.sh
+require_file evals/forge-audit-smoke.sh
 require_file evals/init-smoke.sh
 require_file evals/reliability-gains.sh
 require_file evals/reliability-rubric.md
 require_file evals/fixtures/reliability/baseline-no-suit.md
 require_file evals/fixtures/reliability/hyperagent-suit.md
 require_file evals/sense-smoke.sh
+require_file evals/fixtures/forge-audit/good-proposal.md
+require_file evals/fixtures/forge-audit/weak-proposal.md
 require_file workshop/backlog.md
 require_file workshop/rubric.md
 require_file forge/process/quality-rubric.md
@@ -75,6 +81,8 @@ require_dir forge/reviews
 require_text skills/codex-hyperagent/SKILL.md "Workshop Review Prompt"
 require_text skills/codex-hyperagent/SKILL.md "Forge Review Prompt"
 require_text skills/codex-hyperagent/SKILL.md "Relevance Triage"
+require_text skills/codex-hyperagent/SKILL.md "mission-closeout"
+require_text skills/codex-hyperagent/SKILL.md "verify-mission --strict"
 require_text skills/codex-hyperagent/SKILL.md "workshop/rubric.md"
 require_text skills/codex-hyperagent/SKILL.md "name: codex-hyperagent"
 require_text skills/codex-hyperagent/SKILL.md "version: v0.1.0-alpha"
@@ -82,6 +90,7 @@ require_text skills/codex-hyperagent/agents/openai.yaml "display_name: \"HyperAg
 require_text AGENTS.md "HyperAgent triage on every task"
 require_text AGENTS.md "README Architecture Diagram"
 require_text CONTRIBUTING.md "How To Propose A Suit Upgrade"
+require_text CONTRIBUTING.md "Product State Reconciliation"
 require_text CONTRIBUTING.md "architecture diagram update"
 require_text SECURITY.md "Authority Boundary"
 require_text .github/pull_request_template.md "README architecture diagram was reviewed or updated"
@@ -103,14 +112,23 @@ require_text scripts/setup-hyperagent.sh "unsafe skills dir"
 require_text scripts/setup-hyperagent.sh "Dry run: verification and install checks were not executed."
 require_text scripts/update-codex-skill.sh "update complete"
 require_text bin/hyperagent "scripts/hyperagent.sh"
-require_text scripts/hyperagent.sh "init [--target DIR] [--force] [--dry-run]"
+require_text scripts/hyperagent.sh "init [--target DIR] [--update] [--force] [--dry-run]"
 require_text scripts/hyperagent.sh "setup-hyperagent [options]"
+require_text scripts/hyperagent.sh "verify-config"
 require_text scripts/hyperagent.sh "generate_init_config"
+require_text scripts/hyperagent.sh "verify_config"
+require_text scripts/hyperagent.sh "generate_init_project_helper"
+require_text scripts/hyperagent.sh "HYPERAGENT_PROJECT_ROOT"
+require_text scripts/hyperagent.sh "HYPERAGENT_RUNTIME_ROOT"
 require_text scripts/hyperagent.sh "HyperAgent Project Upgrade Backlog"
 require_text scripts/hyperagent.sh "decide-upgrade"
 require_text scripts/hyperagent.sh "sense [--format markdown|json]"
 require_text scripts/hyperagent.sh "doctor [--workbench-trace-log PATH]"
+require_text scripts/hyperagent.sh "forge audit [--write-proposal]"
 require_text scripts/hyperagent.sh "record-check --command TEXT"
+require_text scripts/hyperagent.sh "check [--note TEXT]"
+require_text scripts/hyperagent.sh "mission-closeout --request TEXT [--mission PATH]"
+require_text scripts/hyperagent.sh "verify-mission [--strict] PATH"
 require_text scripts/hyperagent.sh "Does not inspect file contents"
 require_text scripts/hyperagent.sh ".hyperagent-evidence/commands.log"
 require_text scripts/hyperagent.sh ".hyperagent-evidence/workbench/traces.jsonl"
@@ -118,13 +136,17 @@ require_text scripts/hyperagent.sh "human review required"
 require_text scripts/hyperagent.sh "--commands-run"
 require_text scripts/hyperagent.sh "git_status_short"
 require_text scripts/hyperagent.sh "Copy And Symlink Behavior"
+require_text scripts/hyperagent.sh "Init Output Categories"
+require_text scripts/hyperagent.sh "Updating Existing Projects"
 require_text scripts/verify-forge-review.sh "Forge review verification passed."
 require_text .hyperagent 'hyperagent_version = "v0.1.0-alpha"'
+require_text .hyperagent '"sh scripts/hyperagent.sh verify-config"'
 require_text .hyperagent 'install_mode = "copy"'
 require_text .hyperagent 'project_instructions = "AGENTS.md"'
 require_text .hyperagent 'evidence_log = ".hyperagent-evidence/commands.log"'
 require_text .hyperagent 'workbench_trace_log = ".hyperagent-evidence/workbench/traces.jsonl"'
 require_text .hyperagent 'codex = true'
+require_text .hyperagent 'sh evals/forge-audit-smoke.sh'
 require_text README.md "v0.1.0-alpha"
 require_text README.md "docs/releases/v0.1.0-alpha.md"
 require_text README.md "Try HyperAgent In Codex Mac"
@@ -135,21 +157,39 @@ require_text README.md '/bin/sh -c '\''set -eu; dest="${HYPERAGENT_HOME:-$HOME/H
 require_text README.md 'setup-hyperagent.sh" --install-dir "$dest"'
 require_text README.md "Do not modify my global Codex custom instructions"
 require_text README.md "docs/quickstart.md"
+require_text README.md "docs/config.md"
 require_text README.md "docs/clean-install-uat.md"
 require_text README.md "sh scripts/update-codex-skill.sh"
 require_text README.md "docs/release-checklist.md"
+require_text README.md "docs/roadmap.md"
 require_text README.md "docs/assets/hyperagent-architecture.svg"
 require_text README.md "docs/architecture/hyperagent.mmd"
+require_text docs/roadmap.md "PRD Milestone Map"
+require_text docs/roadmap.md "Implemented Surfaces"
+require_text docs/roadmap.md "Current Limits"
+require_text docs/roadmap.md "Next Work"
+require_text docs/roadmap.md "Mark I"
+require_text docs/roadmap.md "Workshop"
+require_text docs/roadmap.md "Forge"
+require_text docs/roadmap.md "Codex Mac App Distribution"
+require_text docs/roadmap.md "Multi-Platform Suit"
+require_text docs/roadmap.md "human review required"
 require_text docs/quickstart.md "Manual Quickstart"
 require_text docs/quickstart.md "One-Command HyperAgent Setup"
 require_text docs/quickstart.md '/bin/sh -c '\''set -eu; dest="${HYPERAGENT_HOME:-$HOME/HyperAgent}"; if [ -d "$dest/.git" ]; then git -C "$dest" pull --ff-only;'
 require_text docs/quickstart.md 'setup-hyperagent.sh" --install-dir "$dest"'
 require_text docs/quickstart.md 'sh "$HOME/HyperAgent/scripts/setup-hyperagent.sh" --init-target'
 require_text docs/quickstart.md "sh scripts/hyperagent.sh init --target"
+require_text docs/quickstart.md "sh scripts/hyperagent.sh init --target /path/to/project --update"
 require_text docs/quickstart.md "sh scripts/install-codex-skill.sh"
 require_text docs/quickstart.md "sh scripts/hyperagent.sh status"
+require_text docs/quickstart.md "sh scripts/hyperagent.sh verify-config"
 require_text docs/quickstart.md "sh scripts/hyperagent.sh sense"
 require_text docs/quickstart.md "sh scripts/hyperagent.sh doctor"
+require_text docs/quickstart.md "sh scripts/hyperagent.sh check -- sh scripts/verify-mvp.sh"
+require_text docs/quickstart.md "sh scripts/hyperagent.sh mission-closeout"
+require_text docs/quickstart.md "sh scripts/hyperagent.sh verify-mission --strict"
+require_text docs/quickstart.md "--mission missions/DRAFT.md"
 require_text docs/quickstart.md ".hyperagent-evidence/"
 require_text docs/quickstart.md "--symlink"
 require_text docs/quickstart.md "Capture Local Senses"
@@ -167,17 +207,37 @@ require_text docs/release-checklist.md "outcome, proposal, eval, safety, process
 require_text docs/release-checklist.md "v0.1.0-alpha"
 require_text docs/release-checklist.md "Clean-Clone Test"
 require_text docs/releases/v0.1.0-alpha.md "Forge Review Flow"
+require_text docs/releases/v0.1.0-alpha.md "docs/releases/next-alpha.md"
 require_text docs/releases/v0.1.0-alpha.md "Persistent behavior changes require human review."
+require_text docs/releases/next-alpha.md "Unreleased Since"
+require_text docs/releases/next-alpha.md "Acceptance Status"
+require_text docs/releases/next-alpha.md "Persistent behavior changes still require human review."
 require_text docs/quickstart.md "--forge-review"
+require_text docs/quickstart.md "sh scripts/hyperagent.sh forge audit"
+require_text docs/config.md "HyperAgent Project Config"
+require_text docs/config.md "config_version = 1"
+require_text docs/config.md "Adapter-Owned Fields"
+require_text docs/config.md "verification.commands"
+require_text docs/config.md "TOML subset"
 require_text evals/README.md "Installer Smoke Eval"
 require_text evals/README.md "HyperAgent Setup Smoke Eval"
 require_text evals/README.md "Init Smoke Eval"
 require_text evals/README.md "Reliability Gains Eval"
 require_text evals/smoke-loop.sh "HyperAgent smoke loop passed."
 require_text evals/setup-hyperagent-smoke.sh "HyperAgent setup-hyperagent smoke passed."
+require_text evals/README.md "Forge Audit Smoke Eval"
+require_text evals/README.md "Init Smoke Eval"
+require_text evals/README.md "Reliability Gains Eval"
+require_text evals/smoke-loop.sh "HyperAgent smoke loop passed."
+require_text evals/smoke-loop.sh "check wrapper did not record passed status"
+require_text evals/smoke-loop.sh "strict mission verification accepted placeholder mission"
+require_text evals/smoke-loop.sh "closeout missing sense snapshot"
+require_text evals/smoke-loop.sh "closeout did not update requested mission"
 require_text evals/smoke-loop.sh "mission missing repo path"
 require_text evals/smoke-loop.sh "mission missing verification status"
 require_text evals/init-smoke.sh "HyperAgent init smoke passed."
+require_text evals/init-smoke.sh "init copied the runtime operating prompt into the target"
+require_text evals/init-smoke.sh "--update kept copied runtime helper"
 require_text evals/reliability-gains.sh "HyperAgent reliability gains eval passed."
 require_text evals/reliability-rubric.md "Missed Verification"
 require_text evals/fixtures/reliability/hyperagent-suit.md "Condition: with-hyperagent"
@@ -185,6 +245,8 @@ require_text evals/README.md "Sense Smoke Eval"
 require_text evals/smoke-loop.sh "HyperAgent smoke loop passed."
 require_text evals/smoke-loop.sh "Evidence source type: forge review"
 require_text evals/smoke-loop.sh "verify-forge-review.sh"
+require_text evals/forge-audit-smoke.sh "HyperAgent Forge audit smoke passed."
+require_text evals/forge-audit-smoke.sh "[weak-proposal]"
 require_text evals/init-smoke.sh "HyperAgent init smoke passed."
 require_text evals/sense-smoke.sh "HyperAgent sense smoke passed."
 require_text evals/sense-smoke.sh "Workbench trace status"
@@ -192,11 +254,18 @@ require_text hyperagent/operating-prompt.md "human review required"
 require_text hyperagent/operating-prompt.md "relevance triage"
 require_text hyperagent/operating-prompt.md "workshop/decisions"
 require_text hyperagent/operating-prompt.md "--forge-review"
+require_text hyperagent/operating-prompt.md "forge audit"
+require_text hyperagent/operating-prompt.md "mission-closeout"
+require_text hyperagent/operating-prompt.md "verify-mission --strict"
 require_text hyperagent/capability-registry.md "human review required"
 require_text hyperagent/capability-registry.md "codex-skill-installer"
+require_text hyperagent/capability-registry.md "In Review Capabilities"
 require_text templates/mission-record.md "Mission ID"
 require_text templates/mission-record.md "Repository Evidence"
 require_text templates/mission-record.md "Verification status"
+require_text templates/mission-record.md "Auto-Filled Evidence"
+require_text templates/mission-record.md "Agent Judgment"
+require_text templates/mission-record.md "Sense snapshot"
 require_text templates/mission-record.md "Agent plan"
 require_text templates/mission-record.md "Tools used"
 require_text templates/mission-record.md "Suit friction observed"
@@ -224,7 +293,9 @@ require_text forge/process/quality-rubric.md "Eval Quality Metrics"
 require_text forge/process/quality-rubric.md "Safety Quality Metrics"
 require_text forge/process/quality-rubric.md "Score Scale"
 require_text forge/process/quality-rubric.md "Deterministic Gates"
+require_text forge/process/quality-rubric.md "sh scripts/hyperagent.sh forge audit"
 require_text scripts/hyperagent.sh "--forge-review"
+require_text scripts/hyperagent.sh "registry-traceability"
 
 sh scripts/hyperagent.sh status >/dev/null
 

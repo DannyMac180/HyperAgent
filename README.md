@@ -12,15 +12,17 @@ HyperAgent starts with OpenAI Codex in the Codex Mac app. The first prototype is
 
 HyperAgent is currently `v0.1.0-alpha`: a developer preview for testing the local Mission -> Workshop -> Forge loop.
 
-This alpha is ready for early open-source use by Codex users who are comfortable with local markdown artifacts and shell scripts. It is not a hosted service, does not provide a polished UI, does not support every agent platform, and does not autonomously modify itself.
+This alpha is ready for early open-source use by Codex users who are comfortable with local markdown artifacts and shell scripts. It is not a hosted service, does not provide an interactive product UI or dashboard, does not support every agent platform, and does not autonomously modify itself.
 
 Release notes: `docs/releases/v0.1.0-alpha.md`
+
+Current product state and roadmap: `docs/roadmap.md`
 
 ## Architecture
 
 HyperAgent is designed to sit at the Codex Mac app level as a user-level operating layer across Codex workspaces. The Global Suit provides shared operating rules, safety defaults, and reusable capabilities. Each workspace gets its own local Suit context for repo-specific rules, workflows, and memory.
 
-Mission records capture evidence from real work. The Workshop turns that evidence into proposed Suit upgrades. The Forge improves the Workshop itself by checking whether proposals are specific, evidence-backed, safe, testable, worth installing, and actually improving behavior after acceptance. Forge reviews use anchored 0-5 scores, evidence references, deterministic gates, and small payoff counters so the process can be inspected over time. Human review approves persistent behavior changes before they become part of the Suit.
+Mission records capture evidence from real work. The Workshop turns that evidence into proposed Suit upgrades. The Forge improves the Workshop itself by checking whether proposals are specific, evidence-backed, safe, testable, worth installing, and actually improving behavior after acceptance. Forge reviews use anchored 0-5 scores, evidence references, deterministic gates, and small payoff counters so the process can be inspected over time. `forge audit` adds a concise process-health check for stale decisions, weak proposals, traceability gaps, and eval coverage. Human review approves persistent behavior changes before they become part of the Suit.
 
 <p align="center">
   <img src="docs/assets/hyperagent-architecture.svg" alt="HyperAgent high-level architecture diagram">
@@ -75,6 +77,8 @@ The MVP is file-based on purpose. There is no hosted service, no database, and n
 
 For the manual and one-command setup paths, see `docs/quickstart.md`.
 
+For the project config contract, see `docs/config.md`.
+
 For clean-install acceptance testing, see `docs/clean-install-uat.md`.
 
 For early release readiness, see `docs/release-checklist.md`.
@@ -104,9 +108,12 @@ Restart Codex Desktop or open a fresh thread after updating the installed skill.
 
 - `docs/hyperagent-prd.md`: product requirements and milestone plan.
 - `docs/concepts.md`: the Suit, Mission, Workshop, and Forge mental model.
+- `docs/config.md`: `.hyperagent` schema, stable fields, adapter-owned fields, and verification command contract.
 - `docs/clean-install-uat.md`: repeatable clean-install acceptance test for the README prompt.
 - `docs/release-checklist.md`: alpha release criteria, clean-clone test, and update model.
 - `docs/releases/v0.1.0-alpha.md`: first alpha release notes.
+- `docs/releases/next-alpha.md`: unreleased next-alpha notes.
+- `docs/roadmap.md`: product-state source of truth for shipped, accepted, in-review, deferred, and stale surfaces.
 - `docs/article-outline.md`: public essay outline for the Iron Man Suit thesis.
 - `skills/codex-hyperagent/`: Codex skill instructions.
 - `bin/hyperagent`: small command wrapper for `scripts/hyperagent.sh`.
@@ -114,7 +121,7 @@ Restart Codex Desktop or open a fresh thread after updating the installed skill.
 - `scripts/setup-hyperagent.sh`: one-command HyperAgent setup path for clone/update, verification, skill install, and optional project init.
 - `scripts/install-codex-skill.sh`: dependency-free Codex skill installer.
 - `scripts/update-codex-skill.sh`: update helper for copy installs.
-- `scripts/hyperagent.sh`: local helper for project init, local sensing, command/check evidence, mission shells, proposals, Forge reviews, approval decisions, and status.
+- `scripts/hyperagent.sh`: runtime helper for project init, local sensing, command/check evidence, mission shells, proposals, Forge reviews, Forge audits, approval decisions, and status. Initialized projects get a small shim that delegates to this runtime.
 - `.hyperagent-evidence/`: ignored local runtime evidence, including the opt-in command/check log used by `sense`.
 - `hyperagent/operating-prompt.md`: the operating layer Codex wears during work.
 - `hyperagent/capability-registry.md`: accepted capability registry with reviewed local capabilities.
@@ -138,10 +145,11 @@ Agents may propose upgrades freely and draft local, low-risk files when asked. T
 Run the local MVP verifier:
 
 ```bash
+sh scripts/hyperagent.sh verify-config
 sh scripts/verify-mvp.sh
 ```
 
-The verifier checks that the Codex skill, installer, operating prompt, local memory directories, templates, documentation, capability registry, and safety defaults are present.
+The config verifier checks the root `.hyperagent` contract. The MVP verifier checks that the Codex skill, installer, operating prompt, local memory directories, templates, documentation, capability registry, and safety defaults are present.
 
 Run the end-to-end local smoke loop:
 
@@ -151,13 +159,21 @@ sh evals/smoke-loop.sh
 
 The smoke loop copies the repo to a temporary directory, creates a mission record, creates a proposal linked to that mission, creates a Forge review, creates a process-improvement proposal linked to that Forge review, records a human-review decision, and verifies the accepted capability appears in the registry.
 
+Run the Forge audit smoke eval:
+
+```bash
+sh evals/forge-audit-smoke.sh
+```
+
+The audit smoke eval uses one complete proposal fixture and one intentionally weak proposal fixture to verify that `forge audit` catches proposal-quality and decision-handoff problems while keeping generated process proposals `human review required`.
+
 Run the project init smoke test:
 
 ```bash
 sh evals/init-smoke.sh
 ```
 
-The init smoke test creates a temporary repo, runs `hyperagent init`, checks the generated markdown-first structure and `.hyperagent` config, verifies overwrite refusal, verifies `--force`, and confirms `--dry-run` leaves the target untouched.
+The init smoke test creates a temporary repo, runs `hyperagent init`, checks the generated markdown-first structure and `.hyperagent` config, verifies that global runtime files are not copied into the target, verifies `--update`, verifies overwrite refusal, verifies `--force`, and confirms `--dry-run` leaves the target untouched.
 
 Run the HyperAgent setup smoke test:
 
@@ -177,7 +193,9 @@ The sensing smoke test records passed and failed checks, verifies changed-file d
 
 ## Current Limits
 
-HyperAgent Mark I is a working local prototype. It does not provide a UI, autonomously modify itself, or support every agent platform yet. The point of this version is to prove the Mission -> Workshop -> Forge loop with durable local artifacts and explicit human review.
+HyperAgent Mark I is a working local prototype. It includes a static README architecture visual and local markdown/shell workflows, but it does not provide an interactive product UI, autonomously modify itself, or support every agent platform yet. The point of this version is to prove the Mission -> Workshop -> Forge loop with durable local artifacts and explicit human review.
+
+For the current status of `init`, `sense`, reliability evals, Forge checks, and other newer surfaces, see `docs/roadmap.md`.
 
 ## License
 

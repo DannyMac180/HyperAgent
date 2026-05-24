@@ -67,6 +67,21 @@ Examples:
 
 Use `forge/process/quality-rubric.md` and write Forge reviews in `forge/reviews/`.
 
+## Product State Reconciliation
+
+When a contribution changes user-visible product state, reconcile the inspectable truth files in the same PR.
+
+Checklist:
+
+- Update `docs/roadmap.md` when a surface becomes shipped, accepted, in review, deferred, or stale.
+- Keep `README.md` high level and link to `docs/roadmap.md` instead of duplicating detailed status tables.
+- Update `docs/releases/v0.1.0-alpha.md` only for first-alpha truth; put unreleased next-alpha notes in `docs/releases/next-alpha.md`.
+- Add accepted capabilities to `hyperagent/capability-registry.md` only after a human decision record exists in `workshop/decisions/`.
+- Put implemented-but-unaccepted surfaces in the registry and backlog as `in review`, not `accepted`.
+- Update `workshop/backlog.md` when a new proposal-backed item, review candidate, or deferred PRD area changes.
+- Review `docs/architecture/hyperagent.mmd` and `docs/assets/hyperagent-architecture.svg` when user-visible modules are added, removed, renamed, or materially changed.
+- Run `sh scripts/verify-mvp.sh` after reconciliation.
+
 ## Pull Requests
 
 Before opening a PR:

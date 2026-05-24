@@ -16,7 +16,7 @@ forge_quality_rubric = "forge/process/quality-rubric.md"
 templates = "templates"
 operating_prompt = "hyperagent/operating-prompt.md"
 capability_registry = "hyperagent/capability-registry.md"
-project_readme = "hyperagent/README.md"
+project_readme = "README.md"
 local_helper = "scripts/hyperagent.sh"
 evidence_log = ".hyperagent-evidence/commands.log"
 workbench_trace_log = ".hyperagent-evidence/workbench/traces.jsonl"
@@ -26,11 +26,13 @@ codex = true
 
 [verification]
 commands = [
+  "sh scripts/hyperagent.sh verify-config",
   "sh scripts/hyperagent.sh status",
   "sh scripts/hyperagent.sh sense --pr off",
   "sh scripts/hyperagent.sh doctor",
   "sh scripts/verify-mvp.sh",
   "sh evals/init-smoke.sh",
   "sh evals/sense-smoke.sh",
+  "sh evals/forge-audit-smoke.sh",
   "sh evals/smoke-loop.sh",
 ]

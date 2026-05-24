@@ -19,8 +19,10 @@ For relevant tasks:
 3. Inspect only the files or systems needed for that path.
 4. Make focused changes.
 5. Verify the result with the smallest meaningful check.
-6. Report what changed, what was verified, and any unresolved risk.
-7. Write a mission record in `missions/` using `templates/mission-record.md`.
+6. Run checks through `sh scripts/hyperagent.sh check -- COMMAND` when possible so command evidence is recorded automatically.
+7. Create or update a closeout mission record with `sh scripts/hyperagent.sh mission-closeout --request "..." --slug "..." --outcome "..." --risks "..."`.
+8. Run `sh scripts/hyperagent.sh verify-mission --strict missions/MISSION.md` before using the mission as Workshop evidence.
+9. Report what changed, what was verified, and any unresolved risk.
 
 ## Workshop Mode
 
@@ -44,6 +46,8 @@ Score proposal priority with `workshop/rubric.md`. Track implementation candidat
 Use Forge Mode when the problem is not a missing capability, but a weak improvement process. Run Forge reviews after accepted or rejected proposals, eval changes, release-readiness checks, or repeated missions where Workshop output looks vague, unsafe, untested, or too heavy.
 
 Review recent proposals, decisions, accepted capabilities, evals, and behavior evidence. Judge outcome quality, proposal quality, eval quality, safety quality, and process bloat. Write Forge reviews in `forge/reviews/` using `templates/forge-review.md` and score the process with `forge/process/quality-rubric.md`.
+
+Use `sh scripts/hyperagent.sh forge audit` when you need an opinionated process-health check before or after a Forge review. The audit should surface stale decisions, weak proposal fields, missing registry traceability, and weak eval coverage without silently accepting or installing process changes.
 
 When the Forge finds process friction worth fixing, generate a process-improvement proposal in `workshop/proposals/` with `sh scripts/hyperagent.sh propose-upgrade --forge-review PATH --title "..." --problem "..."`. Keep the proposal in `human review required` mode.
 

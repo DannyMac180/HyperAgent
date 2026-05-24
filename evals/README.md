@@ -31,6 +31,16 @@ The smoke loop copies the repo to a temporary directory, then verifies that the 
 - record a human-review decision in `workshop/decisions/`,
 - append an accepted capability to `hyperagent/capability-registry.md`.
 
+## CLI Help Smoke Eval
+
+Run:
+
+```bash
+sh evals/cli-help-smoke.sh
+```
+
+The CLI help smoke test copies the repo to a temporary directory, then verifies that help leads with the five primary flows: `init`, `sense`, `mission`, `review`, and `ui`. It also checks grouped mission/review commands and confirms older flat commands such as `new-mission`, `mission-closeout`, and `propose-upgrade` remain working compatibility aliases.
+
 ## Forge Audit Smoke Eval
 
 Run:
@@ -167,5 +177,5 @@ The installed `SKILL.md` should retain the source-of-truth links to the Suit pro
 5. Confirm the proposal links to the mission record and uses `human review required`.
 6. Confirm a human approval or rejection can be recorded in `workshop/decisions/`.
 7. Confirm Forge can review recent proposal quality and write a review in `forge/reviews/`.
-8. Confirm Forge can generate a process-improvement proposal with `propose-upgrade --forge-review`.
-9. Confirm Forge can audit proposal quality and traceability with `sh scripts/hyperagent.sh forge audit`.
+8. Confirm Forge can generate a process-improvement proposal with `review workshop --forge-review`.
+9. Confirm Forge can audit proposal quality and traceability with `sh scripts/hyperagent.sh review forge audit`.

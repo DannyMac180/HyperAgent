@@ -25,5 +25,6 @@ Score each item with `workshop/rubric.md`.
 
 | Priority | Status | Proposal | Evidence | Next action |
 | --- | --- | --- | --- | --- |
+| P3 | Proposed | `workshop/proposals/2026-05-24-0652-scoped-rename-safety.md` | `missions/2026-05-24-0652-dan-192-setup-hyperagent-rework.md` | Keep as draft unless scoped rename friction repeats; first step would add a short checklist to `hyperagent/operating-prompt.md`. |
 | P0 | Accepted | `workshop/proposals/2026-05-16-1216-local-loop-helper-and-smoke-eval.md` | `missions/2026-05-16-1216-prd-fulfillment-working-product.md` | Loop helper and smoke eval implemented; keep covered by `scripts/verify-mvp.sh` and `evals/smoke-loop.sh`. |
 | P1 | Accepted | `workshop/proposals/2026-05-01-2108-codex-skill-installer.md` | `missions/2026-05-01-2108-mark-i-build.md` | Installer implemented; keep covered by smoke evals. |

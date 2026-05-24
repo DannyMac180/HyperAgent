@@ -6,20 +6,12 @@ If you only want to try HyperAgent in the Codex Mac app, start with the copy-pas
 
 Use this guide when you want to inspect or run the setup commands yourself. It proves the Mark I loop locally: install the Codex skill, run a mission, write telemetry, propose an upgrade, and record an explicit human decision.
 
-## 1. One-Command Codex Setup
+## 1. One-Command HyperAgent Setup
 
 From a machine that has `git` and `sh`, run:
 
 ```bash
-/bin/sh -c 'set -eu
-dest="${HYPERAGENT_HOME:-$HOME/HyperAgent}"
-if [ -d "$dest/.git" ]; then
-  git -C "$dest" pull --ff-only
-else
-  test ! -e "$dest" || { echo "Refusing to replace non-repo path: $dest" >&2; exit 1; }
-  git clone https://github.com/DannyMac180/HyperAgent "$dest"
-fi
-sh "$dest/scripts/setup-codex.sh" --install-dir "$dest"'
+/bin/sh -c 'set -eu; dest="${HYPERAGENT_HOME:-$HOME/HyperAgent}"; if [ -d "$dest/.git" ]; then git -C "$dest" pull --ff-only; else test ! -e "$dest" || { echo "Refusing to replace non-repo path: $dest" >&2; exit 1; }; git clone https://github.com/DannyMac180/HyperAgent "$dest"; fi; sh "$dest/scripts/setup-hyperagent.sh" --install-dir "$dest"'
 ```
 
 The setup command:
@@ -35,7 +27,7 @@ The setup command:
 To ask before initializing a project repo in the same run:
 
 ```bash
-sh "$HOME/HyperAgent/scripts/setup-codex.sh" --init-target /path/to/project
+sh "$HOME/HyperAgent/scripts/setup-hyperagent.sh" --init-target /path/to/project
 ```
 
 The init step is opt-in and waits for a `y` confirmation before writing project-local files. Existing project files keep the normal HyperAgent overwrite refusal unless you also pass `--force-init`.
@@ -43,7 +35,7 @@ The init step is opt-in and waits for a `y` confirmation before writing project-
 You can also run the setup path through the wrapper after cloning:
 
 ```bash
-bin/hyperagent setup-codex
+bin/hyperagent setup-hyperagent
 ```
 
 Restart Codex Desktop or open a fresh thread after setup if the installed skill does not appear immediately.
@@ -217,7 +209,7 @@ sh scripts/hyperagent.sh propose-upgrade \
 
 ```bash
 sh scripts/verify-mvp.sh
-sh evals/setup-codex-smoke.sh
+sh evals/setup-hyperagent-smoke.sh
 sh evals/init-smoke.sh
 sh evals/sense-smoke.sh
 sh evals/smoke-loop.sh

@@ -35,18 +35,10 @@ Mission records capture evidence from real work. The Workshop turns that evidenc
 If you want the command path first, run this in Terminal:
 
 ```bash
-/bin/sh -c 'set -eu
-dest="${HYPERAGENT_HOME:-$HOME/HyperAgent}"
-if [ -d "$dest/.git" ]; then
-  git -C "$dest" pull --ff-only
-else
-  test ! -e "$dest" || { echo "Refusing to replace non-repo path: $dest" >&2; exit 1; }
-  git clone https://github.com/DannyMac180/HyperAgent "$dest"
-fi
-sh "$dest/scripts/setup-codex.sh" --install-dir "$dest"'
+/bin/sh -c 'set -eu; dest="${HYPERAGENT_HOME:-$HOME/HyperAgent}"; if [ -d "$dest/.git" ]; then git -C "$dest" pull --ff-only; else test ! -e "$dest" || { echo "Refusing to replace non-repo path: $dest" >&2; exit 1; }; git clone https://github.com/DannyMac180/HyperAgent "$dest"; fi; sh "$dest/scripts/setup-hyperagent.sh" --install-dir "$dest"'
 ```
 
-This clones or updates HyperAgent, runs local verification, installs or updates the `codex-hyperagent` skill, and leaves global Codex custom instructions untouched. Project initialization is opt-in; pass `--init-target /path/to/project` to `scripts/setup-codex.sh` when you want the script to ask before initializing a target repo.
+This clones or updates HyperAgent, runs local verification, installs or updates the `codex-hyperagent` skill, and leaves global Codex custom instructions untouched. Project initialization is opt-in; pass `--init-target /path/to/project` to `scripts/setup-hyperagent.sh` when you want the script to ask before initializing a target repo.
 
 For the assisted path, copy this prompt into the Codex Mac app:
 
@@ -119,7 +111,7 @@ Restart Codex Desktop or open a fresh thread after updating the installed skill.
 - `skills/codex-hyperagent/`: Codex skill instructions.
 - `bin/hyperagent`: small command wrapper for `scripts/hyperagent.sh`.
 - `.hyperagent`: machine-readable project config for initialized paths, adapters, and verification commands.
-- `scripts/setup-codex.sh`: one-command Codex setup path for clone/update, verification, skill install, and optional project init.
+- `scripts/setup-hyperagent.sh`: one-command HyperAgent setup path for clone/update, verification, skill install, and optional project init.
 - `scripts/install-codex-skill.sh`: dependency-free Codex skill installer.
 - `scripts/update-codex-skill.sh`: update helper for copy installs.
 - `scripts/hyperagent.sh`: local helper for project init, local sensing, command/check evidence, mission shells, proposals, Forge reviews, approval decisions, and status.
@@ -167,10 +159,10 @@ sh evals/init-smoke.sh
 
 The init smoke test creates a temporary repo, runs `hyperagent init`, checks the generated markdown-first structure and `.hyperagent` config, verifies overwrite refusal, verifies `--force`, and confirms `--dry-run` leaves the target untouched.
 
-Run the Codex setup smoke test:
+Run the HyperAgent setup smoke test:
 
 ```bash
-sh evals/setup-codex-smoke.sh
+sh evals/setup-hyperagent-smoke.sh
 ```
 
 The setup smoke test installs the Codex skill into a temporary skills directory, confirms project init only happens after an explicit yes, and checks dry-run clone/install reporting.

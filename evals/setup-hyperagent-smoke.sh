@@ -30,7 +30,7 @@ target="$tmpdir/target"
 mkdir -p "$target"
 
 setup_log="$tmpdir/setup.log"
-printf 'y\n' | sh "$repo_root/scripts/setup-codex.sh" \
+printf 'y\n' | sh "$repo_root/scripts/setup-hyperagent.sh" \
   --install-dir "$repo_root" \
   --skills-dir "$skills_dir" \
   --init-target "$target" \
@@ -47,7 +47,7 @@ require_text "$target/AGENTS.md" "HyperAgent Project Instructions"
 skip_target="$tmpdir/skip-target"
 mkdir -p "$skip_target"
 skip_log="$tmpdir/skip.log"
-printf 'n\n' | sh "$repo_root/scripts/setup-codex.sh" \
+printf 'n\n' | sh "$repo_root/scripts/setup-hyperagent.sh" \
   --install-dir "$repo_root" \
   --skills-dir "$tmpdir/skip-skills" \
   --init-target "$skip_target" \
@@ -58,7 +58,7 @@ test ! -e "$skip_target/.hyperagent" || fail "project init ran without yes confi
 require_text "$skip_log" "Project init skipped by user."
 
 dry_log="$tmpdir/dry.log"
-sh "$repo_root/scripts/setup-codex.sh" \
+sh "$repo_root/scripts/setup-hyperagent.sh" \
   --install-dir "$tmpdir/DryHyperAgent" \
   --skills-dir "$tmpdir/dry-skills" \
   --repo-url "$repo_root" \
@@ -72,7 +72,7 @@ require_text "$dry_log" "Would run: sh"
 require_text "$dry_log" "Dry run: verification and install checks were not executed."
 
 env_home_log="$tmpdir/env-home.log"
-HYPERAGENT_HOME="$repo_root" sh "$repo_root/scripts/setup-codex.sh" \
+HYPERAGENT_HOME="$repo_root" sh "$repo_root/scripts/setup-hyperagent.sh" \
   --skills-dir "$tmpdir/env-home-skills" \
   --skip-smoke \
   --no-update \
@@ -80,7 +80,7 @@ HYPERAGENT_HOME="$repo_root" sh "$repo_root/scripts/setup-codex.sh" \
 require_text "$env_home_log" "Install dir: $repo_root"
 
 unsafe_log="$tmpdir/unsafe.log"
-if sh "$repo_root/scripts/setup-codex.sh" \
+if sh "$repo_root/scripts/setup-hyperagent.sh" \
   --install-dir "$repo_root" \
   --skills-dir / \
   --skip-smoke \
@@ -89,4 +89,4 @@ if sh "$repo_root/scripts/setup-codex.sh" \
 fi
 require_text "$unsafe_log" "unsafe skills dir: /"
 
-printf 'HyperAgent setup-codex smoke passed.\n'
+printf 'HyperAgent setup-hyperagent smoke passed.\n'

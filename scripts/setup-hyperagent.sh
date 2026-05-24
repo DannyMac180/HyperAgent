@@ -3,7 +3,7 @@ set -eu
 
 usage() {
   cat <<'USAGE'
-Usage: sh scripts/setup-codex.sh [options]
+Usage: sh scripts/setup-hyperagent.sh [options]
 
 Clone or update HyperAgent, verify it, install the Codex skill, and optionally
 initialize a target project after confirmation.
@@ -150,7 +150,7 @@ if path_is_unsafe "$skills_dir"; then
   fail "unsafe skills dir: $skills_dir"
 fi
 
-info "HyperAgent Codex setup"
+info "HyperAgent setup"
 info "Install dir: $install_dir"
 info "Skills dir: $skills_dir"
 info "Repo URL: $repo_url"

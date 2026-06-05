@@ -39,6 +39,34 @@ When skipping the full loop, mention briefly that HyperAgent triage classified t
 
 Because this repo is the HyperAgent testbed, prefer recording mission telemetry for borderline cases. The goal is to learn which tasks deserve the loop and where the loop feels too heavy.
 
+## Core And Extensions
+
+Use `docs/product-state.md` as the current source for what belongs to the PRD core versus optional extensions or release support.
+
+- Core changes should preserve the Codex-first Suit, local mission evidence, Workshop, Forge, human review, and markdown-first memory.
+- Optional extension changes include the local UI, sensing extras, Workbench traces, and reliability scoring.
+- Release-support changes include GitHub templates, clean-install UAT, release notes, and rendered README assets.
+
+Run the narrowest relevant verification tier first:
+
+```bash
+sh scripts/verify-core.sh
+sh scripts/verify-extensions.sh
+sh scripts/verify-release.sh
+```
+
+## Symphony Linear Handoff
+
+Before a Symphony-managed issue is moved to `Human Review`, complete a documentation checkpoint:
+
+1. Check whether the completed changes need documentation updates.
+2. Make any required documentation changes before the handoff.
+3. Add a Linear issue comment summarizing the documentation changes made.
+
+If no documentation changes were needed, add a Linear issue comment saying that the documentation checkpoint was completed and no docs changes were required.
+
+Only move the Linear issue to `Human Review` after that documentation checkpoint comment has been posted.
+
 ## README Architecture Diagram
 
 The GitHub README is the initial user-facing landing page. Keep its high-level architecture diagram current when user-visible HyperAgent modules are added, removed, renamed, or materially changed.

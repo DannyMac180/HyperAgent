@@ -18,9 +18,9 @@ trap cleanup EXIT INT TERM
 cp -R "$repo_root" "$tmpdir/HyperAgent"
 cd "$tmpdir/HyperAgent"
 
-sh scripts/verify-mvp.sh >/dev/null
+sh scripts/hyperagent.sh verify core >/dev/null
 
-mission=$(sh scripts/hyperagent.sh new-mission \
+mission=$(sh scripts/hyperagent.sh mission new \
   --request "Smoke test the HyperAgent loop" \
   --slug smoke-loop \
   --commands-run "sh scripts/verify-mvp.sh" \
@@ -36,18 +36,18 @@ grep -F "Verification status: Smoke verification pending" "$mission" >/dev/null 
 grep -F "Final outcome: Pending final outcome." "$mission" >/dev/null || fail "mission missing final outcome placeholder"
 grep -F "Unresolved risks: Pending unresolved risk review." "$mission" >/dev/null || fail "mission missing unresolved risk placeholder"
 
-proposal=$(sh scripts/hyperagent.sh propose-upgrade \
+proposal=$(sh scripts/hyperagent.sh review proposal \
   --mission "$mission" \
   --title "Smoke-test upgrade proposal" \
   --problem "The loop needs proof that proposal creation works")
 test -f "$proposal" || fail "proposal was not created"
 grep -F "human review required" "$proposal" >/dev/null || fail "proposal missing activation mode"
 
-forge_review=$(sh scripts/hyperagent.sh new-forge-review --slug smoke-loop-forge-review)
+forge_review=$(sh scripts/hyperagent.sh review forge --slug smoke-loop-forge-review)
 test -f "$forge_review" || fail "forge review was not created"
 grep -F "Proposal quality score" "$forge_review" >/dev/null || fail "forge review missing quality score"
 
-decision=$(sh scripts/hyperagent.sh decide-upgrade \
+decision=$(sh scripts/hyperagent.sh review decision \
   --proposal "$proposal" \
   --decision accepted \
   --reviewer "Smoke Eval" \

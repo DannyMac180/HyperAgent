@@ -32,12 +32,11 @@ The init command creates or updates:
 - `forge/reviews/`
 - `templates/`
 - `hyperagent/`
-- `scripts/hyperagent.sh`
 - a HyperAgent instructions block in `AGENTS.md`
 
 The root `.hyperagent` file is the machine-readable project anchor. It records the HyperAgent version, install mode, initialized paths, enabled adapters, verification commands, and links to project instruction files.
 
-Generated operational files are plain Markdown and shell scripts. Init copies project setup files by default instead of symlinking them, so each repo can inspect, edit, and commit its own local memory. Existing files are left alone when identical, and conflicting files are refused unless `--force` is passed.
+Generated operational files are plain Markdown. Init copies local memory/setup files by default instead of copying the full HyperAgent runtime or optional UI, so each repo can inspect, edit, and commit its own local memory without drifting runtime scripts. Existing files are left alone when identical, and conflicting files are refused unless `--force` is passed.
 
 Preview changes without writing files:
 
@@ -71,11 +70,10 @@ You should see counts for missions, Workshop proposals, Workshop decisions, Forg
 
 ## 4. Capture Local Senses
 
-Record commands and checks explicitly when they matter for a mission:
+Run and record commands in one step when they matter for a mission:
 
 ```bash
-sh scripts/hyperagent.sh record-check --status passed --command "sh scripts/verify-mvp.sh"
-sh scripts/hyperagent.sh record-check --status failed --command "sh evals/smoke-loop.sh" --note "example failure note"
+sh scripts/hyperagent.sh check -- sh scripts/verify-mvp.sh
 ```
 
 Then generate a compact mission-ready summary:
@@ -83,14 +81,24 @@ Then generate a compact mission-ready summary:
 ```bash
 sh scripts/hyperagent.sh sense
 sh scripts/hyperagent.sh sense --format json --pr off
-sh scripts/hyperagent.sh doctor
+sh scripts/hyperagent.sh sense --doctor
 ```
 
 The sensing layer summarizes the current branch, upstream, HEAD, git status counts, changed files, recent opt-in commands/checks, failures and retries, optional PR/CI status when `gh` can find a pull request, and an optional trace link passed with `--trace-url`. By default, it also checks `.hyperagent-evidence/workbench/traces.jsonl` or `HYPERAGENT_WORKBENCH_TRACE_LOG` for local Workbench/Raindrop trace entries. It is local-first and does not require hosted services. It does not inspect file contents, environment variables, shell history, credentials, or secrets, and it redacts secret-like command and trace fragments before output.
 
-Workbench trace enrichment is a background sensing subsystem. If Workbench is unavailable, unhealthy, or not initialized yet, `sense` reports that state and continues with the lightweight fallback. Use `doctor` for local diagnostics and retention/redaction reminders before adding trace evidence to a mission record.
+Workbench trace enrichment is an optional extension. If Workbench is unavailable, unhealthy, or not initialized yet, `sense` reports that state and continues with the lightweight fallback. Use `sense --doctor` for local diagnostics and retention/redaction reminders before adding trace evidence to a mission record.
 
-## 5. Run A Mission In Codex
+## 5. Optional: Open The Local UI
+
+Serve the local Web UI from the project:
+
+```bash
+sh scripts/hyperagent.sh ui
+```
+
+By default, the UI opens at `http://127.0.0.1:8765`. It is an optional evidence cockpit over the same local markdown files and evidence logs: missions, Workshop proposals, Forge reviews, decisions, accepted capabilities, and sensing summaries. The UI does not replace the markdown files as the source of truth and does not silently activate upgrades.
+
+## 6. Run A Mission In Codex
 
 Ask Codex:
 
@@ -103,19 +111,19 @@ The mission record belongs in `missions/`. The helper prefills repo evidence suc
 You can also create a mission record shell:
 
 ```bash
-sh scripts/hyperagent.sh new-mission \
+sh scripts/hyperagent.sh mission new \
   --request "Run a small HyperAgent mission" \
   --slug small-hyperagent-mission \
   --commands-run "sh scripts/verify-mvp.sh" \
   --verification-status "pending"
 ```
 
-## 6. Run Workshop Review
+## 7. Run Workshop Review
 
 Ask Codex:
 
 ```bash
-sh scripts/hyperagent.sh workshop-prompt
+sh scripts/hyperagent.sh review prompt workshop
 ```
 
 Then have Codex follow the printed prompt. Proposals belong in `workshop/proposals/`.
@@ -123,18 +131,18 @@ Then have Codex follow the printed prompt. Proposals belong in `workshop/proposa
 To create a proposal shell:
 
 ```bash
-sh scripts/hyperagent.sh propose-upgrade \
+sh scripts/hyperagent.sh review proposal \
   --mission missions/2026-05-01-2108-mark-i-build.md \
   --title "Improve first-run verification" \
   --problem "The install step needs a concrete smoke test"
 ```
 
-## 7. Record Human Approval Or Rejection
+## 8. Record Human Approval Or Rejection
 
 Persistent behavior changes are not activated silently.
 
 ```bash
-sh scripts/hyperagent.sh decide-upgrade \
+sh scripts/hyperagent.sh review decision \
   --proposal workshop/proposals/2026-05-01-2108-codex-skill-installer.md \
   --decision accepted \
   --reviewer "Human reviewer" \
@@ -144,26 +152,28 @@ sh scripts/hyperagent.sh decide-upgrade \
 
 Accepted decisions are recorded in `workshop/decisions/` and appended to `hyperagent/capability-registry.md`.
 
-## 8. Run Forge Review
+## 9. Run Forge Review
 
 Ask Codex:
 
 ```bash
-sh scripts/hyperagent.sh forge-prompt
+sh scripts/hyperagent.sh review prompt forge
 ```
 
 Forge reviews belong in `forge/reviews/`. The Forge should improve the Workshop process, not silently activate new capabilities.
 
-## 9. Verify
+## 10. Verify
 
 ```bash
 sh scripts/verify-mvp.sh
-sh evals/init-smoke.sh
-sh evals/sense-smoke.sh
-sh evals/smoke-loop.sh
+sh scripts/hyperagent.sh verify core
+sh scripts/hyperagent.sh verify extensions
+sh scripts/hyperagent.sh verify release
 ```
 
-## 10. Update Later
+Core verification is the PRD MVP surface. Extension checks cover optional sensing, UI, Workbench trace enrichment, and reliability scoring. Release checks cover public packaging and release-readiness artifacts.
+
+## 11. Update Later
 
 For copy installs:
 

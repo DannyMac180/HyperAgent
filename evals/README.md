@@ -2,13 +2,24 @@
 
 Mark I evals are local checks for the Mission -> Workshop loop. They are intentionally small and dependency-free.
 
-Run:
+## Verification Tiers
+
+Run the PRD core verifier:
 
 ```bash
 sh scripts/verify-mvp.sh
 ```
 
-The verifier checks whether the repo contains the artifacts required by the PRD for the Codex-first prototype.
+`verify-mvp.sh` is a compatibility alias for `scripts/verify-core.sh`.
+
+Run optional extension and release checks only when touching those surfaces:
+
+```bash
+sh scripts/verify-extensions.sh
+sh scripts/verify-release.sh
+```
+
+The core verifier checks whether the repo contains the artifacts required by the PRD for the Codex-first prototype. Extension checks cover local sensing, Workbench trace enrichment, the optional UI cockpit, and reliability scoring. Release checks cover public packaging docs and GitHub-facing release artifacts.
 
 ## Loop Smoke Eval
 
@@ -31,10 +42,10 @@ The smoke loop copies the repo to a temporary directory, then verifies that the 
 Run:
 
 ```bash
-sh evals/reliability-gains.sh
+sh evals/extensions/reliability-gains.sh
 ```
 
-The reliability gains eval scores comparable local run records for the same task,
+The reliability gains eval is an optional research extension. It scores comparable local run records for the same task,
 including a baseline `without-hyperagent` case and a `with-hyperagent` case. It
 is deterministic, dependency-free, and writes inspectable output to
 `evals/out/reliability-gains/`.
@@ -63,7 +74,7 @@ The init smoke test creates a temporary repo, runs `sh scripts/hyperagent.sh ini
 
 - creates `missions/`, `workshop/proposals/`, `workshop/decisions/`, and `forge/reviews/`,
 - creates `.hyperagent` as the machine-readable project anchor for version, install mode, paths, adapters, verification commands, and instruction links,
-- copies templates, rubrics, the local prompt, a blank project backlog, a project capability registry, and `scripts/hyperagent.sh`,
+- copies templates, rubrics, the local prompt, a blank project backlog, and a project capability registry,
 - adds project instructions to `AGENTS.md`,
 - documents copy vs symlink behavior in `hyperagent/README.md`,
 - refuses conflicting overwrites unless `--force` is passed,
@@ -74,10 +85,10 @@ The init smoke test creates a temporary repo, runs `sh scripts/hyperagent.sh ini
 Run:
 
 ```bash
-sh evals/sense-smoke.sh
+sh evals/extensions/sense-smoke.sh
 ```
 
-The sense smoke test copies the repo to a temporary directory, then verifies that the local helper can:
+The sense smoke test is an optional extension check. It copies the repo to a temporary directory, then verifies that the local helper can:
 
 - record passed and failed command/check evidence in the ignored local evidence log,
 - summarize branch, status counts, and changed files,
@@ -85,8 +96,18 @@ The sense smoke test copies the repo to a temporary directory, then verifies tha
 - produce both Markdown and JSON summaries for mission records,
 - include an optional local trace reference,
 - enrich the summary from a local Workbench trace fixture by default,
-- report Workbench trace health through `doctor`,
+- report Workbench trace health through `sense --doctor`,
 - redact secret-like command, note, and trace fragments before storage and output.
+
+## UI Smoke Eval
+
+Run:
+
+```bash
+sh evals/extensions/ui-smoke.sh
+```
+
+The UI smoke test is an optional extension check. It starts the local Web UI on a loopback port, verifies that the static shell loads, confirms the overview and mission APIs expose local artifacts, and checks that the status action runs through the constrained UI command endpoint.
 
 ## Installer Smoke Eval
 

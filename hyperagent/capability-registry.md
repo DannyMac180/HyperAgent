@@ -4,6 +4,13 @@ This registry records accepted Suit capabilities after human review.
 
 Default activation mode: `human review required`.
 
+State ownership:
+
+- Human decision records in `workshop/decisions/` are the approval source of truth.
+- This registry is the final accepted-capability index for quick discovery.
+- Proposed or pending work belongs in `workshop/proposals/` and `workshop/backlog.md`, not here.
+- Every accepted entry must keep proposal, decision, activation mode, verification, and rollback traceability.
+
 ## Accepted Capabilities
 
 ## codex-skill-installer

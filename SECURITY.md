@@ -2,6 +2,11 @@
 
 HyperAgent is an early alpha local agent-operating layer. It is not a hosted service and should not handle secrets by default.
 
+Canonical local policy:
+
+- `docs/safety-policy.md`
+- `docs/evidence-policy.md`
+
 ## Supported Versions
 
 Security review currently applies to `main` and tagged alpha releases.
@@ -62,4 +67,3 @@ The alpha release does not provide:
 - automatic permission auditing,
 - production-grade secrets management,
 - autonomous self-modification safeguards beyond local human-review policy.
-

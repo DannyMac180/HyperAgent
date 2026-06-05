@@ -21,7 +21,7 @@ The release should not claim:
 
 - autonomous self-modification,
 - hosted memory,
-- a polished UI,
+- a polished hosted UI,
 - multi-platform support beyond Codex,
 - automatic upgrades across every user project,
 - production-grade safety automation.
@@ -31,7 +31,9 @@ The release should not claim:
 Before tagging an alpha release:
 
 - [x] `main` is clean and up to date with `origin/main` before tagging.
-- [x] `sh scripts/verify-mvp.sh` passes.
+- [x] `sh scripts/verify-mvp.sh` / `sh scripts/verify-core.sh` passes.
+- [x] `sh scripts/verify-extensions.sh` passes when optional extension surfaces changed.
+- [x] `sh scripts/verify-release.sh` passes before public release.
 - [x] `sh evals/smoke-loop.sh` passes.
 - [x] A clean clone can install the skill with `sh scripts/install-codex-skill.sh "$HOME/.codex/skills"`.
 - [x] A clean clone can install the skill in development mode with `--symlink`.
@@ -70,7 +72,7 @@ Before release, verify:
 - [x] `forge/process/quality-rubric.md` defines proposal quality metrics.
 - [x] `templates/forge-review.md` includes proposal quality and process reliability fields.
 - [x] At least one real Forge review exists in `forge/reviews/`.
-- [x] `scripts/verify-mvp.sh` fails if the Forge rubric or review template is missing.
+- [x] `scripts/verify-core.sh` fails if the Forge rubric or review template is missing.
 - [x] `docs/quickstart.md` shows how to run a Forge review prompt.
 - [x] README and release notes describe the Forge as "improves the Workshop."
 
@@ -92,6 +94,8 @@ For users who cloned the repo:
 ```bash
 git pull
 sh scripts/verify-mvp.sh
+sh scripts/verify-extensions.sh
+sh scripts/verify-release.sh
 ```
 
 How the installed Codex skill receives updates depends on install mode:
@@ -123,6 +127,8 @@ tmpdir=$(mktemp -d)
 git clone https://github.com/DannyMac180/HyperAgent.git "$tmpdir/HyperAgent"
 cd "$tmpdir/HyperAgent"
 sh scripts/verify-mvp.sh
+sh scripts/verify-extensions.sh
+sh scripts/verify-release.sh
 sh evals/smoke-loop.sh
 tmpskills=$(mktemp -d)
 sh scripts/install-codex-skill.sh "$tmpskills"

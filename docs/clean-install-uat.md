@@ -61,7 +61,8 @@ The test passes when all of these are true:
 - `~/HyperAgent` exists and is a clone of the HyperAgent repo.
 - HyperAgent local verification passes, including `sh scripts/verify-mvp.sh`.
 - `~/.codex/skills/codex-hyperagent/SKILL.md` exists.
-- The scratch project contains `.hyperagent`, `AGENTS.md`, `missions/`, `workshop/`, `forge/`, `templates/`, `hyperagent/`, and `scripts/hyperagent.sh` after confirmed init.
+- The scratch project contains `.hyperagent`, `AGENTS.md`, `missions/`, `workshop/`, `forge/`, `templates/`, and `hyperagent/` after confirmed init.
+- The scratch project does not require copied `scripts/hyperagent.sh` or copied `ui/` assets for the core setup to be valid.
 - Codex reports whether a restart or fresh thread is needed.
 - Codex reports the files it changed.
 - Codex does not edit global Codex custom instructions during the happy path.

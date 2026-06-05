@@ -26,10 +26,10 @@ cd "$tmpdir/HyperAgent"
 
 printf '\nSense smoke change.\n' >>README.md
 
-log_path=$(sh scripts/hyperagent.sh record-check --status passed --command "sh scripts/verify-mvp.sh" --note "artifact verifier passed")
-test -f "$log_path" || fail "record-check did not create command log"
+log_path=$(sh scripts/hyperagent.sh check --record --status passed --command "sh scripts/verify-mvp.sh" --note "artifact verifier passed")
+test -f "$log_path" || fail "check --record did not create command log"
 
-sh scripts/hyperagent.sh record-check \
+sh scripts/hyperagent.sh check --record \
   --status failed \
   --command "SECRET_TOKEN=super-secret sh evals/smoke-loop.sh" \
   --note "Intentional smoke failure with API_KEY=hidden" >/dev/null
@@ -43,7 +43,7 @@ doctor="$tmpdir/doctor.txt"
 
 sh scripts/hyperagent.sh sense --pr off >"$markdown"
 sh scripts/hyperagent.sh sense --format json --pr off --trace-url "local-trace://sense-smoke" >"$json"
-sh scripts/hyperagent.sh doctor >"$doctor"
+sh scripts/hyperagent.sh sense --doctor >"$doctor"
 
 require_text "$markdown" "HyperAgent Sense Summary"
 require_text "$markdown" "Branch:"

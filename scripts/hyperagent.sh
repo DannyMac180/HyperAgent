@@ -12,32 +12,41 @@ Commands:
   status
       Print HyperAgent local product status.
 
-  sense [--format markdown|json] [--command-log PATH] [--trace-url URL] [--workbench-trace-log PATH] [--pr auto|off]
-      Print a compact local sensing summary for mission records.
+  sense [--format markdown|json] [--command-log PATH] [--trace-url URL] [--workbench-trace-log PATH] [--pr auto|off] [--doctor]
+      Print a compact local sensing summary. Use --doctor for sensing diagnostics.
 
-  doctor [--workbench-trace-log PATH]
-      Print local diagnostics for HyperAgent sensing and Workbench trace enrichment.
-
-  record-check --command TEXT --status passed|failed|retried|skipped [--note TEXT]
-      Append an opt-in check or command result to the local evidence log.
-
-  new-mission --request TEXT [--slug SLUG] [--commands-run TEXT] [--verification-status TEXT]
+  mission new --request TEXT [--slug SLUG] [--commands-run TEXT] [--verification-status TEXT]
       Create a mission record in missions/.
 
-  propose-upgrade --mission PATH --title TEXT --problem TEXT [--slug SLUG]
+  mission closeout --mission PATH
+      Audit a mission record for pending closeout placeholders.
+
+  review prompt workshop|forge
+      Print the repeatable Workshop or Forge prompt.
+
+  review proposal --mission PATH --title TEXT --problem TEXT [--slug SLUG]
       Create a Workshop proposal in workshop/proposals/.
 
-  workshop-prompt
-      Print the repeatable Workshop review prompt.
-
-  new-forge-review [--slug SLUG]
+  review forge [--slug SLUG]
       Create a Forge review record in forge/reviews/.
 
-  forge-prompt
-      Print the repeatable Forge review prompt.
+  review decision --proposal PATH --decision accepted|rejected --reviewer NAME --reason TEXT [--capability ID]
+      Record a human approval decision. Accepted decisions require --capability.
 
-  decide-upgrade --proposal PATH --decision accepted|rejected --reviewer NAME --reason TEXT [--capability ID]
-      Record a human approval decision. Accepted decisions require --capability and are added to the capability registry.
+  verify core|extensions|release|all
+      Run HyperAgent verification tiers.
+
+  check -- COMMAND [ARG...]
+      Run a local command and record passed/failed evidence.
+
+  check --record --command TEXT --status passed|failed|retried|skipped [--note TEXT]
+      Append an opt-in check or command result to the local evidence log.
+
+  ui [--host HOST] [--port PORT]
+      Serve the optional local HyperAgent UI evidence cockpit.
+
+Legacy aliases:
+  doctor, record-check, new-mission, propose-upgrade, workshop-prompt, new-forge-review, forge-prompt, decide-upgrade
 
   help
       Show this help.
@@ -231,187 +240,23 @@ init_touch_file() {
 }
 
 generate_init_registry() {
-  cat <<'EOF'
-# HyperAgent Capability Registry
-
-This project-local registry records accepted HyperAgent capabilities for this repository.
-
-- Default activation mode: human review required
-- Silent activation allowed: no
-- Permission, deployment, account, or secrets changes require explicit human approval.
-
-## Accepted Capabilities
-
-No project-local capabilities have been accepted yet.
-
-Add accepted capabilities only after a proposal in `workshop/proposals/` has a matching human decision in `workshop/decisions/`.
-EOF
+  cat "$repo_root/templates/project-capability-registry.md"
 }
 
 generate_init_backlog() {
-  cat <<'EOF'
-# HyperAgent Project Upgrade Backlog
-
-This project-local backlog tracks proposed HyperAgent, Suit, and workflow upgrades after they have evidence from mission records.
-
-Default activation mode: `human review required`.
-
-## Intake Rules
-
-- Every backlog item must link to a proposal in `workshop/proposals/`.
-- Every proposal must link to at least one mission record or Forge review.
-- The highest-priority item must name its first implementation step and acceptance test.
-- Accepted items require a decision record in `workshop/decisions/`.
-- Accepted local capabilities are recorded in `hyperagent/capability-registry.md`.
-
-## Priority Rubric
-
-Score each item with `workshop/rubric.md`.
-
-- `P0`: Blocks the Mission -> Workshop -> Forge loop or creates a serious safety gap.
-- `P1`: Removes repeated friction from real missions or improves verification quality.
-- `P2`: Improves ergonomics, docs, or contributor onboarding.
-- `P3`: Useful later, but not needed for local reliability.
-
-## Backlog
-
-| Priority | Status | Proposal | Evidence | Next action |
-| --- | --- | --- | --- | --- |
-EOF
+  cat "$repo_root/templates/project-backlog.md"
 }
 
 generate_init_config() {
-  cat <<'EOF'
-# HyperAgent project config
-
-hyperagent_version = "v0.1.0-alpha"
-config_version = 1
-install_mode = "copy"
-
-[paths]
-project_instructions = "AGENTS.md"
-missions = "missions"
-workshop_proposals = "workshop/proposals"
-workshop_decisions = "workshop/decisions"
-workshop_backlog = "workshop/backlog.md"
-workshop_rubric = "workshop/rubric.md"
-forge_reviews = "forge/reviews"
-forge_quality_rubric = "forge/process/quality-rubric.md"
-templates = "templates"
-operating_prompt = "hyperagent/operating-prompt.md"
-capability_registry = "hyperagent/capability-registry.md"
-project_readme = "hyperagent/README.md"
-local_helper = "scripts/hyperagent.sh"
-evidence_log = ".hyperagent-evidence/commands.log"
-workbench_trace_log = ".hyperagent-evidence/workbench/traces.jsonl"
-
-[adapters]
-codex = true
-
-[verification]
-commands = [
-  "sh scripts/hyperagent.sh status",
-]
-EOF
+  cat "$repo_root/templates/project-config.toml"
 }
 
 generate_init_readme() {
-  cat <<'EOF'
-# HyperAgent Project Setup
-
-This repository has local HyperAgent memory and workflow files.
-
-The root `.hyperagent` file is the machine-readable project anchor. Scripts and
-adapters can read it to find the HyperAgent version, install mode, initialized
-paths, enabled adapters, verification commands, and instruction files.
-
-Use these files to keep agent work inspectable:
-
-- `missions/`: mission records from meaningful tasks.
-- `workshop/proposals/`: proposed improvements backed by mission evidence.
-- `workshop/decisions/`: explicit human approvals or rejections.
-- `forge/reviews/`: reviews of Workshop proposal quality.
-- `templates/`: markdown templates for records, proposals, decisions, and Forge reviews.
-- `hyperagent/operating-prompt.md`: local Suit prompt.
-- `hyperagent/capability-registry.md`: accepted local capabilities.
-
-## Local Commands
-
-```bash
-sh scripts/hyperagent.sh status
-sh scripts/hyperagent.sh sense
-sh scripts/hyperagent.sh record-check --status passed --command "sh scripts/verify-mvp.sh"
-sh scripts/hyperagent.sh doctor
-sh scripts/hyperagent.sh new-mission --request "Describe the task" --slug task-slug
-sh scripts/hyperagent.sh workshop-prompt
-sh scripts/hyperagent.sh forge-prompt
-```
-
-## Verification
-
-For this project, the lightweight check is:
-
-```bash
-sh scripts/hyperagent.sh status
-```
-
-To capture local task evidence for mission records:
-
-```bash
-sh scripts/hyperagent.sh record-check --status passed --command "sh scripts/verify-mvp.sh"
-sh scripts/hyperagent.sh sense
-```
-
-The sensing summary reads Git metadata, the opt-in local command log, and local Workbench trace metadata when the default ignored trace log exists. It does not inspect repository file contents or environment values, and command text is redacted for secret-like tokens before storage and output.
-
-Add any project-specific build, test, lint, or smoke commands to `AGENTS.md` so future agents know the strongest relevant verification path.
-
-## Copy And Symlink Behavior
-
-`hyperagent init` copies markdown templates, prompt files, and helper scripts into the target repository. It does not symlink project setup files by default, because local project memory should remain portable, reviewable, and safe to edit.
-
-If you installed the global Codex skill with `scripts/install-codex-skill.sh --symlink`, only the Codex skill install is symlinked. Project-local files created by `hyperagent init` are still normal files.
-
-Existing files are left alone when they are identical. Conflicting generated files are not overwritten unless `--force` is passed.
-EOF
+  cat "$repo_root/templates/project-readme.md"
 }
 
 generate_init_agents_block() {
-  cat <<'EOF'
-<!-- hyperagent-init:start -->
-
-## HyperAgent Project Instructions
-
-Use HyperAgent triage for substantial work in this repository.
-
-Run the full Mission -> Workshop -> Forge loop when a task:
-
-- changes files, docs, scripts, templates, tests, product behavior, or workflow behavior,
-- requires investigation across multiple files or commands,
-- involves verification, debugging, or failing checks,
-- reveals friction worth turning into a reusable improvement,
-- explicitly asks for HyperAgent.
-
-For full-loop tasks:
-
-1. Complete the task with focused changes and explicit verification.
-2. Write a mission record in `missions/`.
-3. Create a Workshop proposal in `workshop/proposals/` only when there is concrete Suit friction or a worthwhile improvement.
-4. Create a Forge review in `forge/reviews/` only when the Workshop process itself needs review.
-5. Keep persistent behavior changes `human review required`.
-
-Skip the full loop only for clearly isolated one-off tasks such as simple factual answers, trivial commands, small clarifications, or status restatements without new investigation. When skipping, say that HyperAgent triage classified the task as an isolated one-off and no mission record was written.
-
-Local verification guidance:
-
-```bash
-sh scripts/hyperagent.sh status
-```
-
-Add project-specific build, test, lint, or smoke commands here as they become known.
-
-<!-- hyperagent-init:end -->
-EOF
+  cat "$repo_root/templates/project-agents-block.md"
 }
 
 init_update_agents() {
@@ -529,8 +374,7 @@ init_project() {
     "$target_root/forge/reviews" \
     "$target_root/forge/process" \
     "$target_root/templates" \
-    "$target_root/hyperagent" \
-    "$target_root/scripts"
+    "$target_root/hyperagent"
   do
     if [ "$dry_run" -eq 1 ]; then
       if [ -d "$dir" ]; then
@@ -556,8 +400,6 @@ init_project() {
   init_install_file "$repo_root/workshop/rubric.md" "$target_root/workshop/rubric.md" "$force" "$dry_run"
   init_install_file "$repo_root/forge/process/quality-rubric.md" "$target_root/forge/process/quality-rubric.md" "$force" "$dry_run"
   init_install_file "$repo_root/hyperagent/operating-prompt.md" "$target_root/hyperagent/operating-prompt.md" "$force" "$dry_run"
-  init_install_file "$repo_root/scripts/hyperagent.sh" "$target_root/scripts/hyperagent.sh" "$force" "$dry_run"
-
   init_write_generated "$target_root/.hyperagent" "$force" "$dry_run" generate_init_config
   init_write_generated "$target_root/workshop/backlog.md" "$force" "$dry_run" generate_init_backlog
   init_write_generated "$target_root/hyperagent/capability-registry.md" "$force" "$dry_run" generate_init_registry
@@ -565,7 +407,7 @@ init_project() {
   init_update_agents "$target_root" "$force" "$dry_run"
 
   init_log "HyperAgent init complete."
-  init_log "Next: inspect AGENTS.md, add project-specific verification commands, then run: sh scripts/hyperagent.sh status"
+  init_log "Next: inspect AGENTS.md, add project-specific verification commands, then run HyperAgent status from your installed HyperAgent helper."
 }
 
 count_markdown_files() {
@@ -600,19 +442,6 @@ git_status_short() {
   fi
 }
 
-git_changed_files() {
-  if is_git_repo; then
-    status=$(git -C "$repo_root" status --short 2>/dev/null || true)
-    if [ -n "$status" ]; then
-      printf '%s\n' "$status" | sed 's/^...//'
-    else
-      printf 'none\n'
-    fi
-  else
-    printf 'not a git repository\n'
-  fi
-}
-
 print_status() {
   ensure_dirs
   printf 'HyperAgent status\n'
@@ -624,6 +453,10 @@ print_status() {
   printf 'Forge reviews: %s\n' "$(count_markdown_files "$forge_dir")"
   test -f "$registry_file" || fail "missing capability registry: $registry_file"
   printf 'Capability registry: %s\n' "$registry_file"
+  printf 'Product state: %s\n' "$repo_root/docs/product-state.md"
+  printf 'Optional extensions: %s\n' "$repo_root/docs/extensions.md"
+  printf 'Accepted capabilities:\n'
+  awk '/^## / && $0 !~ /Accepted Capabilities|Capability Entry Template/ { sub(/^## /, "- "); print }' "$registry_file"
 }
 
 record_check() {
@@ -672,6 +505,28 @@ record_check() {
   safe_note=$(redact_text "$note")
   printf '%s\t%s\t%s\t%s\n' "$(now_readable)" "$status" "$safe_command" "$safe_note" >>"$log_file"
   printf '%s\n' "$log_file"
+}
+
+run_check() {
+  if [ "${1:-}" = "--record" ]; then
+    shift
+    record_check "$@"
+    return 0
+  fi
+
+  if [ "${1:-}" = "--" ]; then
+    shift
+  fi
+  test "$#" -gt 0 || fail "check requires a command after --"
+
+  command_text=$*
+  if "$@"; then
+    record_check --status passed --command "$command_text" --note "command completed" >/dev/null
+    return 0
+  fi
+  status=$?
+  record_check --status failed --command "$command_text" --note "command exited with status $status" >/dev/null
+  return "$status"
 }
 
 git_value() {
@@ -930,9 +785,13 @@ print_sense() {
   trace_url=
   pr_mode=auto
   workbench_trace_log_override=
+  doctor_mode=0
 
   while [ "$#" -gt 0 ]; do
     case "$1" in
+      --doctor)
+        doctor_mode=1
+        ;;
       --format)
         shift
         test "$#" -gt 0 || fail "--format requires markdown or json"
@@ -966,6 +825,11 @@ print_sense() {
   done
 
   workbench_trace_log=$(workbench_trace_log_path "$workbench_trace_log_override")
+
+  if [ "$doctor_mode" -eq 1 ]; then
+    print_doctor --workbench-trace-log "$workbench_trace_log"
+    return 0
+  fi
 
   case "$format" in
     markdown) print_sense_markdown "$command_log" "$trace_url" "$pr_mode" "$workbench_trace_log" ;;
@@ -1010,6 +874,11 @@ print_doctor() {
   printf 'Workbench retention: local ignored evidence; keep only recent mission-relevant traces and prune manually or with your local Workbench policy.\n'
   printf 'Workbench redaction: HyperAgent redacts secret-like tokens before sense output; Workbench may still store local prompts, tool payloads, file paths, and command outputs.\n'
   printf 'Fallback: sense remains usable without Workbench traces.\n'
+}
+
+serve_ui() {
+  command -v node >/dev/null 2>&1 || fail "node is required to run the HyperAgent UI"
+  exec node "$repo_root/scripts/hyperagent-ui.mjs" "$@"
 }
 
 create_mission() {
@@ -1068,6 +937,11 @@ create_mission() {
 - Environment: \`$repo_root\`
 - User request: $request
 
+## Artifact Metadata
+
+- Artifact type: mission
+- Artifact status: draft
+
 ## Repository Evidence
 
 - Repo path: \`$repo_root\`
@@ -1117,6 +991,42 @@ $changed_files
 EOF
 
   printf '%s\n' "$file"
+}
+
+mission_closeout() {
+  mission=
+
+  while [ "$#" -gt 0 ]; do
+    case "$1" in
+      --mission)
+        shift
+        test "$#" -gt 0 || fail "--mission requires a path"
+        mission=$1
+        ;;
+      *)
+        fail "unknown mission closeout option: $1"
+        ;;
+    esac
+    shift
+  done
+
+  test -n "$mission" || fail "mission closeout requires --mission"
+  test -f "$mission" || fail "mission record not found: $mission"
+
+  printf 'HyperAgent mission closeout audit\n'
+  printf 'Mission: %s\n' "$mission"
+
+  pending=$(grep -n -E 'Pending final outcome|Pending unresolved risk review|Pending verification|Replace during mission closeout|Not captured by helper' "$mission" || true)
+  if [ -n "$pending" ]; then
+    printf 'Status: needs closeout\n'
+    printf '%s\n' "$pending"
+    printf '\nRecent local sense summary follows.\n\n'
+    print_sense --pr off
+    return 1
+  fi
+
+  printf 'Status: closeout complete\n'
+  print_sense --pr off
 }
 
 create_proposal() {
@@ -1177,6 +1087,11 @@ create_proposal() {
 - Allowed activation modes: suggest only; draft files only; human review required; auto-install low risk
 - Backlog priority:
 - Workshop rubric score:
+
+## Artifact Metadata
+
+- Artifact type: proposal
+- Artifact status: draft
 
 ## Problem
 
@@ -1258,6 +1173,11 @@ create_forge_review() {
 - Date/time: $(now_readable)
 - Proposals reviewed:
 - Reviewer: Codex wearing the HyperAgent Suit
+
+## Artifact Metadata
+
+- Artifact type: forge-review
+- Artifact status: draft
 
 ## Workshop Quality
 
@@ -1365,6 +1285,11 @@ record_decision() {
 - Reason: $reason
 - Capability registry ID: $capability
 
+## Artifact Metadata
+
+- Artifact type: decision
+- Artifact status: $decision
+
 ## Authority Boundary
 
 - Human approval recorded: yes
@@ -1395,6 +1320,87 @@ EOF
   printf '%s\n' "$file"
 }
 
+mission_command() {
+  subcommand=${1:-help}
+  if [ "$#" -gt 0 ]; then
+    shift
+  fi
+
+  case "$subcommand" in
+    new)
+      create_mission "$@"
+      ;;
+    closeout)
+      mission_closeout "$@"
+      ;;
+    help|-h|--help)
+      printf '%s\n' "Usage: sh scripts/hyperagent.sh mission new|closeout [options]"
+      ;;
+    *)
+      fail "unknown mission command: $subcommand"
+      ;;
+  esac
+}
+
+review_command() {
+  subcommand=${1:-help}
+  if [ "$#" -gt 0 ]; then
+    shift
+  fi
+
+  case "$subcommand" in
+    prompt)
+      prompt=${1:-}
+      case "$prompt" in
+        workshop) print_workshop_prompt ;;
+        forge) print_forge_prompt ;;
+        *) fail "review prompt requires workshop or forge" ;;
+      esac
+      ;;
+    proposal)
+      create_proposal "$@"
+      ;;
+    forge)
+      create_forge_review "$@"
+      ;;
+    decision)
+      record_decision "$@"
+      ;;
+    help|-h|--help)
+      printf '%s\n' "Usage: sh scripts/hyperagent.sh review prompt|proposal|forge|decision [options]"
+      ;;
+    *)
+      fail "unknown review command: $subcommand"
+      ;;
+  esac
+}
+
+verify_command() {
+  tier=${1:-core}
+  case "$tier" in
+    core|mvp)
+      (cd "$repo_root" && sh scripts/verify-core.sh)
+      ;;
+    extensions|extension)
+      (cd "$repo_root" && sh scripts/verify-extensions.sh)
+      ;;
+    release)
+      (cd "$repo_root" && sh scripts/verify-release.sh)
+      ;;
+    all)
+      (cd "$repo_root" && sh scripts/verify-core.sh)
+      (cd "$repo_root" && sh scripts/verify-extensions.sh)
+      (cd "$repo_root" && sh scripts/verify-release.sh)
+      ;;
+    help|-h|--help)
+      printf '%s\n' "Usage: sh scripts/hyperagent.sh verify core|extensions|release|all"
+      ;;
+    *)
+      fail "unknown verify tier: $tier"
+      ;;
+  esac
+}
+
 command=${1:-help}
 if [ "$#" -gt 0 ]; then
   shift
@@ -1410,11 +1416,26 @@ case "$command" in
   sense)
     print_sense "$@"
     ;;
+  mission)
+    mission_command "$@"
+    ;;
+  review)
+    review_command "$@"
+    ;;
+  verify)
+    verify_command "$@"
+    ;;
+  check)
+    run_check "$@"
+    ;;
   doctor)
-    print_doctor "$@"
+    print_sense --doctor "$@"
+    ;;
+  ui)
+    serve_ui "$@"
     ;;
   record-check)
-    record_check "$@"
+    run_check --record "$@"
     ;;
   new-mission)
     create_mission "$@"

@@ -9,6 +9,11 @@
 - Backlog priority:
 - Workshop rubric score:
 
+## Artifact Metadata
+
+- Artifact type: proposal
+- Artifact status: draft
+
 ## Problem
 
 - Problem observed:

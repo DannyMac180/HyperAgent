@@ -6,6 +6,11 @@
 - Environment:
 - User request:
 
+## Artifact Metadata
+
+- Artifact type: mission
+- Artifact status: draft
+
 ## Repository Evidence
 
 - Repo path:

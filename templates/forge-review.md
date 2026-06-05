@@ -5,6 +5,11 @@
 - Proposals reviewed:
 - Reviewer:
 
+## Artifact Metadata
+
+- Artifact type: forge-review
+- Artifact status: draft
+
 ## Workshop Quality
 
 - Are proposals specific and evidence-backed?

@@ -47,7 +47,6 @@ require_dir "$target/workshop/decisions"
 require_dir "$target/forge/reviews"
 require_dir "$target/templates"
 require_dir "$target/hyperagent"
-require_dir "$target/scripts"
 
 require_file "$target/.hyperagent"
 require_file "$target/missions/.gitkeep"
@@ -64,31 +63,32 @@ require_file "$target/forge/process/quality-rubric.md"
 require_file "$target/hyperagent/operating-prompt.md"
 require_file "$target/hyperagent/capability-registry.md"
 require_file "$target/hyperagent/README.md"
-require_file "$target/scripts/hyperagent.sh"
 require_file "$target/AGENTS.md"
+
+test ! -e "$target/scripts/hyperagent.sh" || fail "init copied the full helper runtime into the target"
+test ! -e "$target/ui" || fail "init copied optional UI assets into the target"
 
 require_text "$target/AGENTS.md" "Existing Project Instructions"
 require_text "$target/AGENTS.md" "Keep this project-specific note."
 require_text "$target/AGENTS.md" "HyperAgent Project Instructions"
-require_text "$target/AGENTS.md" "sh scripts/hyperagent.sh status"
+require_text "$target/AGENTS.md" "hyperagent status"
 require_text "$target/.hyperagent" 'hyperagent_version = "v0.1.0-alpha"'
 require_text "$target/.hyperagent" 'install_mode = "copy"'
 require_text "$target/.hyperagent" 'project_instructions = "AGENTS.md"'
 require_text "$target/.hyperagent" 'evidence_log = ".hyperagent-evidence/commands.log"'
 require_text "$target/.hyperagent" 'codex = true'
-require_text "$target/.hyperagent" '"sh scripts/hyperagent.sh status"'
+require_text "$target/.hyperagent" '[verification.core]'
+require_text "$target/.hyperagent" '"hyperagent status"'
 require_text "$target/hyperagent/README.md" "Copy And Symlink Behavior"
 require_text "$target/hyperagent/README.md" "machine-readable project anchor"
-require_text "$target/hyperagent/README.md" "sh scripts/hyperagent.sh sense"
+require_text "$target/hyperagent/README.md" "hyperagent sense"
 require_text "$target/hyperagent/README.md" "opt-in local command log"
-require_text "$target/hyperagent/README.md" "does not symlink project setup files by default"
+require_text "$target/hyperagent/README.md" "does not copy the optional UI or full HyperAgent runtime"
 require_text "$target/hyperagent/capability-registry.md" "human review required"
 require_text "$target/workshop/backlog.md" "HyperAgent Project Upgrade Backlog"
 if grep -F "2026-05-16-1216-local-loop-helper-and-smoke-eval" "$target/workshop/backlog.md" >/dev/null; then
   fail "init copied source-repo backlog entries into the target"
 fi
-
-sh "$target/scripts/hyperagent.sh" status >/dev/null
 
 printf 'local change\n' >>"$target/.hyperagent"
 if sh "$repo_root/scripts/hyperagent.sh" init --target "$target" >"$refusal_log" 2>&1; then

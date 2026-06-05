@@ -4,6 +4,13 @@ This backlog tracks proposed Suit and Workshop upgrades after they have evidence
 
 Default activation mode: `human review required`.
 
+State ownership:
+
+- Proposals in `workshop/proposals/` are the source for proposed work.
+- Decisions in `workshop/decisions/` are the source for approvals and rejections.
+- The backlog is a planning view, not a second approval system.
+- Accepted capabilities are indexed in `hyperagent/capability-registry.md` only after a human decision record exists.
+
 ## Intake Rules
 
 - Every backlog item must link to a proposal in `workshop/proposals/`.

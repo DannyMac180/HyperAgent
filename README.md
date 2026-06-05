@@ -12,7 +12,7 @@ HyperAgent starts with OpenAI Codex in the Codex Mac app. The first prototype is
 
 HyperAgent is currently `v0.1.0-alpha`: a developer preview for testing the local Mission -> Workshop -> Forge loop.
 
-This alpha is ready for early open-source use by Codex users who are comfortable with local markdown artifacts and shell scripts. It is not a hosted service, does not provide a polished UI, does not support every agent platform, and does not autonomously modify itself.
+This alpha is ready for early open-source use by Codex users who are comfortable with local markdown artifacts and shell scripts. It is not a hosted service, does not provide a polished hosted UI, does not support every agent platform, and does not autonomously modify itself.
 
 Release notes: `docs/releases/v0.1.0-alpha.md`
 
@@ -49,7 +49,7 @@ Do the following:
 1. Check whether `git` and `sh` are available, and create `~/.codex/skills` if needed.
 2. Clone HyperAgent into `~/HyperAgent` if it is not already there.
 3. If HyperAgent is already cloned there, update it with `git pull --ff-only`.
-4. Run `sh scripts/verify-mvp.sh` from the HyperAgent repo. If the repo is healthy and the checks are relevant, also run the local smoke tests.
+4. Run `sh scripts/verify-mvp.sh` from the HyperAgent repo.
 5. Install or update the `codex-hyperagent` skill in my local Codex skills directory. If an existing skill is present, inspect it before replacing it.
 6. If I am currently inside a project repo, ask me whether to initialize HyperAgent in that repo.
 7. If I confirm, run the HyperAgent project init flow for that repo.
@@ -67,7 +67,11 @@ The MVP is file-based on purpose. There is no hosted service, no database, and n
 
 For the manual command path, see `docs/quickstart.md`.
 
+For current product boundaries, see `docs/product-state.md`, `docs/roadmap.md`, and `docs/extensions.md`.
+
 For clean-install acceptance testing, see `docs/clean-install-uat.md`.
+
+For repeated human dogfooding, see `docs/dogfooding.md`.
 
 For early release readiness, see `docs/release-checklist.md`.
 
@@ -95,8 +99,15 @@ Restart Codex Desktop or open a fresh thread after updating the installed skill.
 ## What Is Included
 
 - `docs/hyperagent-prd.md`: product requirements and milestone plan.
+- `docs/product-state.md`: current core, extension, release, and state ownership boundaries.
+- `docs/roadmap.md`: PRD milestone status and deferred work.
+- `docs/extensions.md`: optional sensing, UI, Workbench, and reliability surfaces.
+- `docs/adapters.md`: adapter boundary for Codex-first alpha and future platforms.
+- `docs/evidence-policy.md`: public/private evidence handling and redaction checklist.
+- `docs/safety-policy.md`: authority boundary and activation policy.
 - `docs/concepts.md`: the Suit, Mission, Workshop, and Forge mental model.
 - `docs/clean-install-uat.md`: repeatable clean-install acceptance test for the README prompt.
+- `docs/dogfooding.md`: human UAT and repeated-use dogfooding guide.
 - `docs/release-checklist.md`: alpha release criteria, clean-clone test, and update model.
 - `docs/releases/v0.1.0-alpha.md`: first alpha release notes.
 - `docs/article-outline.md`: public essay outline for the Iron Man Suit thesis.
@@ -105,8 +116,9 @@ Restart Codex Desktop or open a fresh thread after updating the installed skill.
 - `.hyperagent`: machine-readable project config for initialized paths, adapters, and verification commands.
 - `scripts/install-codex-skill.sh`: dependency-free Codex skill installer.
 - `scripts/update-codex-skill.sh`: update helper for copy installs.
-- `scripts/hyperagent.sh`: local helper for project init, local sensing, command/check evidence, mission shells, proposals, Forge reviews, approval decisions, and status.
+- `scripts/hyperagent.sh`: local helper with a small public surface: `init`, `status`, `sense`, `mission`, `review`, `verify`, `check`, and optional `ui`.
 - `.hyperagent-evidence/`: ignored local runtime evidence, including the opt-in command/check log used by `sense`.
+- `ui/` and `scripts/hyperagent-ui.mjs`: optional local Web UI evidence cockpit for missions, Workshop proposals, Forge reviews, capabilities, and sensing.
 - `hyperagent/operating-prompt.md`: the operating layer Codex wears during work.
 - `hyperagent/capability-registry.md`: accepted capability registry with reviewed local capabilities.
 - `templates/mission-record.md`: mission telemetry template.
@@ -132,7 +144,14 @@ Run the local MVP verifier:
 sh scripts/verify-mvp.sh
 ```
 
-The verifier checks that the Codex skill, installer, operating prompt, local memory directories, templates, documentation, capability registry, and safety defaults are present.
+The MVP verifier is the core verifier. It checks the PRD core: Codex skill, installer, operating prompt, local memory directories, templates, documentation, capability registry, and safety defaults.
+
+Run extension and release checks when touching optional or public-release surfaces:
+
+```bash
+sh scripts/verify-extensions.sh
+sh scripts/verify-release.sh
+```
 
 Run the end-to-end local smoke loop:
 
@@ -158,9 +177,23 @@ sh evals/sense-smoke.sh
 
 The sensing smoke test records passed and failed checks, verifies changed-file detection, checks Markdown and JSON summaries, and confirms secret-like command fragments are redacted.
 
+Run the optional local UI:
+
+```bash
+sh scripts/hyperagent.sh ui
+```
+
+The UI serves a local evidence cockpit on `127.0.0.1:8765` by default. It reads the same markdown artifacts and local evidence logs used by the CLI helpers, and it only exposes explicit local actions such as status, sense, and verifier checks.
+
+Run the UI smoke test:
+
+```bash
+sh evals/ui-smoke.sh
+```
+
 ## Current Limits
 
-HyperAgent Mark I is a working local prototype. It does not provide a UI, autonomously modify itself, or support every agent platform yet. The point of this version is to prove the Mission -> Workshop -> Forge loop with durable local artifacts and explicit human review.
+HyperAgent Mark I is a working local prototype. It does not provide a polished hosted UI, autonomously modify itself, or support every agent platform yet. The optional local UI is a cockpit over markdown artifacts, not a replacement source of truth. The point of this version is to prove the Mission -> Workshop -> Forge loop with durable local artifacts and explicit human review.
 
 ## License
 

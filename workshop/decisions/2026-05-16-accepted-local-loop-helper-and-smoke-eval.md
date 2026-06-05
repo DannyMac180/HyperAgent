@@ -13,6 +13,8 @@
 - Human approval recorded: yes
 - Silent activation allowed: no
 - Permission or secrets changes approved: no
+- Filesystem authority approved: no new authority; writes remain limited to local repository artifacts.
+- Network or account authority approved: no
 
 ## Outcome
 
@@ -20,4 +22,3 @@
 - Verification: `sh scripts/verify-mvp.sh`; `sh evals/smoke-loop.sh`; `sh scripts/hyperagent.sh status`.
 - Registry update: `hyperagent/capability-registry.md`
 - Rollback path: Revert the files named above and remove the `local-loop-helper` registry entry.
-

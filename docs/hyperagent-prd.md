@@ -464,6 +464,8 @@ I can install HyperAgent into Codex, assign a simple real task to the agent, and
 
 ### Milestone 5: Multi-Platform Suit
 
+Deferred until the Codex adapter boundary is reviewed. Future platform work should start from `adapters/contract.md` and preserve the current Codex-first alpha scope.
+
 - Claude Code adapter.
 - OpenClaw adapter.
 - Cursor adapter.

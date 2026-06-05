@@ -4,6 +4,19 @@ Use this checklist to test the public README flow the way a first-time Codex Mac
 
 The goal is to verify that the README prompt can take a machine from no local HyperAgent install to a working Codex skill and optional project initialization, without requiring the user to understand the internal command sequence first.
 
+## Latest Recorded Result
+
+Status as of 2026-05-24: not yet run for the next alpha candidate from this reviewed branch.
+
+Before tagging the next alpha, record:
+
+- candidate commit,
+- Codex Desktop version or build if available,
+- whether the README prompt completed without manual edits,
+- whether project init required explicit confirmation,
+- whether a restart or fresh thread was needed before the skill appeared,
+- any mismatch between the README, release notes, install flow, and actual shipped surface.
+
 ## What This Test Covers
 
 - The GitHub README is the entry point.
@@ -13,6 +26,7 @@ The goal is to verify that the README prompt can take a machine from no local Hy
 - Project initialization happens only after explicit user confirmation.
 - Codex clearly reports any manual step it cannot perform.
 - Global Codex custom instructions are not changed by the installer prompt.
+- The documented command path can set up the Codex skill without relying on a long first-run prompt.
 
 ## Before You Start
 
@@ -43,7 +57,14 @@ if [ -e "$HOME/HyperAgent" ]; then
 fi
 ```
 
-## Test Flow
+## Command Path Test Flow
+
+1. Open Terminal.
+2. Run the command from the README `Try HyperAgent In Codex Mac` section.
+3. Confirm the script reports clone or update status, verification, skill install, and restart or fresh-thread guidance.
+4. Confirm it does not initialize the scratch project unless `--init-target "$HOME/hyperagent-uat-target"` is passed and confirmed with `y`.
+
+## Codex Prompt Test Flow
 
 1. Open the Codex Mac app in the scratch target project.
 2. Open the HyperAgent GitHub README.
@@ -61,8 +82,8 @@ The test passes when all of these are true:
 - `~/HyperAgent` exists and is a clone of the HyperAgent repo.
 - HyperAgent local verification passes, including `sh scripts/verify-mvp.sh`.
 - `~/.codex/skills/codex-hyperagent/SKILL.md` exists.
-- The scratch project contains `.hyperagent`, `AGENTS.md`, `missions/`, `workshop/`, `forge/`, `templates/`, and `hyperagent/` after confirmed init.
-- The scratch project does not require copied `scripts/hyperagent.sh` or copied `ui/` assets for the core setup to be valid.
+- The command path reports that global Codex custom instructions were unchanged.
+- The scratch project contains `.hyperagent`, `AGENTS.md`, `missions/`, `workshop/`, `forge/`, `templates/`, `hyperagent/`, and `scripts/hyperagent.sh` after confirmed init.
 - Codex reports whether a restart or fresh thread is needed.
 - Codex reports the files it changed.
 - Codex does not edit global Codex custom instructions during the happy path.

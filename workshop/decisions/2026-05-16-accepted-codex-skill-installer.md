@@ -13,6 +13,8 @@
 - Human approval recorded: yes
 - Silent activation allowed: no
 - Permission or secrets changes approved: no
+- Filesystem authority approved: no new authority; writes remain limited to the explicit local skills target.
+- Network or account authority approved: no
 
 ## Outcome
 

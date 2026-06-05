@@ -6,12 +6,9 @@
 - Environment:
 - User request:
 
-## Artifact Metadata
+## Auto-Filled Evidence
 
-- Artifact type: mission
-- Artifact status: draft
-
-## Repository Evidence
+### Repository Evidence
 
 - Repo path:
 - Branch:
@@ -25,16 +22,24 @@
 ~~~text
 ~~~
 
-## Execution Evidence
+- Sense snapshot:
 
-- Commands run:
+~~~markdown
+~~~
+
+- Recent commands and checks:
+
+~~~text
+~~~
+
 - Verification status:
 
-## Outcome
+## Agent Judgment
 
 - Final outcome:
 - Completion evidence:
 - Unresolved risks:
+- Candidate upgrades:
 
 ## Actions
 

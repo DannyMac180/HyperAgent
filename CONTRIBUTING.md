@@ -18,8 +18,27 @@ HyperAgent is an early alpha, Codex-first, file-based project. Contributions sho
 2. Create a proposal in `workshop/proposals/` using `templates/upgrade-proposal.md`.
 3. Score the proposal with `workshop/rubric.md`.
 4. Add the proposal to `workshop/backlog.md` if it is worth tracking.
-5. Include an acceptance test and rollback plan.
-6. Keep the activation mode `human review required`.
+5. Complete the Suit Not Scaffold review gate.
+6. Include an acceptance test and rollback plan.
+7. Keep the activation mode `human review required`.
+
+## Suit Not Scaffold Review Gate
+
+Before adding a feature, decide whether it strengthens durable agency infrastructure or only patches a narrow workflow. The allowed durable-agency pillars are: sensing, verification, memory, safety, capability discovery, upgrade flow, and adapter boundary.
+
+Answer these questions in the proposal and PR:
+
+- Which durable-agency pillar does this strengthen?
+- Is the feature core Suit infrastructure, an adapter-specific convenience, an example, or an experiment?
+- If it is task-specific, why does it belong outside core?
+- What evidence or local verification will show the feature prevents product creep instead of adding it?
+
+Use these homes:
+
+- Core Suit infrastructure belongs in the local Mission -> Workshop -> Forge loop, shared templates, verification, safety boundaries, memory shape, or capability discovery surfaces.
+- Adapter-specific conveniences belong under adapter-owned docs, config, scripts, or examples until the adapter boundary is accepted.
+- Examples belong in docs, fixtures, eval fixtures, or sample artifacts that do not become required product behavior.
+- Experiments belong in Workshop proposals, backlog candidates, or clearly marked future work until a human decision accepts them.
 
 Accepted upgrades require:
 
@@ -27,6 +46,19 @@ Accepted upgrades require:
 - a decision record in `workshop/decisions/`,
 - a capability registry entry in `hyperagent/capability-registry.md`,
 - verification evidence.
+
+## How To Handle Mission Evidence
+
+Mission records can include local paths, issue metadata, trace references, and implementation details from real dogfooding. Before committing mission evidence, follow `docs/evidence-policy.md`.
+
+Use `docs/examples/missions/` for public-safe sample missions. Keep raw local evidence in ignored paths such as `.hyperagent-evidence/`.
+
+Before proposing a public mission commit, run:
+
+```bash
+sh scripts/hyperagent.sh verify-mission --strict PATH
+sh scripts/hyperagent.sh mission redact-check PATH
+```
 
 ## How To Add Evals
 
@@ -75,6 +107,21 @@ Examples:
 - better promotion rules from proposals to accepted capabilities.
 
 Use `forge/process/quality-rubric.md` and write Forge reviews in `forge/reviews/`.
+
+## Product State Reconciliation
+
+When a contribution changes user-visible product state, reconcile the inspectable truth files in the same PR.
+
+Checklist:
+
+- Update `docs/roadmap.md` when a surface becomes shipped, accepted, in review, deferred, or stale.
+- Keep `README.md` high level and link to `docs/roadmap.md` instead of duplicating detailed status tables.
+- Update `docs/releases/v0.1.0-alpha.md` only for first-alpha truth; put unreleased next-alpha notes in `docs/releases/next-alpha.md`.
+- Add accepted capabilities to `hyperagent/capability-registry.md` only after a human decision record exists in `workshop/decisions/`.
+- Put implemented-but-unaccepted surfaces in the registry and backlog as `in review`, not `accepted`.
+- Update `workshop/backlog.md` when a new proposal-backed item, review candidate, or deferred PRD area changes.
+- Review `docs/architecture/hyperagent.mmd` and `docs/assets/hyperagent-architecture.svg` when user-visible modules are added, removed, renamed, or materially changed.
+- Run `sh scripts/verify-mvp.sh` after reconciliation.
 
 ## Pull Requests
 

@@ -35,7 +35,11 @@ The default activation mode is `human review required`.
 
 The Forge improves the Workshop itself.
 
-Forge reviews live in `forge/reviews/`. They review whether proposals are specific, evidence-backed, safe, testable, and worth installing. If proposals are vague or evals are weak, the Forge proposes process changes instead of new Suit capabilities.
+Forge reviews live in `forge/reviews/`. They review whether proposals are specific, evidence-backed, safe, testable, and worth installing, then look back at accepted upgrades to ask whether they improved behavior. A good Forge review grades outcome quality, proposal quality, eval quality, safety quality, and process bloat.
+
+Run a Forge review when a proposal is accepted or rejected, an eval changes, a release checklist asks which upgrades paid off, or repeated missions show the Workshop producing vague, unsafe, untested, or low-value proposals.
+
+If proposals are vague or evals are weak, the Forge proposes process changes instead of new Suit capabilities. Those process changes are written as normal Workshop proposals linked to the Forge review and still require human review before activation.
 
 `forge/process/quality-rubric.md` defines the proposal and process quality checks the Forge should apply.
 
@@ -47,5 +51,6 @@ Forge reviews live in `forge/reviews/`. They review whether proposals are specif
 4. Human approval or rejection is recorded in `workshop/decisions/`.
 5. Accepted upgrades are recorded in `hyperagent/capability-registry.md`.
 6. Forge reviews are written to `forge/reviews/`.
-7. Durable lessons are promoted into docs or Suit memory only after review.
-8. Proposals link back to mission records as evidence.
+7. Process-improvement proposals can link back to Forge reviews as evidence.
+8. Durable lessons are promoted into docs or Suit memory only after review.
+9. Proposals link back to mission records or Forge reviews as evidence.

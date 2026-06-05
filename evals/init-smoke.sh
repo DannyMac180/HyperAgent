@@ -47,6 +47,7 @@ require_dir "$target/workshop/decisions"
 require_dir "$target/forge/reviews"
 require_dir "$target/templates"
 require_dir "$target/hyperagent"
+require_dir "$target/scripts"
 
 require_file "$target/.hyperagent"
 require_file "$target/missions/.gitkeep"
@@ -60,35 +61,80 @@ require_file "$target/templates/forge-review.md"
 require_file "$target/workshop/rubric.md"
 require_file "$target/workshop/backlog.md"
 require_file "$target/forge/process/quality-rubric.md"
-require_file "$target/hyperagent/operating-prompt.md"
 require_file "$target/hyperagent/capability-registry.md"
 require_file "$target/hyperagent/README.md"
+require_file "$target/scripts/hyperagent.sh"
 require_file "$target/AGENTS.md"
-
-test ! -e "$target/scripts/hyperagent.sh" || fail "init copied the full helper runtime into the target"
-test ! -e "$target/ui" || fail "init copied optional UI assets into the target"
 
 require_text "$target/AGENTS.md" "Existing Project Instructions"
 require_text "$target/AGENTS.md" "Keep this project-specific note."
 require_text "$target/AGENTS.md" "HyperAgent Project Instructions"
-require_text "$target/AGENTS.md" "hyperagent status"
+require_text "$target/AGENTS.md" "sh scripts/hyperagent.sh status"
 require_text "$target/.hyperagent" 'hyperagent_version = "v0.1.0-alpha"'
-require_text "$target/.hyperagent" 'install_mode = "copy"'
+require_text "$target/.hyperagent" 'install_mode = "global-runtime"'
 require_text "$target/.hyperagent" 'project_instructions = "AGENTS.md"'
 require_text "$target/.hyperagent" 'evidence_log = ".hyperagent-evidence/commands.log"'
+require_text "$target/.hyperagent" 'override_env = "HYPERAGENT_RUNTIME_ROOT"'
 require_text "$target/.hyperagent" 'codex = true'
-require_text "$target/.hyperagent" '[verification.core]'
-require_text "$target/.hyperagent" '"hyperagent status"'
+require_text "$target/.hyperagent" '"sh scripts/hyperagent.sh verify-config"'
+require_text "$target/.hyperagent" '"sh scripts/hyperagent.sh status"'
 require_text "$target/hyperagent/README.md" "Copy And Symlink Behavior"
+require_text "$target/hyperagent/README.md" "Init Output Categories"
+require_text "$target/hyperagent/README.md" "Five Primary Flows"
+require_text "$target/hyperagent/README.md" "Global runtime dependency"
+require_text "$target/hyperagent/README.md" "Updating Existing Projects"
 require_text "$target/hyperagent/README.md" "machine-readable project anchor"
-require_text "$target/hyperagent/README.md" "hyperagent sense"
+require_text "$target/hyperagent/README.md" "sh scripts/hyperagent.sh verify-config"
+require_text "$target/hyperagent/README.md" "sh scripts/hyperagent.sh sense"
+require_text "$target/hyperagent/README.md" "sh scripts/hyperagent.sh mission closeout"
+require_text "$target/hyperagent/README.md" "sh scripts/hyperagent.sh review workshop"
+require_text "$target/hyperagent/README.md" "Compatibility aliases remain available"
 require_text "$target/hyperagent/README.md" "opt-in local command log"
-require_text "$target/hyperagent/README.md" "does not copy the optional UI or full HyperAgent runtime"
+require_text "$target/hyperagent/README.md" "global HyperAgent runtime"
+require_text "$target/hyperagent/README.md" "--forge-review"
 require_text "$target/hyperagent/capability-registry.md" "human review required"
 require_text "$target/workshop/backlog.md" "HyperAgent Project Upgrade Backlog"
 if grep -F "2026-05-16-1216-local-loop-helper-and-smoke-eval" "$target/workshop/backlog.md" >/dev/null; then
   fail "init copied source-repo backlog entries into the target"
 fi
+test ! -e "$target/hyperagent/operating-prompt.md" || fail "init copied the runtime operating prompt into the target"
+if grep -F "generate_init_config()" "$target/scripts/hyperagent.sh" >/dev/null; then
+  fail "init copied the full runtime helper instead of the project shim"
+fi
+
+sh "$target/scripts/hyperagent.sh" verify-config >/dev/null
+sh "$target/scripts/hyperagent.sh" status >/dev/null
+
+bad_config="$tmpdir/bad-project"
+mkdir -p "$bad_config"
+sh "$repo_root/scripts/hyperagent.sh" init --target "$bad_config" >/dev/null
+awk '$1 != "hyperagent_version"' "$bad_config/.hyperagent" >"$bad_config/.hyperagent.tmp"
+mv "$bad_config/.hyperagent.tmp" "$bad_config/.hyperagent"
+if sh "$bad_config/scripts/hyperagent.sh" verify-config >"$tmpdir/bad-config.out" 2>"$tmpdir/bad-config.err"; then
+  fail "verify-config passed with a missing hyperagent_version"
+fi
+require_text "$tmpdir/bad-config.err" "missing required field hyperagent_version"
+
+custom_paths="$tmpdir/custom-path-project"
+mkdir -p "$custom_paths/project-memory/missions" "$custom_paths/project-memory/forge-reviews"
+sh "$repo_root/scripts/hyperagent.sh" init --target "$custom_paths" >/dev/null
+sed \
+  -e 's#missions = "missions"#missions = "project-memory/missions"#' \
+  -e 's#forge_reviews = "forge/reviews"#forge_reviews = "project-memory/forge-reviews"#' \
+  "$custom_paths/.hyperagent" >"$custom_paths/.hyperagent.tmp"
+mv "$custom_paths/.hyperagent.tmp" "$custom_paths/.hyperagent"
+custom_mission=$(sh "$custom_paths/scripts/hyperagent.sh" new-mission --request "Verify configured mission path" --slug configured-mission-path)
+case "$custom_mission" in
+  "$custom_paths/project-memory/missions/"*) ;;
+  *) fail "new-mission did not honor configured missions path: $custom_mission" ;;
+esac
+test -f "$custom_mission" || fail "configured mission path did not create a mission"
+custom_review=$(sh "$custom_paths/scripts/hyperagent.sh" new-forge-review --slug configured-forge-path)
+case "$custom_review" in
+  "$custom_paths/project-memory/forge-reviews/"*) ;;
+  *) fail "new-forge-review did not honor configured forge_reviews path: $custom_review" ;;
+esac
+test -f "$custom_review" || fail "configured forge review path did not create a review"
 
 printf 'local change\n' >>"$target/.hyperagent"
 if sh "$repo_root/scripts/hyperagent.sh" init --target "$target" >"$refusal_log" 2>&1; then
@@ -100,6 +146,50 @@ sh "$repo_root/scripts/hyperagent.sh" init --target "$target" --force >/dev/null
 if grep -F "local change" "$target/.hyperagent" >/dev/null; then
   fail "--force did not replace the changed project config"
 fi
+
+legacy_target="$tmpdir/legacy-project"
+mkdir -p "$legacy_target/scripts" "$legacy_target/hyperagent"
+cp "$repo_root/scripts/hyperagent.sh" "$legacy_target/scripts/hyperagent.sh"
+cp "$repo_root/hyperagent/operating-prompt.md" "$legacy_target/hyperagent/operating-prompt.md"
+cat >"$legacy_target/.hyperagent" <<'EOF'
+# HyperAgent project config
+
+hyperagent_version = "v0.1.0-alpha"
+config_version = 1
+install_mode = "copy"
+
+[paths]
+project_instructions = "AGENTS.md"
+missions = "missions"
+workshop_proposals = "workshop/proposals"
+workshop_decisions = "workshop/decisions"
+workshop_backlog = "workshop/backlog.md"
+workshop_rubric = "workshop/rubric.md"
+forge_reviews = "forge/reviews"
+forge_quality_rubric = "forge/process/quality-rubric.md"
+templates = "templates"
+operating_prompt = "hyperagent/operating-prompt.md"
+capability_registry = "hyperagent/capability-registry.md"
+project_readme = "hyperagent/README.md"
+local_helper = "scripts/hyperagent.sh"
+evidence_log = ".hyperagent-evidence/commands.log"
+workbench_trace_log = ".hyperagent-evidence/workbench/traces.jsonl"
+
+[adapters]
+codex = true
+
+[verification]
+commands = [
+  "sh scripts/hyperagent.sh status",
+]
+EOF
+sh "$repo_root/scripts/hyperagent.sh" init --target "$legacy_target" --update >/dev/null
+require_text "$legacy_target/.hyperagent" 'install_mode = "global-runtime"'
+test ! -e "$legacy_target/hyperagent/operating-prompt.md" || fail "--update kept copied runtime prompt"
+if grep -F "generate_init_config()" "$legacy_target/scripts/hyperagent.sh" >/dev/null; then
+  fail "--update kept copied runtime helper"
+fi
+sh "$legacy_target/scripts/hyperagent.sh" status >/dev/null
 
 dry_target="$tmpdir/dry-project"
 mkdir -p "$dry_target"

@@ -28,6 +28,9 @@ Primary flows:
   review workshop (--mission PATH | --forge-review PATH) --title TEXT --problem TEXT [--slug SLUG]
       Create a human-review-required Workshop proposal from mission or Forge evidence.
 
+  review proposal (--mission PATH | --forge-review PATH) --title TEXT --problem TEXT [--slug SLUG]
+      Compatibility alias for review workshop.
+
   review digest [--limit N] [--draft-proposal] [--title TEXT] [--slug SLUG]
       Review recent mission, Workshop, and Forge artifacts for backlog movement opportunities.
 
@@ -39,6 +42,12 @@ Primary flows:
 
   review decide --proposal PATH --decision accepted|rejected --reviewer NAME --reason TEXT [--capability ID]
       Record a human approval decision. Accepted decisions require --capability.
+
+  review decision --proposal PATH --decision accepted|rejected --reviewer NAME --reason TEXT [--capability ID]
+      Compatibility alias for review decide.
+
+  verify core|extensions|release|all
+      Run HyperAgent verification tiers.
 
   ui
       Open the local HyperAgent cockpit when available. Currently prints local status and roadmap pointers.
@@ -1848,18 +1857,67 @@ print_doctor() {
 }
 
 print_ui() {
+  case "${1:-}" in
+    --help|-h|help)
+      cat <<'EOF'
+Usage: sh scripts/hyperagent.sh ui [serve --host HOST --port PORT]
+
+Without a subcommand, print local cockpit pointers. Use `serve` to start the optional local UI when the Node runtime file is available.
+EOF
+      return 0
+      ;;
+    serve)
+      shift
+      command -v node >/dev/null 2>&1 || fail "node is required to run the HyperAgent UI"
+      test -f "$runtime_root/scripts/hyperagent-ui.mjs" || fail "missing optional UI runtime: $runtime_root/scripts/hyperagent-ui.mjs"
+      exec node "$runtime_root/scripts/hyperagent-ui.mjs" "$@"
+      ;;
+    '')
+      ;;
+    *)
+      fail "unknown ui option or subcommand: $1"
+      ;;
+  esac
+
   cat <<'EOF'
 HyperAgent UI
 
-The hosted cockpit is not part of this local alpha yet. Use these local cockpit views:
+The hosted cockpit is not part of this local alpha. Use these local cockpit views:
 
   sh scripts/hyperagent.sh sense
   sh scripts/hyperagent.sh review digest
   sh scripts/hyperagent.sh review forge audit
+  sh scripts/hyperagent.sh ui serve
 
 Product state:
   docs/roadmap.md
 EOF
+}
+
+verify_tier() {
+  tier=${1:-core}
+  case "$tier" in
+    core|mvp)
+      (cd "$runtime_root" && sh scripts/verify-core.sh)
+      ;;
+    extensions|extension)
+      (cd "$runtime_root" && sh scripts/verify-extensions.sh)
+      ;;
+    release)
+      (cd "$runtime_root" && sh scripts/verify-release.sh)
+      ;;
+    all)
+      (cd "$runtime_root" && sh scripts/verify-core.sh)
+      (cd "$runtime_root" && sh scripts/verify-extensions.sh)
+      (cd "$runtime_root" && sh scripts/verify-release.sh)
+      ;;
+    help|-h|--help)
+      printf '%s\n' "Usage: sh scripts/hyperagent.sh verify core|extensions|release|all"
+      ;;
+    *)
+      fail "unknown verify tier: $tier"
+      ;;
+  esac
 }
 
 create_mission() {
@@ -3295,6 +3353,9 @@ case "$command" in
   verify-safety)
     verify_safety "$@"
     ;;
+  verify)
+    verify_tier "$@"
+    ;;
   status)
     print_status "$@"
     ;;
@@ -3347,8 +3408,16 @@ case "$command" in
       shift
     fi
     case "$subcommand" in
-      workshop)
+      workshop|proposal)
         create_proposal "$@"
+        ;;
+      prompt)
+        prompt=${1:-}
+        case "$prompt" in
+          workshop) print_workshop_prompt ;;
+          forge) print_forge_prompt ;;
+          *) fail "review prompt requires workshop or forge" ;;
+        esac
         ;;
       digest)
         print_workshop_digest "$@"
@@ -3362,6 +3431,9 @@ case "$command" in
           new)
             create_forge_review "$@"
             ;;
+          --*)
+            create_forge_review "$forge_subcommand" "$@"
+            ;;
           audit)
             run_forge_audit "$@"
             ;;
@@ -3374,7 +3446,7 @@ case "$command" in
             ;;
         esac
         ;;
-      decide)
+      decide|decision)
         record_decision "$@"
         ;;
       help|-h|--help)
@@ -3393,7 +3465,12 @@ case "$command" in
     record_check "$@"
     ;;
   check)
-    run_check "$@"
+    if [ "${1:-}" = "--record" ]; then
+      shift
+      record_check "$@"
+    else
+      run_check "$@"
+    fi
     ;;
   new-mission)
     create_mission "$@"

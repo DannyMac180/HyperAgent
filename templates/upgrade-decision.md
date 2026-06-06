@@ -8,6 +8,11 @@
 - Reason:
 - Capability registry ID:
 
+## Artifact Metadata
+
+- Artifact type: decision
+- Artifact status:
+
 ## Authority Boundary
 
 - Human approval recorded:

@@ -9,6 +9,8 @@ HyperAgent is an early alpha, Codex-first, file-based project. Contributions sho
 - Do not add autonomous self-modification.
 - Do not broaden filesystem, shell, network, deployment, account, or secrets access without explicit review.
 - Prefer markdown templates, small shell scripts, and focused evals before adding heavier infrastructure.
+- Keep the PRD core small. Put optional UI, sensing, Workbench, reliability, or release-support work behind the extension/release boundary described in `docs/product-state.md`.
+- Use `docs/safety-policy.md` for authority-boundary checks and `docs/evidence-policy.md` before committing mission or trace evidence.
 
 ## How To Propose A Suit Upgrade
 
@@ -77,6 +79,13 @@ sh scripts/verify-mvp.sh
 sh evals/smoke-loop.sh
 ```
 
+Use broader tiers when relevant:
+
+```bash
+sh scripts/verify-extensions.sh
+sh scripts/verify-release.sh
+```
+
 ## How To Change Templates
 
 Template changes affect the Suit's memory shape. When changing templates:
@@ -131,3 +140,4 @@ PRs should explain:
 - any safety or authority-boundary implications,
 - whether user-visible module changes required an architecture diagram update,
 - rollback path when behavior changes persist.
+- whether the change affects core, optional extensions, release support, or adapter boundaries.

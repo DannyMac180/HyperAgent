@@ -47,18 +47,18 @@ missions/2026-05-23-2006-dan-184-mission-closeout-automation.md
 ### Recent Commands And Checks
 
 ~~~text
-2026-05-23 20:05 EDT	passed	sh scripts/verify-mvp.sh	
-2026-05-23 20:05 EDT	passed	sh evals/sense-smoke.sh	
-2026-05-23 20:05 EDT	passed	sh evals/smoke-loop.sh	
-2026-05-23 20:06 EDT	passed	sh evals/init-smoke.sh	
-2026-05-23 20:06 EDT	passed	sh scripts/verify-mvp.sh	
-2026-05-23 20:06 EDT	passed	sh evals/sense-smoke.sh	
-2026-05-23 20:06 EDT	passed	sh evals/smoke-loop.sh	
-2026-05-23 20:07 EDT	passed	sh evals/init-smoke.sh	
-2026-05-23 20:07 EDT	passed	sh scripts/verify-mvp.sh	
-2026-05-23 20:07 EDT	passed	sh evals/sense-smoke.sh	
-2026-05-23 20:07 EDT	passed	sh evals/smoke-loop.sh	
-2026-05-23 20:07 EDT	passed	sh scripts/hyperagent.sh verify-mission --strict missions/2026-05-23-2006-dan-184-mission-closeout-automation.md	
+2026-05-23 20:05 EDT	passed	sh scripts/verify-mvp.sh
+2026-05-23 20:05 EDT	passed	sh evals/sense-smoke.sh
+2026-05-23 20:05 EDT	passed	sh evals/smoke-loop.sh
+2026-05-23 20:06 EDT	passed	sh evals/init-smoke.sh
+2026-05-23 20:06 EDT	passed	sh scripts/verify-mvp.sh
+2026-05-23 20:06 EDT	passed	sh evals/sense-smoke.sh
+2026-05-23 20:06 EDT	passed	sh evals/smoke-loop.sh
+2026-05-23 20:07 EDT	passed	sh evals/init-smoke.sh
+2026-05-23 20:07 EDT	passed	sh scripts/verify-mvp.sh
+2026-05-23 20:07 EDT	passed	sh evals/sense-smoke.sh
+2026-05-23 20:07 EDT	passed	sh evals/smoke-loop.sh
+2026-05-23 20:07 EDT	passed	sh scripts/hyperagent.sh verify-mission --strict missions/2026-05-23-2006-dan-184-mission-closeout-automation.md
 ~~~
 
 ### Failures And Retries

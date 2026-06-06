@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1200" height="680" viewBox="0 0 1200 680" role="img" aria-labelledby="title desc">
   <title id="title">HyperAgent high-level architecture</title>
-  <desc id="desc">A 30,000 foot diagram showing user intent flowing through Codex into HyperAgent, which coordinates project registry, global suit, workspace context, mission records, Workshop, Forge, and Human Review.</desc>
+  <desc id="desc">A 30,000 foot diagram showing user intent flowing through Codex into HyperAgent, which coordinates project registry, global suit, workspace context, a local Web UI, mission records, Workshop, Forge, and Human Review.</desc>
   <defs>
     <filter id="shadow" x="-12%" y="-18%" width="124%" height="136%">
       <feDropShadow dx="0" dy="10" stdDeviation="12" flood-color="#0f172a" flood-opacity="0.13"/>
@@ -54,14 +54,19 @@
   <text class="label" x="763" y="441">Suit</text>
   <text class="small" x="747" y="463">rules and skills</text>
 
-  <rect x="610" y="512" width="160" height="82" rx="14" fill="#e0f2fe" stroke="#0284c7"/>
-  <text class="label" x="641" y="548">Workspace</text>
-  <text class="small" x="634" y="571">local context</text>
+  <rect x="520" y="512" width="160" height="82" rx="14" fill="#e0f2fe" stroke="#0284c7"/>
+  <text class="label" x="551" y="548">Workspace</text>
+  <text class="small" x="544" y="571">local context</text>
+
+  <rect x="716" y="512" width="160" height="82" rx="14" fill="#e0f2fe" stroke="#0284c7"/>
+  <text class="label" x="747" y="548">Local UI</text>
+  <text class="small" x="743" y="571">evidence cockpit</text>
 
   <path class="soft-line" d="M619 314 L588 370"/>
   <path class="soft-line" d="M697 314 L779 371"/>
-  <path class="soft-line" d="M584 474 L662 506"/>
-  <path class="soft-line" d="M796 474 L720 506"/>
+  <path class="soft-line" d="M584 474 L584 500"/>
+  <path class="soft-line" d="M796 474 L796 500"/>
+  <path class="soft-line" d="M720 314 L784 500"/>
 
   <rect x="858" y="176" width="188" height="90" rx="14" fill="#dcfce7" stroke="#16a34a"/>
   <text class="label" x="895" y="213">Mission</text>
@@ -81,6 +86,10 @@
   <text class="small" x="190" y="510">approves persistence</text>
 
   <path class="line" d="M760 246 C806 226 814 221 846 221"/>
+  <path class="soft-line" d="M876 553 C912 521 928 496 946 448"/>
+  <path class="soft-line" d="M876 553 C930 492 947 423 952 402"/>
+  <path class="soft-line" d="M876 553 C938 459 953 332 952 266"/>
+  <path class="soft-line" d="M716 553 C548 550 404 524 353 498"/>
   <path class="line" d="M952 266 V300"/>
   <path class="line" d="M952 402 V436"/>
   <path class="line" d="M858 357 C694 356 535 460 353 487"/>

@@ -37,16 +37,16 @@ evals/fixtures/reliability-traces/
 ### Recent Commands And Checks
 
 ~~~text
-2026-05-24 06:56 EDT	passed	sh evals/reliability-gains.sh	
-2026-05-24 06:56 EDT	passed	sh evals/reliability-gains.sh --traces evals/fixtures/reliability-traces --output evals/out/reliability-gains-traces	
-2026-05-24 06:56 EDT	passed	git diff --check	
-2026-05-24 06:56 EDT	passed	sh scripts/verify-mvp.sh	
-2026-05-24 06:56 EDT	passed	sh evals/smoke-loop.sh	
-2026-05-24 06:57 EDT	passed	sh evals/reliability-gains.sh --traces evals/fixtures/reliability-traces --output evals/out/reliability-gains-traces	
-2026-05-24 06:57 EDT	passed	git diff --check	
-2026-05-24 06:57 EDT	passed	sh scripts/verify-mvp.sh	
-2026-05-24 06:57 EDT	passed	sh evals/reliability-gains.sh	
-2026-05-24 06:57 EDT	passed	sh evals/smoke-loop.sh	
+2026-05-24 06:56 EDT	passed	sh evals/reliability-gains.sh
+2026-05-24 06:56 EDT	passed	sh evals/reliability-gains.sh --traces evals/fixtures/reliability-traces --output evals/out/reliability-gains-traces
+2026-05-24 06:56 EDT	passed	git diff --check
+2026-05-24 06:56 EDT	passed	sh scripts/verify-mvp.sh
+2026-05-24 06:56 EDT	passed	sh evals/smoke-loop.sh
+2026-05-24 06:57 EDT	passed	sh evals/reliability-gains.sh --traces evals/fixtures/reliability-traces --output evals/out/reliability-gains-traces
+2026-05-24 06:57 EDT	passed	git diff --check
+2026-05-24 06:57 EDT	passed	sh scripts/verify-mvp.sh
+2026-05-24 06:57 EDT	passed	sh evals/reliability-gains.sh
+2026-05-24 06:57 EDT	passed	sh evals/smoke-loop.sh
 ~~~
 
 ### Failures And Retries

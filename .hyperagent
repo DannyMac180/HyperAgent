@@ -36,3 +36,33 @@ commands = [
   "sh evals/forge-audit-smoke.sh",
   "sh evals/smoke-loop.sh",
 ]
+
+[verification.core]
+commands = [
+  "sh scripts/hyperagent.sh verify-config",
+  "sh scripts/hyperagent.sh status",
+  "sh scripts/verify-mvp.sh",
+  "sh scripts/verify-core.sh",
+]
+
+[verification.extensions]
+commands = [
+  "sh scripts/hyperagent.sh sense --pr off",
+  "sh scripts/hyperagent.sh sense --doctor",
+  "sh scripts/hyperagent.sh ui --help",
+  "sh scripts/verify-extensions.sh",
+  "sh evals/extensions/sense-smoke.sh",
+  "sh evals/extensions/ui-smoke.sh",
+  "sh evals/extensions/reliability-gains.sh",
+]
+
+[verification.release]
+commands = [
+  "sh scripts/verify-release.sh",
+  "sh evals/extensions/ui-smoke.sh",
+  "sh evals/init-smoke.sh",
+  "sh evals/extensions/sense-smoke.sh",
+  "sh evals/sense-smoke.sh",
+  "sh evals/forge-audit-smoke.sh",
+  "sh evals/smoke-loop.sh",
+]

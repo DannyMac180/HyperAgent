@@ -39,10 +39,10 @@ adapters/
 ### Recent Commands And Checks
 
 ~~~text
-2026-05-24 09:20 EDT	passed	sh scripts/verify-mvp.sh	
-2026-05-24 09:20 EDT	passed	sh scripts/verify-mvp.sh	
-2026-05-24 09:20 EDT	passed	sh evals/smoke-loop.sh	
-2026-05-24 09:20 EDT	passed	sh scripts/hyperagent.sh verify-config	
+2026-05-24 09:20 EDT	passed	sh scripts/verify-mvp.sh
+2026-05-24 09:20 EDT	passed	sh scripts/verify-mvp.sh
+2026-05-24 09:20 EDT	passed	sh evals/smoke-loop.sh
+2026-05-24 09:20 EDT	passed	sh scripts/hyperagent.sh verify-config
 ~~~
 
 ### Failures And Retries

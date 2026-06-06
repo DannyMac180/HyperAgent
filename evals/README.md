@@ -2,14 +2,25 @@
 
 Mark I evals are local checks for the Mission -> Workshop loop. They are intentionally small and dependency-free.
 
-Run:
+## Verification Tiers
+
+Run the PRD core verifier:
 
 ```bash
 sh scripts/hyperagent.sh verify-config
 sh scripts/verify-mvp.sh
 ```
 
-The config verifier checks the root `.hyperagent` project contract. The artifact verifier checks whether the repo contains the artifacts required by the PRD for the Codex-first prototype.
+`verify-mvp.sh` is a compatibility alias for `scripts/verify-core.sh`.
+
+Run optional extension and release checks only when touching those surfaces:
+
+```bash
+sh scripts/verify-extensions.sh
+sh scripts/verify-release.sh
+```
+
+The config verifier checks the root `.hyperagent` project contract. The core verifier checks whether the repo contains the artifacts required by the PRD for the Codex-first prototype. Extension checks cover local sensing, Workbench trace enrichment, the optional UI cockpit, and reliability scoring. Release checks cover public packaging docs and GitHub-facing release artifacts.
 
 ## Loop Smoke Eval
 

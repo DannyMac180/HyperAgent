@@ -6,6 +6,7 @@ flowchart LR
   Registry["Project registry<br/>workspaces, commands, roles"]
   Suit["Global Suit<br/>rules, safety defaults, skills"]
   Workspace["Workspace-local context<br/>repo rules, workflows, memory"]
+  UI["Local Web UI<br/>evidence cockpit"]
 
   Missions["Mission records<br/>evidence from real work"]
   Workshop["Workshop<br/>proposes Suit upgrades"]
@@ -17,11 +18,16 @@ flowchart LR
   Core --> Registry
   Core --> Suit
   Core --> Workspace
+  Core --> UI
 
   Registry --> Workspace
   Suit --> Workspace
 
   Workspace --> Missions
+  UI --> Missions
+  UI --> Workshop
+  UI --> Forge
+  UI --> Review
   Missions --> Workshop
   Workshop --> Review
   Review --> Suit
@@ -37,7 +43,7 @@ flowchart LR
 
   class User,Codex entry;
   class Core core;
-  class Registry,Suit,Workspace support;
+  class Registry,Suit,Workspace,UI support;
   class Missions evidence;
   class Workshop,Forge upgrade;
   class Review review;

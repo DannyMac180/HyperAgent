@@ -140,8 +140,8 @@ The PRD core to preserve:
 
 ### P2: Useful Cleanups
 
-37. Rename extension evals by capability.
-    Example: `evals/extensions/ui-smoke.sh`, `evals/extensions/sense-smoke.sh`.
+37. Keep extension evals on the canonical top-level paths.
+    Example: `evals/ui-smoke.sh`, `evals/sense-smoke.sh`.
 
 38. Keep `.github` issue templates outside MVP verification.
     They matter for open source readiness, not the product loop.

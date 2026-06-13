@@ -9,7 +9,6 @@ The goal is not to have Codex grade itself. The goal is for a human to check whe
 Read these first:
 
 - `docs/hyperagent-prd.md`
-- `docs/product-state.md`
 - `docs/roadmap.md`
 - `docs/extensions.md`
 - `docs/safety-policy.md`
@@ -132,7 +131,7 @@ Check that the UI reads local markdown artifacts, exposes only explicit local ac
 Run:
 
 ```bash
-sh evals/extensions/reliability-gains.sh
+sh evals/reliability-gains.sh
 ```
 
 Treat this as an optional research/eval surface until it uses real repeated mission evidence.
@@ -150,9 +149,9 @@ For optional extensions:
 
 ```bash
 sh scripts/verify-extensions.sh
-sh evals/extensions/sense-smoke.sh
-sh evals/extensions/ui-smoke.sh
-sh evals/extensions/reliability-gains.sh
+sh evals/sense-smoke.sh
+sh evals/ui-smoke.sh
+sh evals/reliability-gains.sh
 ```
 
 Before a public release:
@@ -171,7 +170,7 @@ For a serious dogfooding run:
 3. Review Workshop proposals weekly for specificity, testability, safety, rollback quality, and actual value.
 4. Review Forge output weekly for whether it improves proposal quality instead of adding process theater.
 5. Keep a short human notes file with surprising wins, annoying friction, skipped checks, and any places where HyperAgent felt heavier than the work deserved.
-6. End the run by updating `docs/product-state.md`, `docs/roadmap.md`, and release notes only if the actual product state changed.
+6. End the run by updating `docs/roadmap.md` and release notes only if the actual product state changed.
 
 ## Pass Criteria
 

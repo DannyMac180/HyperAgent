@@ -5,7 +5,7 @@ Implemented the complexity-reduction plan from `.workflow/hyperagent-prd-complex
 
 The implementation makes the smaller path canonical:
 
-- `docs/product-state.md` defines core vs optional extensions vs release support.
+- `docs/roadmap.md` defines core vs optional extensions vs release support.
 - `scripts/verify-mvp.sh` now delegates to `scripts/verify-core.sh`.
 - Optional UI/sensing/Workbench/reliability checks live in `scripts/verify-extensions.sh`.
 - Release/public packaging checks live in `scripts/verify-release.sh`.
@@ -19,7 +19,7 @@ The implementation makes the smaller path canonical:
 - CLI grouped commands added with compatibility aliases.
 - Init reduced to local memory/setup scaffolding.
 - Verification split into core, extensions, and release tiers.
-- Extension eval wrappers added.
+- Extension evals use canonical top-level paths.
 - Safety, evidence, adapter, backlog, and registry boundaries documented.
 - UI retained as optional cockpit and parser made less heuristic.
 
@@ -44,9 +44,9 @@ The implementation makes the smaller path canonical:
 - `sh scripts/verify-mvp.sh`
 - `sh evals/smoke-loop.sh`
 - `sh evals/init-smoke.sh`
-- `sh evals/extensions/sense-smoke.sh`
-- `sh evals/extensions/ui-smoke.sh`
-- `sh evals/extensions/reliability-gains.sh`
+- `sh evals/sense-smoke.sh`
+- `sh evals/ui-smoke.sh`
+- `sh evals/reliability-gains.sh`
 - `sh scripts/hyperagent.sh verify all`
 
 ## Remaining Risks

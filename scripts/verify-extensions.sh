@@ -24,9 +24,6 @@ require_file ui/app.js
 require_file evals/sense-smoke.sh
 require_file evals/ui-smoke.sh
 require_file evals/reliability-gains.sh
-require_file evals/extensions/sense-smoke.sh
-require_file evals/extensions/ui-smoke.sh
-require_file evals/extensions/reliability-gains.sh
 require_file evals/reliability-rubric.md
 require_file evals/fixtures/reliability/baseline-no-suit.md
 require_file evals/fixtures/reliability/hyperagent-suit.md
@@ -44,9 +41,6 @@ require_text ui/app.js "/api/overview"
 require_text evals/sense-smoke.sh "HyperAgent sense smoke passed."
 require_text evals/ui-smoke.sh "HyperAgent UI smoke passed."
 require_text evals/reliability-gains.sh "HyperAgent reliability gains eval passed."
-require_text evals/extensions/sense-smoke.sh "evals/sense-smoke.sh"
-require_text evals/extensions/ui-smoke.sh "evals/ui-smoke.sh"
-require_text evals/extensions/reliability-gains.sh "evals/reliability-gains.sh"
 require_text evals/reliability-rubric.md "Missed Verification"
 require_text evals/fixtures/reliability/hyperagent-suit.md "Condition: with-hyperagent"
 

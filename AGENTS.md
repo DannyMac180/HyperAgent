@@ -41,7 +41,7 @@ Because this repo is the HyperAgent testbed, prefer recording mission telemetry 
 
 ## Core And Extensions
 
-Use `docs/product-state.md` as the current source for what belongs to the PRD core versus optional extensions or release support.
+Use `docs/roadmap.md` as the current source for what belongs to the PRD core versus optional extensions or release support.
 
 - Core changes should preserve the Codex-first Suit, local mission evidence, Workshop, Forge, human review, and markdown-first memory.
 - Optional extension changes include the local UI, sensing extras, Workbench traces, and reliability scoring.

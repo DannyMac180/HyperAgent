@@ -9,7 +9,7 @@ HyperAgent is an early alpha, Codex-first, file-based project. Contributions sho
 - Do not add autonomous self-modification.
 - Do not broaden filesystem, shell, network, deployment, account, or secrets access without explicit review.
 - Prefer markdown templates, small shell scripts, and focused evals before adding heavier infrastructure.
-- Keep the PRD core small. Put optional UI, sensing, Workbench, reliability, or release-support work behind the extension/release boundary described in `docs/product-state.md`.
+- Keep the PRD core small. Put optional UI, sensing, Workbench, reliability, or release-support work behind the extension/release boundary described in `docs/roadmap.md`.
 - Use `docs/safety-policy.md` for authority-boundary checks and `docs/evidence-policy.md` before committing mission or trace evidence.
 
 ## How To Propose A Suit Upgrade

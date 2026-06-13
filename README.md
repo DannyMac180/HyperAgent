@@ -77,7 +77,7 @@ The MVP is file-based on purpose. There is no hosted service, no hidden database
 
 For the manual and one-command setup paths, see `docs/quickstart.md`.
 
-For current product boundaries, see `docs/product-state.md`, `docs/roadmap.md`, and `docs/extensions.md`.
+For current product boundaries, see `docs/roadmap.md` and `docs/extensions.md`.
 
 For repeated human dogfooding, see `docs/dogfooding.md`.
 
@@ -126,7 +126,7 @@ Restart Codex Desktop or open a fresh thread after updating the installed skill.
 
 - `docs/hyperagent-prd.md`: product requirements and milestone plan.
 - `docs/concepts.md`: the Suit, Mission, Workshop, and Forge mental model.
-- `docs/product-state.md`: current core, extension, release, and state ownership boundaries.
+- `docs/roadmap.md`: product-state source of truth for shipped, accepted, in-review, deferred, stale, core, optional extension, and release-support surfaces.
 - `docs/extensions.md`: optional sensing, UI, Workbench, and reliability surfaces.
 - `docs/adapters.md`: adapter boundary for Codex-first alpha and future platforms.
 - `docs/safety-policy.md`: authority boundary and activation policy.
@@ -139,7 +139,7 @@ Restart Codex Desktop or open a fresh thread after updating the installed skill.
 - `docs/release-checklist.md`: alpha release criteria, clean-clone test, and update model.
 - `docs/releases/v0.1.0-alpha.md`: first alpha release notes.
 - `docs/releases/next-alpha.md`: unreleased next-alpha notes.
-- `docs/roadmap.md`: product-state source of truth for shipped, accepted, in-review, deferred, and stale surfaces.
+- `docs/product-state.md`: compatibility pointer to the roadmap for older links.
 - `docs/ui-architecture.md`: optional local cockpit boundary, including read-mostly behavior, constrained commands, and markdown source-of-truth rules.
 - `docs/article-outline.md`: public essay outline for the Iron Man Suit thesis.
 - `skills/codex-hyperagent/`: Codex skill instructions.

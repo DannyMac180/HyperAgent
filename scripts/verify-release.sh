@@ -29,6 +29,7 @@ require_file docs/clean-install-uat.md
 require_file docs/dogfooding.md
 require_file docs/release-checklist.md
 require_file docs/releases/v0.1.0-alpha.md
+require_file docs/releases/next-alpha.md
 require_file docs/article-outline.md
 require_file docs/iron-man-suit-essence.md
 

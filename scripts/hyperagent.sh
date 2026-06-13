@@ -1261,19 +1261,6 @@ git_status_short() {
   fi
 }
 
-git_changed_files() {
-  if is_git_repo; then
-    status=$(git -C "$repo_root" status --short 2>/dev/null || true)
-    if [ -n "$status" ]; then
-      printf '%s\n' "$status" | sed 's/^...//'
-    else
-      printf 'none\n'
-    fi
-  else
-    printf 'not a git repository\n'
-  fi
-}
-
 print_status() {
   verify_config >/dev/null
   ensure_dirs
@@ -2263,31 +2250,6 @@ redact_check_file() {
   printf 'Redaction check passed: %s\n' "$file"
 }
 
-mission_command() {
-  subcommand=${1:-help}
-  if [ "$#" -gt 0 ]; then
-    shift
-  fi
-
-  case "$subcommand" in
-    redact-check)
-      test "$#" -gt 0 || fail "mission redact-check requires at least one path"
-      failed=0
-      for file in "$@"; do
-        redact_check_file "$file" || failed=1
-      done
-      test "$failed" -eq 0 || fail "mission redaction check found public-safety findings"
-      ;;
-    help|-h|--help)
-      usage
-      ;;
-    *)
-      usage >&2
-      fail "unknown mission subcommand: $subcommand"
-      ;;
-  esac
-}
-
 safety_field_value() {
   file="$1"
   label="$2"
@@ -2603,16 +2565,6 @@ create_proposal() {
 EOF
 
   printf '%s\n' "$file"
-}
-
-proposal_has_decision() {
-  proposal="$1"
-  test -d "$decision_dir" || return 1
-  for decision_file in "$decision_dir"/*.md; do
-    test -f "$decision_file" || continue
-    grep -F -e "$proposal" -e "$(basename "$proposal")" "$decision_file" >/dev/null 2>&1 && return 0
-  done
-  return 1
 }
 
 mission_has_proposal_handoff() {
@@ -3480,9 +3432,6 @@ case "$command" in
     ;;
   verify-mission)
     verify_mission "$@"
-    ;;
-  mission)
-    mission_command "$@"
     ;;
   propose-upgrade)
     create_proposal "$@"

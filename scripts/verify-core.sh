@@ -73,9 +73,10 @@ require_dir workshop/proposals
 require_dir workshop/decisions
 require_dir forge/reviews
 
-require_text docs/product-state.md "PRD core"
-require_text docs/product-state.md "Verification Tiers"
-require_text docs/product-state.md "Optional extension"
+require_text docs/product-state.md "compatibility pointer"
+require_text docs/roadmap.md "PRD core"
+require_text docs/roadmap.md "Verification Tiers"
+require_text docs/roadmap.md "Optional extension"
 require_text docs/roadmap.md "PRD Milestone Map"
 require_text docs/roadmap.md "PRD Faithfulness Improvement Map"
 require_text docs/roadmap.md "Current Focus"
@@ -124,7 +125,6 @@ require_text .hyperagent 'codex = true'
 require_text adapters/contract.md "HyperAgent Adapter Contract"
 require_text adapters/codex.md "Codex Adapter"
 require_text README.md "v0.1.0-alpha"
-require_text README.md "docs/product-state.md"
 require_text README.md "docs/roadmap.md"
 require_text README.md "docs/extensions.md"
 require_text README.md "docs/config.md"

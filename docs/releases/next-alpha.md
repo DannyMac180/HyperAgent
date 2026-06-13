@@ -92,7 +92,7 @@ Record the release-candidate verification here before tagging.
 | `sh evals/smoke-loop.sh` | Passed on 2026-05-24 | Ran from branch `dan-193-next-alpha-release-prep` after merging `origin/main` into the release-prep branch; output: `HyperAgent smoke loop passed.` |
 | `sh evals/init-smoke.sh` | Passed on 2026-05-24 | Ran from branch `dan-193-next-alpha-release-prep` after merging `origin/main` into the release-prep branch; output: `HyperAgent init smoke passed.` |
 | `sh evals/sense-smoke.sh` | Passed on 2026-05-24 | Ran from branch `dan-193-next-alpha-release-prep` after merging `origin/main` into the release-prep branch; output: `HyperAgent sense smoke passed.` |
-| `sh evals/ui-smoke.sh` | Not applicable | No `evals/ui-smoke.sh` exists in this repo; the optional local cockpit is not yet treated as a primary product surface. |
+| `sh evals/ui-smoke.sh` | Pending refresh | The eval exists as the canonical optional local cockpit smoke check; refresh before tagging the next alpha. |
 | Remote clean-clone install test | Blocked on 2026-05-24 | `git clone https://github.com/DannyMac180/HyperAgent.git` failed with `Could not resolve host: github.com` in the sandbox. |
 | Local clean-clone install test | Passed on 2026-05-24 | Cloned branch `dan-193-next-alpha-release-prep` into a temp directory after merging `origin/main`; `verify-mvp`, `smoke-loop`, and temp skill install passed. |
 | Manual Codex Desktop clean-install UAT | Pending / manual | Use `docs/clean-install-uat.md`; record the result there or in the release PR. |

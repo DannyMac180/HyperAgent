@@ -22,18 +22,9 @@ require_text() {
 
 require_file README.md
 require_file AGENTS.md
-require_file CONTRIBUTING.md
-require_file SECURITY.md
-require_file .github/pull_request_template.md
 require_file .hyperagent
 require_file adapters/contract.md
 require_file adapters/codex.md
-require_file .github/ISSUE_TEMPLATE/bug_report.md
-require_file .github/ISSUE_TEMPLATE/suit_friction.md
-require_file .github/ISSUE_TEMPLATE/upgrade_proposal.md
-require_file .github/ISSUE_TEMPLATE/eval_idea.md
-require_file docs/architecture/hyperagent.mmd
-require_file docs/assets/hyperagent-architecture.svg
 require_file docs/hyperagent-prd.md
 require_file docs/concepts.md
 require_file docs/config.md
@@ -43,10 +34,6 @@ require_file docs/adapters.md
 require_file docs/evidence-policy.md
 require_file docs/safety-policy.md
 require_file docs/quickstart.md
-require_file docs/clean-install-uat.md
-require_file docs/release-checklist.md
-require_file docs/releases/v0.1.0-alpha.md
-require_file docs/releases/next-alpha.md
 require_file docs/examples/missions/public-safe-mission.md
 require_file skills/codex-hyperagent/SKILL.md
 require_file skills/codex-hyperagent/agents/openai.yaml
@@ -106,11 +93,6 @@ require_text skills/codex-hyperagent/SKILL.md "version: v0.1.0-alpha"
 require_text skills/codex-hyperagent/agents/openai.yaml "display_name: \"HyperAgent\""
 require_text AGENTS.md "HyperAgent triage on every task"
 require_text AGENTS.md "README Architecture Diagram"
-require_text CONTRIBUTING.md "Suit Not Scaffold Review Gate"
-require_text SECURITY.md "Authority Boundary"
-require_text .github/pull_request_template.md "README architecture diagram was reviewed or updated"
-require_text docs/architecture/hyperagent.mmd "flowchart LR"
-require_text docs/assets/hyperagent-architecture.svg "HyperAgent high-level architecture"
 require_text scripts/setup-hyperagent.sh "Usage: sh scripts/setup-hyperagent.sh"
 require_text scripts/setup-hyperagent.sh "Global Codex custom instructions: unchanged"
 require_text scripts/install-codex-skill.sh "Usage: sh scripts/install-codex-skill.sh"

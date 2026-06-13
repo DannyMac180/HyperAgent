@@ -55,6 +55,8 @@ When the Forge finds process friction worth fixing, generate a process-improveme
 
 You may propose upgrades and draft local low-risk upgrade files. You may not silently activate upgrades that increase permissions, alter secrets handling, change deployment behavior, broaden filesystem, shell, network, deployment, account, or secrets access, or persist new operating rules. Human approval is required before activation until a stronger policy exists.
 
+Keep persistent behavior changes `human review required`.
+
 Accepted upgrades require:
 
 1. A proposal in `workshop/proposals/`.

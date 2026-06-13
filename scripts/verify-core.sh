@@ -89,11 +89,13 @@ require_text skills/codex-hyperagent/SKILL.md "Forge Review Prompt"
 require_text skills/codex-hyperagent/SKILL.md "Relevance Triage"
 require_text skills/codex-hyperagent/SKILL.md "mission closeout"
 require_text skills/codex-hyperagent/SKILL.md "mission verify --strict"
+require_text skills/codex-hyperagent/SKILL.md 'Keep persistent behavior changes `human review required`.'
 require_text skills/codex-hyperagent/SKILL.md "name: codex-hyperagent"
 require_text skills/codex-hyperagent/SKILL.md "version: v0.1.0-alpha"
 require_text skills/codex-hyperagent/agents/openai.yaml "display_name: \"HyperAgent\""
 require_text AGENTS.md "HyperAgent triage on every task"
 require_text AGENTS.md "README Architecture Diagram"
+require_text AGENTS.md 'Keep persistent behavior changes `human review required`.'
 require_text scripts/setup-hyperagent.sh "Usage: sh scripts/setup-hyperagent.sh"
 require_text scripts/setup-hyperagent.sh "Global Codex custom instructions: unchanged"
 require_text scripts/install-codex-skill.sh "Usage: sh scripts/install-codex-skill.sh"
@@ -124,6 +126,8 @@ require_text .hyperagent '[verification.release]'
 require_text .hyperagent 'codex = true'
 require_text adapters/contract.md "HyperAgent Adapter Contract"
 require_text adapters/codex.md "Codex Adapter"
+require_text adapters/codex.md "Doctrine Ownership"
+require_text adapters/codex.md 'keep persistent behavior changes `human review required`'
 require_text README.md "v0.1.0-alpha"
 require_text README.md "docs/roadmap.md"
 require_text README.md "docs/extensions.md"
@@ -144,11 +148,12 @@ require_text evals/smoke-loop.sh "check wrapper did not record passed status"
 require_text evals/init-smoke.sh "HyperAgent init smoke passed."
 require_text evals/sense-smoke.sh "HyperAgent sense smoke passed."
 require_text evals/forge-audit-smoke.sh "HyperAgent Forge audit smoke passed."
-require_text evals/reliability-gains.sh "HyperAgent reliability gains eval passed."
+require_text evals/reliability-gains.sh "HyperAgent reliability rubric self-test passed."
 require_text hyperagent/operating-prompt.md "human review required"
 require_text hyperagent/operating-prompt.md "relevance triage"
 require_text hyperagent/operating-prompt.md "workshop/decisions"
 require_text hyperagent/operating-prompt.md "mission closeout"
+require_text hyperagent/operating-prompt.md 'Keep persistent behavior changes `human review required`.'
 require_text hyperagent/capability-registry.md "human review required"
 require_text hyperagent/capability-registry.md "codex-skill-installer"
 require_text hyperagent/capability-registry.md "In Review Capabilities"
@@ -174,5 +179,13 @@ require_text forge/process/quality-rubric.md "Deterministic Gates"
 sh scripts/hyperagent.sh verify-config >/dev/null
 sh scripts/hyperagent.sh status >/dev/null
 sh scripts/hyperagent.sh verify-safety >/dev/null
+sh scripts/hyperagent.sh mission redact-check docs/examples/missions/public-safe-mission.md >/dev/null
+if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  changed_missions=$(git diff --name-only --diff-filter=ACMRT HEAD -- missions docs/examples/missions 2>/dev/null || true)
+  if [ -n "$changed_missions" ]; then
+    # shellcheck disable=SC2086
+    sh scripts/hyperagent.sh mission redact-check $changed_missions >/dev/null
+  fi
+fi
 
 printf 'HyperAgent core verification passed.\n'

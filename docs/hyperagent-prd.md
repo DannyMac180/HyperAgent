@@ -229,6 +229,7 @@ As a user, I can install HyperAgent into Codex, assign work to the agent, and af
 - Do not train or fine-tune models.
 - Do not attempt to support every agent platform on day one.
 - Do not build a complex new UI before the underlying loop works in markdown.
+- A local read-mostly cockpit is acceptable only as an optional view over markdown artifacts and local evidence, not as a hosted service or replacement source of truth.
 - Do not encode brittle task-specific scaffolds as the core product.
 
 ## Functional Requirements

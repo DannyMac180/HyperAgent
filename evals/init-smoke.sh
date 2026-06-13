@@ -80,7 +80,7 @@ require_text "$target/.hyperagent" '"sh scripts/hyperagent.sh verify-config"'
 require_text "$target/.hyperagent" '"sh scripts/hyperagent.sh status"'
 require_text "$target/hyperagent/README.md" "Copy And Symlink Behavior"
 require_text "$target/hyperagent/README.md" "Init Output Categories"
-require_text "$target/hyperagent/README.md" "Five Primary Flows"
+require_text "$target/hyperagent/README.md" "Four Primary Flows"
 require_text "$target/hyperagent/README.md" "Global runtime dependency"
 require_text "$target/hyperagent/README.md" "Updating Existing Projects"
 require_text "$target/hyperagent/README.md" "machine-readable project anchor"

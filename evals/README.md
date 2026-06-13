@@ -50,7 +50,7 @@ Run:
 sh evals/cli-help-smoke.sh
 ```
 
-The CLI help smoke test copies the repo to a temporary directory, then verifies that help leads with the five primary flows: `init`, `sense`, `mission`, `review`, and `ui`. It also checks grouped mission/review commands and confirms older flat commands such as `new-mission`, `mission-closeout`, and `propose-upgrade` remain working compatibility aliases.
+The CLI help smoke test copies the repo to a temporary directory, then verifies that help leads with four primary flows: `init`, `sense`, `mission`, and `review`, with `ui` kept as an optional cockpit helper. It also checks grouped mission/review commands and confirms older flat commands such as `new-mission`, `mission-closeout`, and `propose-upgrade` remain working compatibility aliases.
 
 ## Forge Audit Smoke Eval
 
@@ -67,7 +67,7 @@ The Forge audit smoke test copies the repo to a temporary directory, adds one co
 - reports a finding count,
 - drafts a human-review-required process proposal only when explicitly requested with `--write-proposal`.
 
-## Reliability Gains Eval
+## Reliability Rubric Self-Test
 
 Run:
 
@@ -75,9 +75,10 @@ Run:
 sh evals/reliability-gains.sh
 ```
 
-The reliability gains eval scores comparable local run records for the same task,
-including a baseline `without-hyperagent` case and a `with-hyperagent` case. It
-is deterministic, dependency-free, and writes inspectable output to
+The reliability command is a rubric self-test. It scores comparable local run
+records for the same task, including curated known-answer fixtures for a
+baseline `without-hyperagent` case and a `with-hyperagent` case. It is
+deterministic, dependency-free, and writes inspectable output to
 `evals/out/reliability-gains/`.
 
 By default it scores both curated fixtures and real mission records from
@@ -94,8 +95,9 @@ sh evals/reliability-gains.sh --traces evals/fixtures/reliability-traces
 ```
 
 Trace-derived inputs must be explicit Markdown cases with
-`Evidence source type: trace-derived`; the eval does not claim more precision
-than the exported evidence and manual annotations can support.
+`Evidence source type: trace-derived`; the self-test does not claim more
+precision than the exported evidence and manual annotations can support, and it
+does not prove behavioral improvement by itself.
 
 The first rubric scores six dimensions:
 

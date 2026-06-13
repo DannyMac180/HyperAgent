@@ -4,3 +4,4 @@ evals/out/
 # into a reviewed, redacted public example under docs/examples/missions/.
 .hyperagent-evidence/
 .workflow/
+missions/

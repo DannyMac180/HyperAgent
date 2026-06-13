@@ -60,7 +60,7 @@ fi
 ## Command Path Test Flow
 
 1. Open Terminal.
-2. Run the command from the README `Try HyperAgent In Codex Mac` section.
+2. Follow `docs/quickstart.md#1-one-command-hyperagent-setup` for the exact command path.
 3. Confirm the script reports clone or update status, verification, skill install, and restart or fresh-thread guidance.
 4. Confirm it does not initialize the scratch project unless `--init-target "$HOME/hyperagent-uat-target"` is passed and confirmed with `y`.
 

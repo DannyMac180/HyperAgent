@@ -20,6 +20,8 @@ The default local Codex skills directory is `~/.codex/skills`. The installer sup
 
 Global Codex custom instructions are not edited by the installer.
 
+Codex may read `skills/codex-hyperagent/agents/openai.yaml` as optional agent metadata for the installed skill, including the `interface:` block that describes the Codex-facing surface. The core verifier pins this file and the `display_name` so the metadata remains an intentional Codex extension point, not a stale stray file.
+
 ## Prompt And Skill Surface
 
 Codex enters HyperAgent through the `codex-hyperagent` skill and the operating prompt:
@@ -30,6 +32,19 @@ Codex enters HyperAgent through the `codex-hyperagent` skill and the operating p
 - Initialized project helper: `scripts/hyperagent.sh`
 
 The skill tells Codex when to run the Mission -> Workshop -> Forge loop, how to write mission records, and when persistent behavior changes require human review.
+
+## Doctrine Ownership
+
+These surfaces deliberately repeat a small amount of operating doctrine because they have different readers and install contexts. Keep the wording aligned instead of collapsing the files into one runtime dependency.
+
+| Doctrine area | Owning surface | Mirrors / consumers |
+| --- | --- | --- |
+| HyperAgent project triage and testbed-only repo rules | `AGENTS.md` | Current-repo Codex sessions and project contributors |
+| Installed Codex skill behavior | `skills/codex-hyperagent/SKILL.md` | Copy or symlink installs under `~/.codex/skills` |
+| Runtime Suit mission loop | `hyperagent/operating-prompt.md` | Local helper prompts and mission execution |
+| CLI prompt snippets and compatibility aliases | `scripts/hyperagent.sh` | `workshop-prompt`, `forge-prompt`, and initialized project shims |
+
+The shared drift anchor is: keep persistent behavior changes `human review required`.
 
 ## Tool Capability Assumptions
 

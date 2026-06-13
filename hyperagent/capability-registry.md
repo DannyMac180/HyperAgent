@@ -45,7 +45,7 @@ These surfaces exist in repo artifacts or mission evidence, but do not yet have 
 | `reliability-gains-eval` | in review | `missions/2026-05-20-1554-dan-176-reliability-gains-eval.md`; `evals/reliability-gains.sh` | No decision record yet. |
 | `quantitative-forge-review` | in review | `missions/2026-05-20-1556-dan-177-strengthen-forge.md`; `missions/2026-05-22-1535-dan-177-quantitative-forge-rework.md`; `scripts/verify-forge-review.sh` | No decision record yet. |
 | `readme-architecture-maintenance` | in review | `missions/2026-05-21-1329-readme-architecture-diagram.md`; `docs/architecture/hyperagent.mmd`; `docs/assets/hyperagent-architecture.svg` | No decision record yet. |
-| `product-state-roadmap` | in review | `docs/roadmap.md`; `docs/releases/next-alpha.md`; DAN-181 | No decision record yet. |
+| `product-state-roadmap` | in review | `docs/roadmap.md`; `docs/releases/next-alpha.md`; `missions/2026-05-23-2234-dan-181-product-state-reconciliation.md` | No decision record yet. |
 
 ## Capability Entry Template
 

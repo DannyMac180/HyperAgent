@@ -14,7 +14,7 @@ The format is a small TOML subset on purpose:
 - scalar values are strings, integers, or booleans,
 - sections use `[section]`,
 - `verification.commands` is an array of quoted strings,
-- nested tables, inline tables, multiline strings, escapes, and dotted keys are not part of the supported contract.
+- nested tables, inline tables, multiline strings, escapes, and dotted keys are not part of the supported contract, except for the documented `[verification.*]` tier subtables.
 
 ## Stable Fields
 

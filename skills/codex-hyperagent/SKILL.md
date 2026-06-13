@@ -90,6 +90,7 @@ Use `sh scripts/hyperagent.sh review forge audit` for a concise process-health r
 - Do not broaden filesystem, shell, network, deployment, account, or secrets access without human approval.
 - Do not silently alter secrets handling.
 - Default all upgrade proposals to `human review required`.
+- Keep persistent behavior changes `human review required`.
 
 Allowed activation modes are `suggest only`, `draft files only`, `human review required`, and `auto-install low risk`.
 

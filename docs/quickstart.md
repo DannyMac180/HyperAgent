@@ -121,7 +121,7 @@ The default mode is `human review required`.
 
 `--symlink` is only for the global Codex skill install. Project-local files created by `hyperagent init` remain normal files, while the generated project shim delegates to the global runtime.
 
-## 4. Use The Five Primary Flows
+## 4. Use The Four Primary Flows
 
 HyperAgent's public command model is intentionally small:
 
@@ -129,9 +129,10 @@ HyperAgent's public command model is intentionally small:
 - `sense`: understand current state, recent checks, changed files, PR status, and local trace health.
 - `mission`: start or close out mission records.
 - `review`: create Workshop proposals, run Forge reviews, record decisions, and inspect backlog movement.
-- `ui`: open the local cockpit surface when available; in this alpha it prints local cockpit pointers.
 
-Advanced helpers remain available as compatibility aliases for at least one release. For example, `status`, `doctor`, `new-mission`, `mission-closeout`, `propose-upgrade`, `workshop-prompt`, `new-forge-review`, `forge-prompt`, and `decide-upgrade` still work while the docs move users toward complete flows.
+`ui` remains an optional local cockpit helper when available; in this alpha it prints local cockpit pointers and stays subordinate to the markdown source of truth.
+
+Advanced helpers remain available as compatibility aliases for at least one release. For example, `status`, `doctor`, `new-mission`, `mission-closeout`, `propose-upgrade`, `workshop-prompt`, `new-forge-review`, `forge-prompt`, `ui`, and `decide-upgrade` still work while the docs move users toward complete flows.
 
 ## 5. Sense Current State
 

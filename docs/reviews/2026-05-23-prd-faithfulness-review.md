@@ -2,7 +2,7 @@
 
 - Date: 2026-05-23
 - Reviewer: Codex wearing the HyperAgent Suit
-- Scope: Current `/Users/danielmcateer/Desktop/dev/HyperAgent` checkout compared with `docs/hyperagent-prd.md`
+- Scope: Current local HyperAgent checkout compared with `docs/hyperagent-prd.md`
 - Verification run: `sh scripts/verify-mvp.sh`, `sh evals/smoke-loop.sh`, `sh evals/init-smoke.sh`, `sh evals/sense-smoke.sh`, `sh evals/ui-smoke.sh`, `sh evals/reliability-gains.sh`
 
 ## Verdict
@@ -36,7 +36,7 @@ Recommended fix:
 The helper is useful, but the public surface is sprawling: `init`, `status`, `sense`, `doctor`, `ui`, `record-check`, `new-mission`, `propose-upgrade`, `workshop-prompt`, `new-forge-review`, `forge-prompt`, and `decide-upgrade`.
 
 Recommended simplification:
-- Keep the mental model to five user-facing commands: `init`, `sense`, `mission`, `review`, `ui`.
+- Keep the mental model to four primary commands: `init`, `sense`, `mission`, and `review`, with `ui` framed as an optional cockpit helper.
 - Move low-level commands behind subcommands or keep them documented as advanced helpers.
 - Make `doctor` part of `sense --doctor` unless it stays meaningfully distinct.
 

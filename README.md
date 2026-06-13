@@ -81,15 +81,16 @@ For current product boundaries, see `docs/roadmap.md` and `docs/extensions.md`.
 
 For repeated human dogfooding, see `docs/dogfooding.md`.
 
-The primary CLI model has five flows:
+The primary CLI model has four primary flows:
 
 ```bash
 sh scripts/hyperagent.sh init --target /path/to/project
 sh scripts/hyperagent.sh sense
 sh scripts/hyperagent.sh mission closeout --request "Describe the task" --slug task-slug
 sh scripts/hyperagent.sh review workshop --mission missions/MISSION.md --title "Improve the Suit" --problem "Concrete mission friction"
-sh scripts/hyperagent.sh ui
 ```
+
+`sh scripts/hyperagent.sh ui` is an optional local cockpit helper when available; it is not a separate source of truth.
 
 Development helpers such as `status`, `doctor`, `new-mission`, `mission-closeout`, `propose-upgrade`, `new-forge-review`, `forge audit`, and `decide-upgrade` remain available as compatibility aliases for at least one release.
 
@@ -103,24 +104,7 @@ For early release readiness, see `docs/release-checklist.md`.
 
 ## Updating
 
-HyperAgent updates use normal Git workflows.
-
-For copy installs:
-
-```bash
-git pull
-sh scripts/update-codex-skill.sh
-sh scripts/verify-mvp.sh
-```
-
-For symlink installs:
-
-```bash
-git pull
-sh scripts/verify-mvp.sh
-```
-
-Restart Codex Desktop or open a fresh thread after updating the installed skill.
+HyperAgent updates use normal Git workflows. See `docs/quickstart.md#12-update-later` for the copy-install and symlink-install command paths, then restart Codex Desktop or open a fresh thread after updating the installed skill.
 
 ## What Is Included
 
@@ -148,7 +132,7 @@ Restart Codex Desktop or open a fresh thread after updating the installed skill.
 - `scripts/setup-hyperagent.sh`: one-command HyperAgent setup path for clone/update, verification, skill install, and optional project init.
 - `scripts/install-codex-skill.sh`: dependency-free Codex skill installer.
 - `scripts/update-codex-skill.sh`: update helper for copy installs.
-- `scripts/hyperagent.sh`: runtime helper organized around five user-facing flows: `init`, `sense`, `mission`, `review`, and `ui`. Existing development commands remain available as compatibility aliases. Initialized projects get a small shim that delegates to this runtime.
+- `scripts/hyperagent.sh`: runtime helper organized around four primary flows: `init`, `sense`, `mission`, and `review`, plus an optional `ui` cockpit helper. Existing development commands remain available as compatibility aliases. Initialized projects get a small shim that delegates to this runtime.
 - `.hyperagent-evidence/`: ignored local runtime evidence, including the opt-in command/check log used by `sense`.
 - `hyperagent/operating-prompt.md`: the operating layer Codex wears during work.
 - `hyperagent/capability-registry.md`: accepted capability registry with reviewed local capabilities.

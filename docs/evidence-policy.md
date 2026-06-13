@@ -5,7 +5,7 @@ Mission records are product evidence for the Mission -> Workshop -> Forge loop. 
 ## Default Boundary
 
 - Commit public-safe examples in `docs/examples/missions/`.
-- Commit mission records in `missions/` only when they are intentionally useful project evidence and have passed the redaction checklist below.
+- Commit mission records in `missions/` only when they are intentionally useful project evidence and have passed the redaction checklist below. The directory is ignored by default so new local dogfooding records do not become public evidence accidentally.
 - Keep local dogfooding evidence in `.hyperagent-evidence/` or another ignored local path.
 - Do not commit raw Workbench traces, local trace payloads, shell history, environment dumps, credentials, or private account data.
 - When evidence is useful but too local, convert it into a public example that preserves the learning and removes the private details.
@@ -42,7 +42,7 @@ Run the quick preflight before committing public mission examples:
 sh scripts/hyperagent.sh mission redact-check docs/examples/missions/public-safe-mission.md
 ```
 
-This helper flags obvious local paths, Linear metadata, local evidence payload references, and secret-like strings. Passing the helper is not a guarantee that a mission is public-safe; human review is still required.
+This helper flags obvious local paths, Linear metadata, local evidence payload references, and secret-like strings. Core verification runs it on the public-safe example and on changed mission files visible to git, so new public evidence gets a forward safety gate. Passing the helper is not a guarantee that a mission is public-safe; human review is still required.
 
 ## Dogfooding Records
 

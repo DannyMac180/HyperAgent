@@ -49,6 +49,7 @@ Primary flows:
   verify core|extensions|release|all
       Run HyperAgent verification tiers.
 
+Optional cockpit:
   ui
       Open the local HyperAgent cockpit when available. Currently prints local status and roadmap pointers.
 
@@ -744,14 +745,18 @@ Use these files to keep agent work inspectable:
 - Generated config and docs: `.hyperagent`, `hyperagent/README.md`, and this repository's HyperAgent block in `AGENTS.md`.
 - Global runtime dependency: the local `scripts/hyperagent.sh` shim delegates to the installed HyperAgent runtime instead of copying the full runtime helper or operating prompt into this repo.
 
-## Five Primary Flows
+## Four Primary Flows
 
 ```bash
 sh scripts/hyperagent.sh init --target /path/to/project
 sh scripts/hyperagent.sh sense
 sh scripts/hyperagent.sh mission closeout --request "Describe the task" --slug task-slug
 sh scripts/hyperagent.sh review workshop --mission missions/MISSION.md --title "Improve the Suit" --problem "Concrete friction from the mission"
-sh scripts/hyperagent.sh review forge audit
+```
+
+Optional cockpit helper:
+
+```bash
 sh scripts/hyperagent.sh ui
 ```
 
@@ -2868,7 +2873,7 @@ create_forge_review() {
 - Eval for the process change:
 - Rollback plan:
 - Generate proposal when:
-- Suggested proposal command: \`sh scripts/hyperagent.sh propose-upgrade --forge-review PATH --title "..." --problem "..."\`
+- Suggested proposal command: \`sh scripts/hyperagent.sh review workshop --forge-review PATH --title "..." --problem "..."\`
 
 ## Decision
 
@@ -2884,7 +2889,7 @@ print_forge_prompt() {
   cat <<'EOF'
 Use HyperAgent Forge Mode.
 
-Read recent Workshop proposals in workshop/proposals/, decisions in workshop/decisions/, accepted capabilities in hyperagent/capability-registry.md, evals in evals/ plus scripts/verify-mvp.sh, and prior Forge score history in forge/reviews/. Judge outcome quality, proposal specificity, eval coverage, safety boundary preservation, regression detection, and process bloat risk with 0-5 scores. Every score must cite evidence or a missing-artifact reason. Fill the structured summary, deterministic gates, payoff metrics, recommendation, confidence, and follow-up fields in templates/forge-review.md. Run Forge reviews when proposals are accepted or rejected, evals change, a release checklist asks whether upgrades paid off, or repeated missions show the Workshop producing vague or low-value proposals. If the Workshop process needs an upgrade, create a separate process-improvement proposal with sh scripts/hyperagent.sh propose-upgrade --forge-review PATH --title "..." --problem "...". Do not activate process changes without human approval.
+Read recent Workshop proposals in workshop/proposals/, decisions in workshop/decisions/, accepted capabilities in hyperagent/capability-registry.md, evals in evals/ plus scripts/verify-mvp.sh, and prior Forge score history in forge/reviews/. Judge outcome quality, proposal specificity, eval coverage, safety boundary preservation, regression detection, and process bloat risk with 0-5 scores. Every score must cite evidence or a missing-artifact reason. Fill the structured summary, deterministic gates, payoff metrics, recommendation, confidence, and follow-up fields in templates/forge-review.md. Run Forge reviews when proposals are accepted or rejected, evals change, a release checklist asks whether upgrades paid off, or repeated missions show the Workshop producing vague or low-value proposals. If the Workshop process needs an upgrade, create a separate process-improvement proposal with sh scripts/hyperagent.sh review workshop --forge-review PATH --title "..." --problem "...". Do not activate process changes without human approval.
 EOF
 }
 

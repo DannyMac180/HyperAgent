@@ -35,11 +35,11 @@ Skip the full loop only when the task is clearly isolated and low-signal, such a
 
 When skipping the full loop, mention briefly that HyperAgent triage classified the task as an isolated one-off and no mission record was written.
 
-## Testing Posture
+## Testing Posture (testbed-only)
 
 Because this repo is the HyperAgent testbed, prefer recording mission telemetry for borderline cases. The goal is to learn which tasks deserve the loop and where the loop feels too heavy.
 
-## Core And Extensions
+## Core And Extensions (testbed-only verification tiers)
 
 Use `docs/roadmap.md` as the current source for what belongs to the PRD core versus optional extensions or release support.
 
@@ -55,7 +55,7 @@ sh scripts/verify-extensions.sh
 sh scripts/verify-release.sh
 ```
 
-## Symphony Linear Handoff
+## Symphony Linear Handoff (testbed-only)
 
 Before a Symphony-managed issue is moved to `Human Review`, complete a documentation checkpoint:
 
@@ -67,7 +67,7 @@ If no documentation changes were needed, add a Linear issue comment saying that 
 
 Only move the Linear issue to `Human Review` after that documentation checkpoint comment has been posted.
 
-## README Architecture Diagram
+## README Architecture Diagram (testbed-only)
 
 The GitHub README is the initial user-facing landing page. Keep its high-level architecture diagram current when user-visible HyperAgent modules are added, removed, renamed, or materially changed.
 

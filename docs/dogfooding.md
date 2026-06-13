@@ -4,9 +4,9 @@ This guide is for a human reviewer dogfooding HyperAgent from a fresh install an
 
 The goal is not to have Codex grade itself. The goal is for a human to check whether HyperAgent is faithful to the PRD: a Codex-first, local, markdown-first Suit that records mission evidence, proposes upgrades through the Workshop, reviews the Workshop through the Forge, and keeps persistent changes under human review.
 
-## Source Documents
+## Reference Index
 
-Read these first:
+Read these as needed while reviewing:
 
 - `docs/hyperagent-prd.md`
 - `docs/roadmap.md`
@@ -81,7 +81,7 @@ Check:
 Useful command:
 
 ```bash
-sh scripts/hyperagent.sh review prompt workshop
+sh scripts/hyperagent.sh review workshop
 ```
 
 ## Forge Review
@@ -98,7 +98,7 @@ Check:
 Useful command:
 
 ```bash
-sh scripts/hyperagent.sh review prompt forge
+sh scripts/hyperagent.sh review forge audit
 ```
 
 ## Extension Checks

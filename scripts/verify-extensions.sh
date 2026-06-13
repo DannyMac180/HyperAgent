@@ -40,7 +40,7 @@ require_text ui/styles.css "--paper"
 require_text ui/app.js "/api/overview"
 require_text evals/sense-smoke.sh "HyperAgent sense smoke passed."
 require_text evals/ui-smoke.sh "HyperAgent UI smoke passed."
-require_text evals/reliability-gains.sh "HyperAgent reliability gains eval passed."
+require_text evals/reliability-gains.sh "HyperAgent reliability rubric self-test passed."
 require_text evals/reliability-rubric.md "Missed Verification"
 require_text evals/fixtures/reliability/hyperagent-suit.md "Condition: with-hyperagent"
 

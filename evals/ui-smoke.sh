@@ -44,11 +44,14 @@ const overview = await fetch(base + '/api/overview').then((response) => response
 if (!overview.repoRoot || overview.safetyMode !== 'human review required') {
   throw new Error('overview missing repo root or safety mode');
 }
-if (typeof overview.missionCount !== 'number' || overview.missionCount < 1) {
+if (typeof overview.missionCount !== 'number' || overview.missionCount < 0) {
   throw new Error('overview missing mission count');
 }
 const missions = await fetch(base + '/api/missions').then((response) => response.json());
-if (!Array.isArray(missions) || missions.length < 1 || !missions[0].file) {
+if (!Array.isArray(missions)) {
+  throw new Error('missions endpoint did not return an array');
+}
+if (overview.missionCount > 0 && (!missions[0] || !missions[0].file)) {
   throw new Error('missions endpoint missing artifacts');
 }
 const html = await fetch(base + '/').then((response) => response.text());

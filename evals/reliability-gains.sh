@@ -10,8 +10,9 @@ usage() {
   cat <<'USAGE'
 Usage: sh evals/reliability-gains.sh [--cases DIR] [--missions DIR] [--traces DIR] [--output DIR]
 
-Scores local reliability case records and compares without-HyperAgent and
-with-HyperAgent runs. Output defaults to evals/out/reliability-gains/.
+Runs a reliability rubric self-test over local case records, including curated
+known-answer fixtures for without-HyperAgent and with-HyperAgent runs. Output
+defaults to evals/out/reliability-gains/.
 
 By default the eval scores curated fixtures plus local mission records from
 missions/. Trace-derived Markdown case files can be added with --traces DIR.
@@ -351,7 +352,7 @@ else
 fi
 
 {
-  printf '# HyperAgent Reliability Gains Eval\n\n'
+  printf '# HyperAgent Reliability Rubric Self-Test\n\n'
   printf '%s\n' "- Generated: $(date '+%Y-%m-%d %H:%M:%S %Z')"
   printf '%s\n' "- Cases directory: \`$cases_dir\`"
   printf '%s\n' "- Missions directory: \`$missions_dir\`"
@@ -380,9 +381,9 @@ fi
   printf '\n## Rubric\n\n'
   printf 'Each case is scored out of 12 across task completion, final report quality, missed verification, failure recovery, proposal specificity, and time to useful PR or artifact. See `evals/reliability-rubric.md`.\n'
   printf '\n## Interpretation Limits\n\n'
-  printf 'Fixture cases are curated examples. Mission-derived cases are generated from real mission records using conservative metadata inference plus optional manual `Reliability ...` annotations. Trace-derived cases are accepted only when supplied as explicit Markdown cases with `Evidence source type: trace-derived`. Scores are directional evidence for reliability trends, not precise runtime measurements.\n'
+  printf 'Fixture cases are curated known-answer examples for exercising the rubric, not proof that HyperAgent improves behavior in the wild. Mission-derived cases are generated from real mission records using conservative metadata inference plus optional manual `Reliability ...` annotations. Trace-derived cases are accepted only when supplied as explicit Markdown cases with `Evidence source type: trace-derived`. Scores are directional evidence for reliability trends, not precise runtime measurements.\n'
 } >"$report_file"
 
 test "$delta" -gt 0 || fail "with-hyperagent case did not beat without-hyperagent case"
 
-printf 'HyperAgent reliability gains eval passed. Report: %s\n' "$report_file"
+printf 'HyperAgent reliability rubric self-test passed. Report: %s\n' "$report_file"

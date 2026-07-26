@@ -38,7 +38,7 @@ The enum is closed per schema version; adding a type is a minor bump. Adapters e
 
 `session_id` construction: `<vendor>:<native-session-id>` when the harness has one; else `<vendor>:<sha256(path+start_ts)[0..16]>`. Deterministic, so re-ingesting the same transcript yields the same id (idempotent ingestion dedupes on it, §6).
 
-`session_start` payload: `agent` (harness product name), `model` (as reported), `harness_version`, `repo` (git root path), `git_branch`, `cwd`.
+`session_start` payload: `agent` (harness product name), `model` (as reported), `harness_version`, `repo` (git root path), `git_branch`, `cwd`, `parent_session_id` (nullable — session lineage: set when the harness resumes, forks, or compacts a prior session into this one, e.g. Claude Code `--resume`. Downstream consumers treat a lineage chain as one logical body of work; the DAN-200 adapter must populate it rather than inventing its own linkage).
 `session_end` payload: `outcome` (`completed` | `abandoned` | `crashed` | `unknown`), `duration_ms`, `turn_count`, `tool_call_count`. A session with no observed `session_end` is *open*; the daemon may close it with `outcome: unknown` after a timeout — as a new event, never an edit.
 
 ### 4.2 `turn` (span: `turn_start` → `turn_end`)
@@ -130,8 +130,15 @@ CREATE TRIGGER IF NOT EXISTS events_no_delete BEFORE DELETE ON events
 
 - This document's header version == `meta.schema_version` written by the store.
 - **Minor/patch**: additive (new event types, new optional payload fields). Old readers ignore unknown fields (payload keys are preserved opaquely); old events remain valid.
+- **Reader rule (binding on every consumer):** unknown event *types* are skipped with a counted warning, never fatal; unknown payload *fields* are preserved and ignored. A v0.1.0 reader must survive a v0.2.0 log. (The store's CHECK constraint pins the *writer* to its own version's enum; readers must be one version more tolerant than writers.)
 - **Major**: re-shape. Requires a written migration in `src/store/migrations/` and a migration note appended to this file. The events table is never mutated in place; a major migration writes a new log and preserves the old file.
 - The schema is designed to stand alone as a potential open standard for agent telemetry; nothing in it references HyperAgent-internal concepts (missions, Workshop, capabilities) — those are consumers, not schema citizens.
+
+## 8. Known gaps (v0.1.x roadmap, decided before DAN-199/200 build on them)
+
+- **Redaction tombstone.** Append-only currently has no remedy for a secret/PII that reaches an event. Planned (minor bump): a `redaction_tombstone` event type that supersedes a prior event by `id`; readers must treat a tombstoned event's payload as `{}`. Until then, the digest-not-raw-text design (§4.2) keeps the exposure surface to `input_summary`/`claim_text`/`message_summary`, which adapters redact before append.
+- **Multi-writer contention.** WAL is specified; the store should also set `PRAGMA busy_timeout` (e.g. 5000ms) before the daemon, CLI, and Cockpit share one file. Decide in DAN-199.
+- **Digest algorithm pinning.** All digests in v0.1.0 are sha256; the algorithm is pinned per schema version (a change is a major bump), so undated digests remain interpretable. Adapters must not embed absolute local paths in digested canonical input.
 
 ## Changelog
 

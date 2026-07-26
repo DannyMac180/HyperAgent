@@ -5,3 +5,8 @@ evals/out/
 .hyperagent-evidence/
 .workflow/
 missions/
+
+# v2 (Bun) toolchain
+node_modules/
+# Stray MCP server logs some agent harnesses write into the working directory.
+logs/

@@ -6,6 +6,9 @@ The category claim is simple:
 
 > Models provide intelligence. HyperAgent provides agency.
 
+> [!IMPORTANT]
+> **HyperAgent is being rearchitected.** The v2 design — a meta-harness that observes any agent harness involuntarily (transcripts + hooks, never self-reporting) and builds durable cross-vendor memory, verification gates, and self-retiring capabilities on top — is the current direction. **`docs/architecture-v2.md` is the source of truth**; everything below this note describes the v1 prototype, which is legacy. The v1 bash CLI (`scripts/hyperagent.sh`) will be retired as its surviving logic moves to TypeScript per the v2 build order.
+
 HyperAgent starts with OpenAI Codex in the Codex Mac app. The first prototype is intentionally markdown-first: Codex wears a Suit prompt while working, writes mission records after real tasks, and uses those records to propose evidence-backed upgrades through the Workshop. The Forge then reviews whether the Workshop itself is producing useful, safe, testable improvements.
 
 ## Alpha Status

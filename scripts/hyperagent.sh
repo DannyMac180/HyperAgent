@@ -258,26 +258,35 @@ slugify() {
 }
 
 redact_stream() {
+  # Tab-aware: the command/evidence log is tab-separated, and naive per-word
+  # field reassignment made awk rebuild $0 with space OFS, corrupting the
+  # tab structure. Redact space-separated words WITHIN each tab field so the
+  # tab delimiters survive untouched.
   awk '
+    BEGIN { FS = "\t"; OFS = "\t" }
     {
-      redact_next = 0
-      for (i = 1; i <= NF; i++) {
-        lower = tolower($i)
-        if (redact_next == 1) {
-          $i = "[REDACTED]"
-          redact_next = 0
-          continue
-        }
-        if (lower ~ /(token|secret|password|passwd|api_key|access_key|private_key|bearer)/) {
-          if ($i ~ /=/) {
-            sub(/=.*/, "=[REDACTED]", $i)
-          } else {
-            $i = "[REDACTED]"
+      for (f = 1; f <= NF; f++) {
+        n = split($f, w, " ")
+        out = ""
+        redact_next = 0
+        for (i = 1; i <= n; i++) {
+          lower = tolower(w[i])
+          if (redact_next == 1) {
+            w[i] = "[REDACTED]"
+            redact_next = 0
+          } else if (lower ~ /(token|secret|password|passwd|api_key|access_key|private_key|bearer)/) {
+            if (w[i] ~ /=/) {
+              sub(/=.*/, "=[REDACTED]", w[i])
+            } else {
+              w[i] = "[REDACTED]"
+            }
+            if (lower ~ /bearer/) {
+              redact_next = 1
+            }
           }
-          if (lower ~ /bearer/) {
-            redact_next = 1
-          }
+          out = (i == 1) ? w[i] : out " " w[i]
         }
+        $f = out
       }
       print
     }
@@ -2377,6 +2386,7 @@ create_mission_closeout() {
   stamp=$(now_stamp)
   if [ -n "$mission_path" ]; then
     file=$mission_path
+    test ! -e "$file" || fail "mission already exists: $file (closeout writes a full record; refusing to overwrite — pass a new path)"
     case "$file" in
       */*) mkdir -p "$(dirname "$file")" ;;
     esac

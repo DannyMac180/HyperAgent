@@ -5,7 +5,7 @@ Mission records are product evidence for the Mission -> Workshop -> Forge loop. 
 ## Default Boundary
 
 - Commit public-safe examples in `docs/examples/missions/`.
-- Commit mission records in `missions/` only when they are intentionally useful project evidence and have passed the redaction checklist below. The directory is ignored by default so new local dogfooding records do not become public evidence accidentally.
+- `missions/` is private, full stop. As of 2026-07-26 the directory is untracked (`git rm --cached`) and ignored; nothing under it may be committed. Records that were tracked before this date remain in git history — treat everything already pushed as public, and never rely on history for privacy. If a mission teaches a reusable lesson, convert it into a redacted public example under `docs/examples/missions/`.
 - Keep local dogfooding evidence in `.hyperagent-evidence/` or another ignored local path.
 - Do not commit raw Workbench traces, local trace payloads, shell history, environment dumps, credentials, or private account data.
 - When evidence is useful but too local, convert it into a public example that preserves the learning and removes the private details.
@@ -57,7 +57,7 @@ Private dogfooding records can be more specific than public examples, but they s
 
 ## Contributor Workflow
 
-1. Decide whether the record belongs in `missions/`, `docs/examples/missions/`, or an ignored local path.
+1. Decide whether the record belongs in `docs/examples/missions/` (public, redacted) or stays in an ignored local path (`missions/`, `.hyperagent-evidence/`). `missions/` is never committed.
 2. Remove local paths, private issue metadata, secrets, raw traces, and unrelated side context; keep bare issue IDs only when they are intentional public labels.
 3. Run `sh scripts/hyperagent.sh verify-mission --strict PATH` when the file is a mission record.
 4. Run `sh scripts/hyperagent.sh mission redact-check PATH` before proposing a public commit.

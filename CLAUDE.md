@@ -30,8 +30,8 @@ A meta-harness: a local observer daemon (`hyperagentd`) that watches agent harne
 
 Workstreams are Linear tickets **DAN-198 … DAN-215** in the HyperAgent project (team Danmac). `Engineering`-labeled tickets are implementable by Claude Code; `Business`-labeled tickets are Dan's. Each ticket cites its architecture-v2 section. Build order (§9): schema (DAN-198) → daemon + Claude Code adapter (DAN-199/200) → mission generation + scoring (DAN-201) → memory (DAN-202) → gates (DAN-203) → Workshop (DAN-204) → more adapters (DAN-205/207) → Forge (DAN-208) → Cockpit (DAN-210 design → DAN-209 build). DAN-211 (repo transition/hygiene) can run first and in parallel.
 
-## Known repo state (2026-07-26)
+## Known repo state (2026-07-26, post-DAN-211)
 
-- Working tree has an uncommitted v1 change (dotdir install-layout migration + evidence-policy edits, ~19 files) — reconciling it is DAN-211, step 1. Don't mix v2 commits into it.
-- `missions/` contains 66 git-tracked records with local `/Users/` paths despite the evidence policy claiming they're private — resolution is DAN-211, step 2.
-- Known v1 bugs (closeout `--mission` silent overwrite; redaction awk corrupting the tab-separated evidence log) are documented in DAN-211 — fix or freeze, don't build on them.
+- The formerly-uncommitted v1 tree is landed as its own commit; the branch is reconciled with origin/main. Working tree should be clean — if it isn't, that's new work, not legacy debt.
+- `missions/` is untracked (`git rm --cached`, gitignored) and private by policy; records pushed before 2026-07-26 remain in git history and are treated as public (see `docs/evidence-policy.md`). Never re-track it.
+- The two known v1 bugs (closeout `--mission` silent overwrite; redaction awk corrupting the tab-separated log) are FIXED in `scripts/hyperagent.sh`. Full AGENTS.md retirement remains open under DAN-211.

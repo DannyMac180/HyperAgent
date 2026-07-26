@@ -37,9 +37,10 @@ After setup, verify:
 
 - `~/HyperAgent` exists and is a clone of this repo.
 - `~/.codex/skills/codex-hyperagent/SKILL.md` exists.
-- `sh scripts/verify-mvp.sh` passes from the HyperAgent repo.
+- `sh scripts/verify-core.sh` passes from the HyperAgent repo (`verify-mvp.sh` is a thin alias for it).
 - `sh scripts/hyperagent.sh verify all` passes from the HyperAgent repo.
-- The scratch project has `.hyperagent`, `AGENTS.md`, `missions/`, `workshop/`, `forge/`, `templates/`, and `hyperagent/`.
+- The scratch project has `.hyperagent/config.toml`, `.hyperagent/missions/`, `.hyperagent/workshop/`, `.hyperagent/forge/`, `.hyperagent/templates/`, `.hyperagent/hyperagent/`, and `AGENTS.md`.
+- The scratch project does not have top-level `missions/`, `workshop/`, `forge/`, `templates/`, or `hyperagent/` folders created by init.
 - The scratch project does not need a copied `scripts/hyperagent.sh` or copied `ui/` directory for the core setup to be valid.
 - Codex reports any restart or fresh-thread requirement clearly.
 - Codex does not edit global Codex custom instructions.
@@ -52,10 +53,10 @@ In a scratch or low-risk repo, ask Codex to use the HyperAgent skill on a real s
 
 Check the result:
 
-- A mission record is written in `missions/`.
+- A mission record is written in the configured missions directory, which defaults to `.hyperagent/missions/` for new installs.
 - The mission record includes request, plan, files or systems changed, commands/checks, verification, outcome, risks, and friction.
 - The final user-facing response matches the mission evidence.
-- If there was concrete friction, a Workshop proposal is created in `workshop/proposals/`.
+- If there was concrete friction, a Workshop proposal is created in the configured proposals directory, which defaults to `.hyperagent/workshop/proposals/` for new installs.
 - If there was no concrete friction, Codex says no proposal was needed instead of inventing one.
 
 Then run:

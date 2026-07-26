@@ -17,7 +17,8 @@ Public examples should show the shape of the loop without depending on one maint
 Good public examples:
 
 - use relative or fictional repo paths,
-- avoid private issue IDs, URLs, and account names,
+- avoid private issue URLs, account names, and non-public tracker context,
+- use bare planning IDs such as `DAN-NNN` only when they are intentional public roadmap or provenance labels,
 - summarize checks instead of pasting raw tool output,
 - explain unresolved risks without exposing unrelated side context,
 - keep enough detail for contributors to understand what the mission proved.
@@ -30,7 +31,8 @@ Before committing a mission record, review for:
 
 - absolute local paths such as `/Users/name/...`, `/private/tmp/...`, `/var/folders/...`, or `/tmp/...`,
 - private project names, internal workspace names, side-workspace history, or unrelated customer/user context,
-- issue metadata that is not meant for the public sample, including private Linear URLs and issue IDs,
+- issue metadata that is not meant for the public sample, including private Linear URLs, account names, comments, and full tracker payloads,
+- bare issue IDs only when they are not intentional public roadmap or provenance labels,
 - secrets, tokens, passwords, API keys, bearer tokens, private keys, or credential-like command fragments,
 - raw local trace payloads, `.hyperagent-evidence/` contents, Workbench payloads, screenshots, or command logs,
 - network, deployment, filesystem, or account-authority details that would change the safety interpretation of the mission,
@@ -42,7 +44,7 @@ Run the quick preflight before committing public mission examples:
 sh scripts/hyperagent.sh mission redact-check docs/examples/missions/public-safe-mission.md
 ```
 
-This helper flags obvious local paths, Linear metadata, local evidence payload references, and secret-like strings. Core verification runs it on the public-safe example and on changed mission files visible to git, so new public evidence gets a forward safety gate. Passing the helper is not a guarantee that a mission is public-safe; human review is still required.
+This helper flags obvious local paths, private Linear URLs, local evidence payload references, and secret-like strings. It does not treat a bare public planning ID as a finding by itself. Core verification runs it on the public-safe example and on changed mission files visible to git, so new public evidence gets a forward safety gate. Passing the helper is not a guarantee that a mission is public-safe; human review is still required.
 
 ## Dogfooding Records
 
@@ -56,7 +58,7 @@ Private dogfooding records can be more specific than public examples, but they s
 ## Contributor Workflow
 
 1. Decide whether the record belongs in `missions/`, `docs/examples/missions/`, or an ignored local path.
-2. Remove local paths, private issue metadata, secrets, raw traces, and unrelated side context.
+2. Remove local paths, private issue metadata, secrets, raw traces, and unrelated side context; keep bare issue IDs only when they are intentional public labels.
 3. Run `sh scripts/hyperagent.sh verify-mission --strict PATH` when the file is a mission record.
 4. Run `sh scripts/hyperagent.sh mission redact-check PATH` before proposing a public commit.
 5. In the PR, say whether mission evidence was committed, redacted, converted to a public example, or kept local.

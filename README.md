@@ -87,7 +87,7 @@ The primary CLI model has four primary flows:
 sh scripts/hyperagent.sh init --target /path/to/project
 sh scripts/hyperagent.sh sense
 sh scripts/hyperagent.sh mission closeout --request "Describe the task" --slug task-slug
-sh scripts/hyperagent.sh review workshop --mission missions/MISSION.md --title "Improve the Suit" --problem "Concrete mission friction"
+sh scripts/hyperagent.sh review workshop --mission .hyperagent/missions/MISSION.md --title "Improve the Suit" --problem "Concrete mission friction"
 ```
 
 `sh scripts/hyperagent.sh ui` is an optional local cockpit helper when available; it is not a separate source of truth.
@@ -128,12 +128,12 @@ HyperAgent updates use normal Git workflows. See `docs/quickstart.md#12-update-l
 - `docs/article-outline.md`: public essay outline for the Iron Man Suit thesis.
 - `skills/codex-hyperagent/`: Codex skill instructions.
 - `bin/hyperagent`: small command wrapper for `scripts/hyperagent.sh`.
-- `.hyperagent`: machine-readable project config for initialized paths, adapters, and verification commands.
+- `.hyperagent`: machine-readable project config for this development repo. Newly initialized projects use `.hyperagent/config.toml` plus HyperAgent-owned project folders under `.hyperagent/`.
 - `scripts/setup-hyperagent.sh`: one-command HyperAgent setup path for clone/update, verification, skill install, and optional project init.
 - `scripts/install-codex-skill.sh`: dependency-free Codex skill installer.
 - `scripts/update-codex-skill.sh`: update helper for copy installs.
 - `scripts/hyperagent.sh`: runtime helper organized around four primary flows: `init`, `sense`, `mission`, and `review`, plus an optional `ui` cockpit helper. Existing development commands remain available as compatibility aliases. Initialized projects get a small shim that delegates to this runtime.
-- `.hyperagent-evidence/`: ignored local runtime evidence, including the opt-in command/check log used by `sense`.
+- `.hyperagent-evidence/`: legacy ignored local runtime evidence in this repo. Newly initialized projects use `.hyperagent/evidence/`.
 - `hyperagent/operating-prompt.md`: the operating layer Codex wears during work.
 - `hyperagent/capability-registry.md`: accepted capability registry with reviewed local capabilities.
 - `templates/mission-record.md`: mission telemetry template.
@@ -161,7 +161,7 @@ sh scripts/hyperagent.sh verify-config
 sh scripts/verify-mvp.sh
 ```
 
-The config verifier checks the root `.hyperagent` contract. The MVP verifier checks that the Codex adapter docs, Codex skill, installer, operating prompt, local memory directories, templates, documentation, capability registry, and safety defaults are present.
+The config verifier checks the project config contract: `.hyperagent/config.toml` for new initialized projects, and the legacy root `.hyperagent` file in this development repo. The MVP verifier checks that the Codex adapter docs, Codex skill, installer, operating prompt, local memory directories, templates, documentation, capability registry, and safety defaults are present.
 
 The MVP verifier is the core verifier. Run extension and release tiers when touching optional or public-release surfaces:
 
@@ -192,7 +192,7 @@ Run the project init smoke test:
 sh evals/init-smoke.sh
 ```
 
-The init smoke test creates a temporary repo, runs `hyperagent init`, checks the generated markdown-first structure and `.hyperagent` config, verifies that global runtime files are not copied into the target, verifies `--update`, verifies overwrite refusal, verifies `--force`, and confirms `--dry-run` leaves the target untouched.
+The init smoke test creates a temporary repo, runs `hyperagent init`, checks the generated markdown-first structure under `.hyperagent/` and `.hyperagent/config.toml`, verifies that global runtime files are not copied into the target, verifies legacy top-level folder migration with `--update`, verifies overwrite refusal, verifies `--force`, and confirms `--dry-run` leaves the target untouched.
 
 Run the HyperAgent setup smoke test:
 

@@ -60,19 +60,19 @@ Add `bin/` to your `PATH` if you want to run it as plain `hyperagent init`.
 
 The init command creates or updates:
 
-- `.hyperagent`
-- `missions/`
-- `workshop/proposals/`
-- `workshop/decisions/`
-- `workshop/backlog.md`
-- `forge/reviews/`
-- `templates/`
-- `hyperagent/README.md`
-- `hyperagent/capability-registry.md`
+- `.hyperagent/config.toml`
+- `.hyperagent/missions/`
+- `.hyperagent/workshop/proposals/`
+- `.hyperagent/workshop/decisions/`
+- `.hyperagent/workshop/backlog.md`
+- `.hyperagent/forge/reviews/`
+- `.hyperagent/templates/`
+- `.hyperagent/hyperagent/README.md`
+- `.hyperagent/hyperagent/capability-registry.md`
 - `scripts/hyperagent.sh` as a project shim
 - a HyperAgent instructions block in `AGENTS.md`
 
-The root `.hyperagent` file is the machine-readable project anchor. It records the HyperAgent version, install mode, initialized paths, enabled adapters, verification commands, and links to project instruction files.
+The `.hyperagent/config.toml` file is the machine-readable project anchor. It records the HyperAgent version, install mode, initialized paths, enabled adapters, verification commands, and links to project instruction files. The helper can still read the legacy root `.hyperagent` config file from older installs, but new installs group HyperAgent project folders under `.hyperagent/`.
 
 The schema and supported TOML subset are documented in `docs/config.md`. Validate the project contract with:
 
@@ -84,9 +84,9 @@ Generated operational files are plain Markdown and shell scripts. Init separates
 
 Init output categories:
 
-- Project-local artifacts: mission records, Workshop proposals and decisions, Forge reviews, `AGENTS.md`, blank `workshop/backlog.md`, and blank `hyperagent/capability-registry.md`.
-- Copied templates and rubrics: `templates/`, `workshop/rubric.md`, and `forge/process/quality-rubric.md`.
-- Generated config and docs: `.hyperagent`, `hyperagent/README.md`, and the HyperAgent block in `AGENTS.md`.
+- Project-local artifacts: mission records, Workshop proposals and decisions, Forge reviews, `AGENTS.md`, blank `.hyperagent/workshop/backlog.md`, and blank `.hyperagent/hyperagent/capability-registry.md`.
+- Copied templates and rubrics: `.hyperagent/templates/`, `.hyperagent/workshop/rubric.md`, and `.hyperagent/forge/process/quality-rubric.md`.
+- Generated config and docs: `.hyperagent/config.toml`, `.hyperagent/hyperagent/README.md`, and the HyperAgent block in `AGENTS.md`.
 - Global runtime dependency: `scripts/hyperagent.sh` is a small project shim that delegates to the installed HyperAgent runtime. The runtime helper and operating prompt are not copied into initialized repos by default.
 
 Existing files are left alone when identical, and conflicting files are refused unless `--force` is passed.
@@ -103,7 +103,7 @@ After updating your HyperAgent install, migrate an already initialized project:
 sh scripts/hyperagent.sh init --target /path/to/project --update
 ```
 
-Update mode replaces older copied runtime helpers with the project shim and removes an unchanged copied runtime prompt. Locally changed files are refused unless `--force` is passed.
+Update mode migrates older top-level HyperAgent project folders into `.hyperagent/`, replaces older copied runtime helpers with the project shim, and removes an unchanged copied runtime prompt. Locally changed generated files are refused unless `--force` is passed.
 
 ## 3. Install The Codex Skill
 
@@ -167,7 +167,7 @@ sh scripts/hyperagent.sh sense --format json --pr off
 sh scripts/hyperagent.sh doctor
 ```
 
-The sensing layer summarizes the current branch, upstream, HEAD, git status counts, changed files, recent opt-in commands/checks, failures and retries, optional PR/CI status when `gh` can find a pull request, and an optional trace link passed with `--trace-url`. By default, it also checks `.hyperagent-evidence/workbench/traces.jsonl` or `HYPERAGENT_WORKBENCH_TRACE_LOG` for local Workbench/Raindrop trace entries. It is local-first and does not require hosted services. It does not inspect file contents, environment variables, shell history, credentials, or secrets, and it redacts secret-like command and trace fragments before output.
+The sensing layer summarizes the current branch, upstream, HEAD, git status counts, changed files, recent opt-in commands/checks, failures and retries, optional PR/CI status when `gh` can find a pull request, and an optional trace link passed with `--trace-url`. By default, it also checks `.hyperagent/evidence/workbench/traces.jsonl` or `HYPERAGENT_WORKBENCH_TRACE_LOG` for local Workbench/Raindrop trace entries. It is local-first and does not require hosted services. It does not inspect file contents, environment variables, shell history, credentials, or secrets, and it redacts secret-like command and trace fragments before output.
 
 Workbench trace enrichment is a background sensing subsystem. If Workbench is unavailable, unhealthy, or not initialized yet, `sense` reports that state and continues with the lightweight fallback. Use `sense --doctor` for local diagnostics and retention/redaction reminders before adding trace evidence to a mission record. `doctor` remains as a compatibility alias.
 
@@ -179,7 +179,7 @@ Ask Codex:
 Use the codex-hyperagent skill. Run a small HyperAgent mission in this repo, verify the result, write a mission record, and propose an upgrade only if there is concrete friction.
 ```
 
-The mission record belongs in `missions/`. The helper prefills repo evidence such as branch, git status, changed files, command evidence, verification status, and closeout placeholders.
+The mission record belongs in the configured missions directory. New installs default to `.hyperagent/missions/`. The helper prefills repo evidence such as branch, git status, changed files, command evidence, verification status, and closeout placeholders.
 
 For end-of-task telemetry, prefer one closeout command after recording checks:
 
@@ -189,11 +189,11 @@ sh scripts/hyperagent.sh mission-closeout \
   --slug small-hyperagent-mission \
   --outcome "Mission completed and verification passed" \
   --risks "No unresolved risks"
-sh scripts/hyperagent.sh verify-mission --strict missions/MISSION.md
+sh scripts/hyperagent.sh verify-mission --strict .hyperagent/missions/MISSION.md
 ```
 
 Closeout auto-fills the current sense snapshot, recent command/check evidence, changed files, verification status, unresolved-risk prompt, and candidate upgrade field so the record is suitable for Workshop evidence without copy/paste cleanup.
-Pass `--mission missions/DRAFT.md` to replace a draft record with the closeout evidence instead of creating a new file.
+Pass `--mission .hyperagent/missions/DRAFT.md` to replace a draft record with the closeout evidence instead of creating a new file.
 
 The grouped command is the preferred user-facing form:
 
@@ -203,7 +203,7 @@ sh scripts/hyperagent.sh mission closeout \
   --slug small-hyperagent-mission \
   --outcome "Mission completed and verification passed" \
   --risks "No unresolved risks"
-sh scripts/hyperagent.sh mission verify --strict missions/MISSION.md
+sh scripts/hyperagent.sh mission verify --strict .hyperagent/missions/MISSION.md
 ```
 
 You can also create a mission record shell:
@@ -228,7 +228,7 @@ Ask Codex:
 sh scripts/hyperagent.sh workshop-prompt
 ```
 
-Then have Codex follow the printed prompt. Proposals belong in `workshop/proposals/`.
+Then have Codex follow the printed prompt. Proposals belong in the configured Workshop proposals directory, which defaults to `.hyperagent/workshop/proposals/` in new installs.
 
 After several missions, run a digest before writing another standalone proposal:
 
@@ -248,7 +248,7 @@ To create a proposal shell:
 
 ```bash
 sh scripts/hyperagent.sh review workshop \
-  --mission missions/2026-05-01-2108-mark-i-build.md \
+  --mission .hyperagent/missions/2026-05-01-2108-mark-i-build.md \
   --title "Improve first-run verification" \
   --problem "The install step needs a concrete smoke test"
 ```
@@ -265,20 +265,20 @@ Persistent behavior changes are not activated silently.
 
 ```bash
 sh scripts/hyperagent.sh review decide \
-  --proposal workshop/proposals/2026-05-01-2108-codex-skill-installer.md \
+  --proposal .hyperagent/workshop/proposals/2026-05-01-2108-codex-skill-installer.md \
   --decision accepted \
   --reviewer "Human reviewer" \
   --reason "The installer reduces first-run ambiguity and has a local smoke test" \
   --capability codex-skill-installer
 ```
 
-Accepted decisions are recorded in `workshop/decisions/` and appended to `hyperagent/capability-registry.md`.
+Accepted decisions are recorded in the configured decisions directory, which defaults to `.hyperagent/workshop/decisions/`, and appended to `.hyperagent/hyperagent/capability-registry.md`.
 
 `decide-upgrade` remains a compatibility alias:
 
 ```bash
 sh scripts/hyperagent.sh decide-upgrade \
-  --proposal workshop/proposals/2026-05-01-2108-codex-skill-installer.md \
+  --proposal .hyperagent/workshop/proposals/2026-05-01-2108-codex-skill-installer.md \
   --decision accepted \
   --reviewer "Human reviewer" \
   --reason "The installer reduces first-run ambiguity and has a local smoke test" \
@@ -293,14 +293,14 @@ Ask Codex:
 sh scripts/hyperagent.sh review forge new --slug workshop-quality-review
 ```
 
-Forge reviews belong in `forge/reviews/`. Run one after proposals are accepted or rejected, after evals change, before release-readiness decisions, or when repeated missions show the Workshop producing vague, unsafe, untested, or low-value proposals.
+Forge reviews belong in the configured Forge reviews directory, which defaults to `.hyperagent/forge/reviews/`. Run one after proposals are accepted or rejected, after evals change, before release-readiness decisions, or when repeated missions show the Workshop producing vague, unsafe, untested, or low-value proposals.
 
-Each Forge review should include the structured summary block from `templates/forge-review.md`, 0-5 scores with concrete evidence references, deterministic gate results, and payoff counters such as `regressions_caught`, `manual_steps_removed`, and `evals_added`.
+Each Forge review should include the structured summary block from `.hyperagent/templates/forge-review.md`, 0-5 scores with concrete evidence references, deterministic gate results, and payoff counters such as `regressions_caught`, `manual_steps_removed`, and `evals_added`.
 
 You can check a completed review before using it as proposal evidence:
 
 ```bash
-sh scripts/verify-forge-review.sh forge/reviews/2026-05-16-1216-workshop-quality-review.md
+sh scripts/verify-forge-review.sh .hyperagent/forge/reviews/2026-05-16-1216-workshop-quality-review.md
 ```
 
 For a compact process-health report across proposals, decisions, registry entries, and audit eval coverage:
@@ -319,7 +319,7 @@ The Forge should improve the Workshop process, not silently activate new capabil
 
 ```bash
 sh scripts/hyperagent.sh review workshop \
-  --forge-review forge/reviews/2026-05-16-1216-workshop-quality-review.md \
+  --forge-review .hyperagent/forge/reviews/2026-05-16-1216-workshop-quality-review.md \
   --title "Improve Workshop proposal quality" \
   --problem "Recent proposals are too vague to evaluate safely"
 ```

@@ -20,7 +20,7 @@ sh scripts/verify-extensions.sh
 sh scripts/verify-release.sh
 ```
 
-The config verifier checks the root `.hyperagent` project contract. The core verifier checks whether the repo contains the artifacts required by the PRD for the Codex-first prototype. Extension checks cover local sensing, Workbench trace enrichment, the optional UI cockpit, and reliability scoring. Release checks cover public packaging docs and GitHub-facing release artifacts.
+The config verifier checks the project config contract. New initialized projects store it at `.hyperagent/config.toml`; older repos may still use the legacy root `.hyperagent` file. The core verifier is the HyperAgent testbed repo-integrity gate: it checks whether the repo contains the artifacts required by the PRD for the Codex-first alpha, including local sensing and command/check evidence used by mission closeout. Extension checks cover Workbench trace enrichment, the optional UI cockpit, and reliability scoring. Release checks cover public packaging docs and GitHub-facing release artifacts.
 
 ## Loop Smoke Eval
 
@@ -32,15 +32,15 @@ sh evals/smoke-loop.sh
 
 The smoke loop copies the repo to a temporary directory, then verifies that the local helper can:
 
-- create a mission record in `missions/` with repo evidence, command evidence, verification status, and closeout placeholders,
+- create a mission record in the configured missions directory with repo evidence, command evidence, verification status, and closeout placeholders,
 - run `hyperagent check` and record command status automatically,
 - create or update a closeout mission record with sense snapshot, recent checks, changed files, verification status, unresolved risks, and candidate upgrades,
 - fail strict mission verification when draft placeholders remain,
-- create a proposal linked to that mission in `workshop/proposals/`,
-- create a Forge review in `forge/reviews/`,
+- create a proposal linked to that mission in the configured Workshop proposals directory,
+- create a Forge review in the configured Forge reviews directory,
 - create a process-improvement proposal linked to that Forge review,
-- record a human-review decision in `workshop/decisions/`,
-- append an accepted capability to `hyperagent/capability-registry.md`.
+- record a human-review decision in the configured decisions directory,
+- append an accepted capability to the configured capability registry.
 
 ## CLI Help Smoke Eval
 
@@ -121,7 +121,7 @@ sh evals/init-smoke.sh
 
 The init smoke test creates a temporary repo, runs `sh scripts/hyperagent.sh init --target`, and verifies that setup:
 
-- creates `missions/`, `workshop/proposals/`, `workshop/decisions/`, and `forge/reviews/`,
+- creates `.hyperagent/missions/`, `.hyperagent/workshop/proposals/`, `.hyperagent/workshop/decisions/`, and `.hyperagent/forge/reviews/`,
 - creates `.hyperagent` as the machine-readable project anchor for version, install mode, paths, adapters, verification commands, and instruction links,
 - validates the generated `.hyperagent` contract,
 - fails with an actionable error when a core config field is missing,
@@ -129,8 +129,8 @@ The init smoke test creates a temporary repo, runs `sh scripts/hyperagent.sh ini
 - generates a blank project backlog, a project capability registry, local setup docs, and a `scripts/hyperagent.sh` project shim,
 - keeps global runtime files such as the full helper and operating prompt out of the initialized repo by default,
 - adds project instructions to `AGENTS.md`,
-- documents init output categories and the global-runtime boundary in `hyperagent/README.md`,
-- documents copy vs symlink behavior in `hyperagent/README.md`,
+- documents init output categories and the global-runtime boundary in `.hyperagent/hyperagent/README.md`,
+- documents copy vs symlink behavior in `.hyperagent/hyperagent/README.md`,
 - migrates an already initialized fixture with `--update`,
 - refuses conflicting overwrites unless `--force` is passed,
 - leaves the target untouched during `--dry-run`.
@@ -184,11 +184,11 @@ The installed `SKILL.md` should retain the source-of-truth links to the Suit pro
 ## Manual Smoke Eval
 
 1. Ask Codex to use the `codex-hyperagent` skill for a small real task in this repo.
-2. Confirm Codex writes a mission record in `missions/`.
+2. Confirm Codex writes a mission record in the configured missions directory.
 3. Confirm the record includes evidence, verification, friction, and candidate upgrades.
-4. Confirm Codex writes at least one proposal in `workshop/proposals/` when friction is present.
+4. Confirm Codex writes at least one proposal in the configured Workshop proposals directory when friction is present.
 5. Confirm the proposal links to the mission record and uses `human review required`.
-6. Confirm a human approval or rejection can be recorded in `workshop/decisions/`.
-7. Confirm Forge can review recent proposal quality and write a review in `forge/reviews/`.
+6. Confirm a human approval or rejection can be recorded in the configured decisions directory.
+7. Confirm Forge can review recent proposal quality and write a review in the configured Forge reviews directory.
 8. Confirm Forge can generate a process-improvement proposal with `review workshop --forge-review`.
 9. Confirm Forge can audit proposal quality and traceability with `sh scripts/hyperagent.sh review forge audit`.

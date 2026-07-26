@@ -1,6 +1,8 @@
 # HyperAgent Project Config
 
-The root `.hyperagent` file is the machine-readable project contract for a HyperAgent workspace. Local commands use it to find mission records, Workshop artifacts, Forge reviews, adapter settings, and verification commands.
+The `.hyperagent/config.toml` file is the machine-readable project contract for a HyperAgent workspace. Local commands use it to find mission records, Workshop artifacts, Forge reviews, adapter settings, and verification commands.
+
+For compatibility, the helper can still read the legacy root `.hyperagent` file used by older initialized projects. New project installs use the `.hyperagent/` directory layout so HyperAgent-owned project folders stay grouped under one hidden directory.
 
 Validate the contract with:
 
@@ -23,12 +25,12 @@ These fields are stable for `config_version = 1` and are validated by `verify-co
 ```toml
 hyperagent_version = "v0.1.0-alpha"
 config_version = 1
-install_mode = "copy"
+install_mode = "global-runtime"
 ```
 
 - `hyperagent_version`: the HyperAgent release expected by this workspace.
 - `config_version`: the schema version. Version `1` is the only supported version.
-- `install_mode`: how project-local files were initialized. Supported values are `copy` and `symlink`; the default remains `copy`.
+- `install_mode`: how project-local files were initialized. Supported values are `copy`, `symlink`, and `global-runtime`; new installs default to `global-runtime`.
 
 ## Stable Paths
 
@@ -37,23 +39,31 @@ All configured paths must be project-relative and must stay inside the project. 
 ```toml
 [paths]
 project_instructions = "AGENTS.md"
-missions = "missions"
-workshop_proposals = "workshop/proposals"
-workshop_decisions = "workshop/decisions"
-workshop_backlog = "workshop/backlog.md"
-workshop_rubric = "workshop/rubric.md"
-forge_reviews = "forge/reviews"
-forge_quality_rubric = "forge/process/quality-rubric.md"
-templates = "templates"
-operating_prompt = "hyperagent/operating-prompt.md"
-capability_registry = "hyperagent/capability-registry.md"
-project_readme = "README.md"
+missions = ".hyperagent/missions"
+workshop_proposals = ".hyperagent/workshop/proposals"
+workshop_decisions = ".hyperagent/workshop/decisions"
+workshop_backlog = ".hyperagent/workshop/backlog.md"
+workshop_rubric = ".hyperagent/workshop/rubric.md"
+forge_reviews = ".hyperagent/forge/reviews"
+forge_quality_rubric = ".hyperagent/forge/process/quality-rubric.md"
+templates = ".hyperagent/templates"
+capability_registry = ".hyperagent/hyperagent/capability-registry.md"
+project_readme = ".hyperagent/hyperagent/README.md"
 local_helper = "scripts/hyperagent.sh"
-evidence_log = ".hyperagent-evidence/commands.log"
-workbench_trace_log = ".hyperagent-evidence/workbench/traces.jsonl"
+evidence_log = ".hyperagent/evidence/commands.log"
+workbench_trace_log = ".hyperagent/evidence/workbench/traces.jsonl"
 ```
 
 `status`, mission creation, proposal creation, decision creation, Forge review creation, command evidence, and Workbench trace defaults read these paths.
+
+For `install_mode = "global-runtime"`, runtime-only paths live under `[runtime]` because the operating prompt is supplied by the installed HyperAgent runtime instead of being copied into the project:
+
+```toml
+[runtime]
+helper = "scripts/hyperagent.sh"
+operating_prompt = ".hyperagent/hyperagent/operating-prompt.md"
+override_env = "HYPERAGENT_RUNTIME_ROOT"
+```
 
 ## Adapter-Owned Fields
 
@@ -89,7 +99,7 @@ Projects can add stronger local checks, such as `sh scripts/verify-mvp.sh`, `sh 
 
 ## Experimental Paths
 
-The evidence paths are intentionally local and ignored by git:
+The evidence paths are intentionally local. New installs keep them under `.hyperagent/evidence/`:
 
 - `evidence_log`
 - `workbench_trace_log`

@@ -64,11 +64,11 @@ Codex-owned and HyperAgent-owned artifacts are intentionally separate:
 
 - Cross-project Codex memory may live outside the repo, such as Dan's Obsidian Codex vault.
 - Project truth lives in repo markdown and scripts.
-- Mission records live in `missions/`.
-- Workshop proposals live in `workshop/proposals/`.
-- Human decisions live in `workshop/decisions/`.
-- Forge reviews live in `forge/reviews/`.
-- Local runtime evidence, when opted in, lives under `.hyperagent-evidence/` and is ignored by git.
+- Mission records live in the configured missions directory; new installs default to `.hyperagent/missions/`.
+- Workshop proposals live in the configured proposals directory; new installs default to `.hyperagent/workshop/proposals/`.
+- Human decisions live in the configured decisions directory; new installs default to `.hyperagent/workshop/decisions/`.
+- Forge reviews live in the configured Forge reviews directory; new installs default to `.hyperagent/forge/reviews/`.
+- Local runtime evidence, when opted in, lives under the configured evidence path; new installs default to `.hyperagent/evidence/`.
 
 The adapter should summarize durable project state into markdown artifacts rather than depending on transcript history.
 
@@ -112,7 +112,7 @@ The Codex adapter can use local sensing helpers:
 - `sh scripts/hyperagent.sh sense --pr off`
 - `sh scripts/hyperagent.sh doctor`
 
-Workbench/Raindrop trace sensing is local and optional through `.hyperagent-evidence/workbench/traces.jsonl` or `HYPERAGENT_WORKBENCH_TRACE_LOG`. It must remain redacted and local-first.
+Workbench/Raindrop trace sensing is local and optional through `.hyperagent/evidence/workbench/traces.jsonl` or `HYPERAGENT_WORKBENCH_TRACE_LOG`. Legacy projects may still use `.hyperagent-evidence/workbench/traces.jsonl`. It must remain redacted and local-first.
 
 The adapter does not provide a hosted dashboard or product UI.
 

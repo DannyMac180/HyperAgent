@@ -18,7 +18,7 @@ The repo is release-candidate ready only after all of these are true:
 
 ## Unreleased Since `v0.1.0-alpha`
 
-- `hyperagent init` project setup with `.hyperagent`, local templates, generated project backlog, capability registry, and `AGENTS.md` instructions.
+- `hyperagent init` project setup with `.hyperagent/config.toml`, local templates under `.hyperagent/templates/`, generated project backlog and capability registry under `.hyperagent/`, and `AGENTS.md` instructions.
 - Local sensing through `scripts/hyperagent.sh sense`, `record-check`, and `doctor`, including redacted command/check evidence, changed-file summaries, optional PR/CI lookup, and local Workbench trace enrichment when available.
 - Simplified CLI help around four primary flows: `init`, `sense`, `mission`, and `review`, with `ui` framed as an optional cockpit helper and compatibility aliases for the older flat helper commands.
 - Reliability gains eval with deterministic baseline and HyperAgent fixture records.

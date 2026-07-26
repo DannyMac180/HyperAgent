@@ -83,7 +83,8 @@ The test passes when all of these are true:
 - HyperAgent local verification passes, including `sh scripts/verify-mvp.sh`.
 - `~/.codex/skills/codex-hyperagent/SKILL.md` exists.
 - The command path reports that global Codex custom instructions were unchanged.
-- The scratch project contains `.hyperagent`, `AGENTS.md`, `missions/`, `workshop/`, `forge/`, `templates/`, `hyperagent/`, and `scripts/hyperagent.sh` after confirmed init.
+- The scratch project contains `.hyperagent/config.toml`, `.hyperagent/missions/`, `.hyperagent/workshop/`, `.hyperagent/forge/`, `.hyperagent/templates/`, `.hyperagent/hyperagent/`, `AGENTS.md`, and `scripts/hyperagent.sh` after confirmed init.
+- The scratch project does not contain top-level `missions/`, `workshop/`, `forge/`, `templates/`, or `hyperagent/` folders created by init.
 - Codex reports whether a restart or fresh thread is needed.
 - Codex reports the files it changed.
 - Codex does not edit global Codex custom instructions during the happy path.

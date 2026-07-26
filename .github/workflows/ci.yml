@@ -1,0 +1,63 @@
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  ci:
+    name: ci
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      # v2 (Bun/TypeScript) checks — guarded so branches that predate the
+      # src/ layout (and main until DAN-198 merges) still pass.
+      - name: Install dependencies
+        if: ${{ hashFiles('package.json') != '' }}
+        run: bun install --frozen-lockfile
+
+      - name: Typecheck
+        if: ${{ hashFiles('tsconfig.json') != '' }}
+        run: bunx tsc --noEmit
+
+      - name: Test
+        if: ${{ hashFiles('package.json') != '' }}
+        run: bun test
+
+      # v1 legacy surface: syntax-only safety net. Deliberately NOT
+      # scripts/verify-core.sh — its string-presence checks are v1 gates
+      # and must not gate v2 work (see CLAUDE.md).
+      - name: Shell syntax check (v1 legacy scripts)
+        run: |
+          rc=0
+          for f in scripts/*.sh evals/*.sh; do
+            [ -f "$f" ] || continue
+            bash -n "$f" || { echo "syntax error: $f"; rc=1; }
+          done
+          exit "$rc"
+
+      # Repo privacy policy (docs/evidence-policy.md): missions/ is never
+      # committed, and v2 code never embeds absolute personal paths.
+      # Scoped to src/ because four v1 files legitimately reference the
+      # /Users/ pattern (redaction checklists and redaction code).
+      - name: Privacy guard
+        run: |
+          if git ls-files missions/ | grep -q .; then
+            echo "policy violation: missions/ must not be git-tracked (docs/evidence-policy.md)"
+            exit 1
+          fi
+          if [ -d src ] && grep -rn "/Users/" src/; then
+            echo "policy violation: absolute personal path under src/"
+            exit 1
+          fi
+          echo "privacy guard passed"

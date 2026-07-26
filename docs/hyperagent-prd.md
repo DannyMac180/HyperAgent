@@ -188,6 +188,8 @@ Forge upgrades may change:
 - The categories of capabilities the Workshop looks for.
 - The way mission records, upgrade proposals, and accepted suit memory are used.
 
+Forge review cadence should be evidence-triggered, not ratio-triggered. A low number of Forge reviews is not automatically loop dysfunction when missions do not reveal concrete Workshop process friction. Run a Forge review after proposal approvals or rejections, eval changes, release-readiness checks, or repeated missions that show vague, unsafe, untested, or low-value Workshop output. If the project later wants a numeric cadence target, that target should be stated in the roadmap or release checklist as a falsifiable governance rule.
+
 ## Conceptual Architecture
 
 ```mermaid
@@ -229,7 +231,7 @@ As a user, I can install HyperAgent into Codex, assign work to the agent, and af
 - Do not train or fine-tune models.
 - Do not attempt to support every agent platform on day one.
 - Do not build a complex new UI before the underlying loop works in markdown.
-- A local read-mostly cockpit is acceptable only as an optional view over markdown artifacts and local evidence, not as a hosted service or replacement source of truth.
+- A local read-mostly cockpit is acceptable only as an optional view over markdown artifacts and local evidence, not as a hosted service, replacement source of truth, or accepted primary product surface without a decision record and capability-registry entry.
 - Do not encode brittle task-specific scaffolds as the core product.
 
 ## Functional Requirements
@@ -245,6 +247,8 @@ The installation must include:
 - Workshop upgrade proposal instructions.
 - Safety and approval defaults.
 - Memory usage conventions for local mission records, upgrade proposals, and accepted suit knowledge.
+
+The Codex adapter may need several instruction surfaces: project instructions, installed skill instructions, the runtime operating prompt, and helper command prompt text. Those surfaces serve different consumers and install contexts, so the PRD does not require them to collapse into one pointer file. If HyperAgent later single-sources operating doctrine, it should do so through a reviewed build-time generation step that produces a self-contained installed `SKILL.md`; copy installs must not depend on a thin pointer back into the development checkout.
 
 ### Mission Records
 
@@ -311,10 +315,10 @@ HyperAgent should use local, file-based memory on day one rather than requiring 
 
 Recommended memory flow:
 
-1. Mission telemetry is written to `missions/` or an equivalent local directory.
-2. Upgrade proposals are written to `workshop/proposals/`.
+1. Mission telemetry is written to a configured local directory. New installs default to `.hyperagent/missions/`.
+2. Upgrade proposals are written to a configured local Workshop proposals directory. New installs default to `.hyperagent/workshop/proposals/`.
 3. Accepted upgrades are recorded in an installed capability registry.
-4. Forge reviews are written to `forge/reviews/`.
+4. Forge reviews are written to a configured local Forge reviews directory. New installs default to `.hyperagent/forge/reviews/`.
 5. Durable lessons are promoted into project docs or suit memory.
 6. Upgrade proposals link back to mission records as evidence.
 
@@ -365,9 +369,9 @@ Initial repo contents should include:
 - `docs/article-outline.md`: public essay draft.
 - `skills/codex-hyperagent/`: Codex skill instructions.
 - `hyperagent/`: local suit runtime, templates, and project conventions.
-- `templates/mission-record.md`: mission telemetry template.
-- `templates/upgrade-proposal.md`: Workshop proposal template.
-- `templates/forge-review.md`: Forge review template.
+- `.hyperagent/templates/mission-record.md`: initialized-project mission telemetry template.
+- `.hyperagent/templates/upgrade-proposal.md`: initialized-project Workshop proposal template.
+- `.hyperagent/templates/forge-review.md`: initialized-project Forge review template.
 - `evals/`: small tasks that test whether upgrades improve behavior.
 
 ## Success Metrics
@@ -429,6 +433,16 @@ Constraints:
 Definition of done:
 I can install HyperAgent into Codex, assign a simple real task to the agent, and see a mission record plus at least one evidence-backed upgrade proposal written somewhere durable and easy to inspect.
 ```
+
+The smallest local verification deliverable in this first assignment is a user-project check: validate the local `.hyperagent` contract and produce a local sensing summary, currently `sh scripts/hyperagent.sh verify-config` plus `sh scripts/hyperagent.sh sense`. That is separate from the HyperAgent testbed repo-integrity gate.
+
+In this repository, `sh scripts/verify-core.sh` is the testbed repo-integrity gate. It may assert many files across the Codex adapter, local loop helper, safety defaults, evidence policy, local sensing/check evidence, and PRD-governance docs because it protects the alpha product tree, not a freshly initialized user project. `sh scripts/verify-mvp.sh` is a compatibility alias for that gate.
+
+The core/extension/release verification model is the intended post-MVP evolution for this repository:
+
+- `sh scripts/verify-core.sh` checks the Codex-first alpha product tree and local loop integrity.
+- `sh scripts/verify-extensions.sh` checks optional surfaces such as Workbench trace enrichment, the local cockpit, and reliability scoring.
+- `sh scripts/verify-release.sh` checks release-support and GitHub-facing packaging artifacts.
 
 ## Next Milestones
 

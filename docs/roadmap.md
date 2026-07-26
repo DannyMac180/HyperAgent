@@ -22,6 +22,7 @@ HyperAgent's PRD core is intentionally small:
 - Forge reviews that improve the Workshop process.
 - Human review before persistent behavior changes.
 - Markdown-first memory and lightweight verification.
+- Local sensing and check evidence for repo state, command evidence, and mission closeout.
 - Adapter-aware design without implementing every platform in the alpha.
 
 | Surface | Status | Source of truth | Verification tier |
@@ -34,7 +35,7 @@ HyperAgent's PRD core is intentionally small:
 | Forge reviews | Core | `forge/reviews/`, `templates/forge-review.md` | Core |
 | Capability registry | Core final-state index | `hyperagent/capability-registry.md` | Core |
 | Project init | Core setup | `.hyperagent`, `AGENTS.md`, templates, local memory dirs | Core |
-| Sensing summary | Optional extension | `scripts/hyperagent.sh sense` | Extensions |
+| Local sensing and check evidence | Core alpha support / in review | `scripts/hyperagent.sh sense`, `record-check`, `doctor`, `evals/sense-smoke.sh` | Core |
 | Workbench trace enrichment | Optional extension | `.hyperagent-evidence/workbench/traces.jsonl` | Extensions |
 | Local UI cockpit | Optional extension | `scripts/hyperagent-ui.mjs`, `ui/` | Extensions |
 | Reliability scoring | Optional research extension | `evals/reliability-gains.sh` | Extensions |
@@ -46,6 +47,15 @@ HyperAgent's PRD core is intentionally small:
 ## Verification Tiers
 
 Use the smallest tier that proves the change.
+
+For an initialized user project, the smallest local verification run is the project config check plus a sensing summary:
+
+```bash
+sh scripts/hyperagent.sh verify-config
+sh scripts/hyperagent.sh sense
+```
+
+For the HyperAgent testbed repository, `verify-core.sh` is the repo-integrity gate. It is intentionally broader than a user-project check and should not be split into minimal-vs-integrity tiers unless a concrete consumer appears.
 
 ```bash
 sh scripts/verify-core.sh
@@ -63,6 +73,7 @@ sh scripts/verify-release.sh
 - The backlog is a planning view over proposals, not a second approval system.
 - Release notes describe what shipped at a version, not the current living product state.
 - This roadmap is the single current product-state source.
+- Operating doctrine is intentionally mirrored across `AGENTS.md`, `skills/codex-hyperagent/SKILL.md`, `hyperagent/operating-prompt.md`, and helper prompt output for different consumers. Any future single-source path should be a reviewed build-time generation step that still emits a self-contained installed `SKILL.md`.
 
 ## Current Simplification Policy
 
@@ -88,7 +99,7 @@ Features that are useful but not required by the PRD core should remain optional
 | Codex skill installer and updater | Accepted | `scripts/install-codex-skill.sh`, `scripts/update-codex-skill.sh` | `workshop/proposals/2026-05-01-2108-codex-skill-installer.md` | Local filesystem writes only; no hosted service. |
 | Local Mission -> Workshop -> Forge helper | Accepted | `scripts/hyperagent.sh status`, `new-mission`, `propose-upgrade`, `new-forge-review`, `decide-upgrade` | `workshop/decisions/2026-05-16-accepted-local-loop-helper-and-smoke-eval.md` | Accepted for local markdown artifacts and human-reviewed registry promotion. |
 | Project initialization | In review | `scripts/hyperagent.sh init`, `bin/hyperagent init` | `missions/2026-05-20-1017-dan-173-hyperagent-init.md`, `evals/init-smoke.sh` | Implemented and covered by smoke evals, but not accepted into the registry. |
-| Local sensing and check evidence | In review | `scripts/hyperagent.sh sense`, `record-check`, `doctor` | `missions/2026-05-20-1557-dan-174-sensing-layer.md`, `missions/2026-05-21-1308-dan-174-workbench-sensing-rework.md`, `evals/sense-smoke.sh` | Local-first, redacted, and graceful when Workbench traces are unavailable. |
+| Local sensing and check evidence | Core alpha support / in review | `scripts/hyperagent.sh sense`, `record-check`, `doctor` | `missions/2026-05-20-1557-dan-174-sensing-layer.md`, `missions/2026-05-21-1308-dan-174-workbench-sensing-rework.md`, `evals/sense-smoke.sh` | Local-first, redacted, required by the testbed core gate, and graceful when Workbench traces are unavailable. |
 | Reliability gains eval | In review | `evals/reliability-gains.sh` | `missions/2026-05-20-1554-dan-176-reliability-gains-eval.md`, `evals/reliability-rubric.md` | Deterministic fixture-based eval; live trace/replay ingestion is future work. |
 | Quantitative Forge review checks | In review | `templates/forge-review.md`, `scripts/verify-forge-review.sh` | `missions/2026-05-20-1556-dan-177-strengthen-forge.md`, `missions/2026-05-22-1535-dan-177-quantitative-forge-rework.md` | Adds anchored 0-5 scores, evidence fields, deterministic gates, and payoff counters. |
 | README architecture diagram maintenance | In review | `docs/architecture/hyperagent.mmd`, `docs/assets/hyperagent-architecture.svg`, PR checklist | `missions/2026-05-21-1329-readme-architecture-diagram.md` | Reviewed when user-visible modules change; SVG rendering is still manual. |
@@ -125,6 +136,7 @@ This section keeps the 17 review improvements visible without requiring chat his
 - Move implemented-but-unaccepted surfaces through explicit human review before calling them accepted capabilities.
 - Route task-specific conveniences into examples, adapters, or experiments instead of core Suit infrastructure.
 - Preserve `docs/roadmap.md` as the concise product-state index and keep README high level.
+- Treat Workshop and Forge cadence as evidence-triggered restraint: create proposals and Forge reviews when concrete friction appears, not to satisfy a raw mission-to-artifact ratio.
 - Use DAN-193 as the release gate once DAN-192, DAN-195, DAN-196, and safety/roadmap work are reviewed.
 
 ## Deferred By Design

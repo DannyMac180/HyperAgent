@@ -151,7 +151,7 @@ require_text evals/forge-audit-smoke.sh "HyperAgent Forge audit smoke passed."
 require_text evals/reliability-gains.sh "HyperAgent reliability rubric self-test passed."
 require_text hyperagent/operating-prompt.md "human review required"
 require_text hyperagent/operating-prompt.md "relevance triage"
-require_text hyperagent/operating-prompt.md "workshop/decisions"
+require_text hyperagent/operating-prompt.md "configured decisions directory"
 require_text hyperagent/operating-prompt.md "mission closeout"
 require_text hyperagent/operating-prompt.md 'Keep persistent behavior changes `human review required`.'
 require_text hyperagent/capability-registry.md "human review required"

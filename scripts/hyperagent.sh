@@ -17,7 +17,7 @@ Primary flows:
       Run local diagnostics for sensing and Workbench trace enrichment.
 
   mission new --request TEXT [--slug SLUG] [--commands-run TEXT] [--verification-status TEXT]
-      Start a mission record in missions/.
+      Start a mission record in the configured missions directory.
 
   mission closeout --request TEXT [--mission PATH] [--slug SLUG] [--outcome TEXT] [--risks TEXT] [--candidate-upgrades TEXT]
       Close out a mission with sense, checks, changed files, risks, and Workshop prompts.
@@ -35,7 +35,7 @@ Primary flows:
       Review recent mission, Workshop, and Forge artifacts for backlog movement opportunities.
 
   review forge new [--slug SLUG]
-      Create a Forge review record in forge/reviews/.
+      Create a Forge review record in the configured Forge reviews directory.
 
   review forge audit [--write-proposal]
       Audit Workshop proposal quality, decisions, registry traceability, and eval coverage.
@@ -73,7 +73,7 @@ Compatibility and diagnostics:
       Run a command and automatically record its pass/fail status.
 
   new-mission --request TEXT [--slug SLUG] [--commands-run TEXT] [--verification-status TEXT]
-      Create a mission record in missions/.
+      Create a mission record in the configured missions directory.
 
   mission-closeout --request TEXT [--mission PATH] [--slug SLUG] [--outcome TEXT] [--risks TEXT] [--candidate-upgrades TEXT]
       Create or update a near-final mission record with current sense, checks, changed files, and review prompts.
@@ -85,13 +85,13 @@ Compatibility and diagnostics:
       Flag mission evidence that should be redacted before public commit.
 
   propose-upgrade (--mission PATH | --forge-review PATH) --title TEXT --problem TEXT [--slug SLUG]
-      Create a Workshop proposal in workshop/proposals/ from mission evidence or Forge review evidence.
+      Create a Workshop proposal in the configured proposals directory from mission evidence or Forge review evidence.
 
   workshop-prompt
       Print the repeatable Workshop review prompt.
 
   new-forge-review [--slug SLUG]
-      Create a Forge review record in forge/reviews/.
+      Create a Forge review record in the configured Forge reviews directory.
 
   forge audit [--write-proposal]
   forge-audit [--write-proposal]
@@ -122,7 +122,11 @@ fail() {
 script_dir=$(CDPATH= cd "$(dirname "$0")" && pwd)
 runtime_root=$(CDPATH= cd "$script_dir/.." && pwd)
 repo_root=${HYPERAGENT_PROJECT_ROOT:-$runtime_root}
-config_file="$repo_root/.hyperagent"
+if [ -d "$repo_root/.hyperagent" ]; then
+  config_file="$repo_root/.hyperagent/config.toml"
+else
+  config_file="$repo_root/.hyperagent"
+fi
 
 strip_toml_value() {
   sed 's/^[[:space:]]*//; s/[[:space:]]*$//; s/^"//; s/"$//'
@@ -228,14 +232,15 @@ config_path_or_default() {
   resolve_project_path "$(config_value_or_default paths "$1" "$2")"
 }
 
-mission_dir=$(config_path_or_default missions "missions")
-proposal_dir=$(config_path_or_default workshop_proposals "workshop/proposals")
-decision_dir=$(config_path_or_default workshop_decisions "workshop/decisions")
-forge_dir=$(config_path_or_default forge_reviews "forge/reviews")
-registry_file=$(config_path_or_default capability_registry "hyperagent/capability-registry.md")
-default_command_log=$(config_path_or_default evidence_log ".hyperagent-evidence/commands.log")
+mission_dir=$(config_path_or_default missions ".hyperagent/missions")
+proposal_dir=$(config_path_or_default workshop_proposals ".hyperagent/workshop/proposals")
+decision_dir=$(config_path_or_default workshop_decisions ".hyperagent/workshop/decisions")
+forge_dir=$(config_path_or_default forge_reviews ".hyperagent/forge/reviews")
+registry_file=$(config_path_or_default capability_registry ".hyperagent/hyperagent/capability-registry.md")
+template_dir=$(config_path_or_default templates ".hyperagent/templates")
+default_command_log=$(config_path_or_default evidence_log ".hyperagent/evidence/commands.log")
 default_evidence_dir=$(dirname "$default_command_log")
-default_workbench_trace_log=$(config_path_or_default workbench_trace_log ".hyperagent-evidence/workbench/traces.jsonl")
+default_workbench_trace_log=$(config_path_or_default workbench_trace_log ".hyperagent/evidence/workbench/traces.jsonl")
 eval_dir="$repo_root/evals"
 
 now_stamp() {
@@ -253,26 +258,35 @@ slugify() {
 }
 
 redact_stream() {
+  # Tab-aware: the command/evidence log is tab-separated, and naive per-word
+  # field reassignment made awk rebuild $0 with space OFS, corrupting the
+  # tab structure. Redact space-separated words WITHIN each tab field so the
+  # tab delimiters survive untouched.
   awk '
+    BEGIN { FS = "\t"; OFS = "\t" }
     {
-      redact_next = 0
-      for (i = 1; i <= NF; i++) {
-        lower = tolower($i)
-        if (redact_next == 1) {
-          $i = "[REDACTED]"
-          redact_next = 0
-          continue
-        }
-        if (lower ~ /(token|secret|password|passwd|api_key|access_key|private_key|bearer)/) {
-          if ($i ~ /=/) {
-            sub(/=.*/, "=[REDACTED]", $i)
-          } else {
-            $i = "[REDACTED]"
+      for (f = 1; f <= NF; f++) {
+        n = split($f, w, " ")
+        out = ""
+        redact_next = 0
+        for (i = 1; i <= n; i++) {
+          lower = tolower(w[i])
+          if (redact_next == 1) {
+            w[i] = "[REDACTED]"
+            redact_next = 0
+          } else if (lower ~ /(token|secret|password|passwd|api_key|access_key|private_key|bearer)/) {
+            if (w[i] ~ /=/) {
+              sub(/=.*/, "=[REDACTED]", w[i])
+            } else {
+              w[i] = "[REDACTED]"
+            }
+            if (lower ~ /bearer/) {
+              redact_next = 1
+            }
           }
-          if (lower ~ /bearer/) {
-            redact_next = 1
-          }
+          out = (i == 1) ? w[i] : out " " w[i]
         }
+        $f = out
       }
       print
     }
@@ -365,6 +379,80 @@ init_same_file() {
   test -f "$1" && test -f "$2" && cmp -s "$1" "$2"
 }
 
+init_prepare_config_dir() {
+  target_root="$1"
+  force="$2"
+  dry_run="$3"
+  update="$4"
+  anchor="$target_root/.hyperagent"
+
+  if [ -d "$anchor" ]; then
+    init_log "up to date: $anchor"
+    return 0
+  fi
+
+  if [ -f "$anchor" ]; then
+    if [ "$update" -ne 1 ] && [ "$force" -ne 1 ]; then
+      fail "legacy .hyperagent file blocks .hyperagent directory; rerun init with --update to migrate generated HyperAgent project files"
+    fi
+    if [ "$dry_run" -eq 1 ]; then
+      init_log "would migrate legacy config file to: $anchor/config.toml"
+      return 0
+    fi
+    tmp_anchor="$target_root/.hyperagent.tmp.$$"
+    test ! -e "$tmp_anchor" || fail "temporary migration path already exists: $tmp_anchor"
+    mkdir -p "$tmp_anchor"
+    mv "$anchor" "$tmp_anchor/config.toml"
+    mv "$tmp_anchor" "$anchor"
+    init_log "migrated legacy config file to: $anchor/config.toml"
+    return 0
+  fi
+
+  if [ -e "$anchor" ]; then
+    fail "cannot create .hyperagent directory over non-file path: $anchor"
+  fi
+
+  if [ "$dry_run" -eq 1 ]; then
+    init_log "would create: $anchor"
+    return 0
+  fi
+
+  mkdir -p "$anchor"
+  init_log "created: $anchor"
+}
+
+init_migrate_dir() {
+  old="$1"
+  new="$2"
+  force="$3"
+  dry_run="$4"
+  update="$5"
+
+  [ -e "$old" ] || return 0
+  [ "$old" != "$new" ] || return 0
+
+  if [ "$update" -ne 1 ] && [ "$force" -ne 1 ]; then
+    fail "legacy HyperAgent path exists outside .hyperagent; rerun init with --update to migrate: $old"
+  fi
+
+  if [ -e "$new" ]; then
+    if [ "$force" -eq 1 ]; then
+      init_log "leaving existing migrated path in place: $new"
+      return 0
+    fi
+    fail "refusing to merge legacy path into existing path without --force: $old -> $new"
+  fi
+
+  if [ "$dry_run" -eq 1 ]; then
+    init_log "would move: $old -> $new"
+    return 0
+  fi
+
+  mkdir -p "$(init_parent_dir "$new")"
+  mv "$old" "$new"
+  init_log "moved: $old -> $new"
+}
+
 shell_single_quote() {
   printf "%s" "$1" | sed "s/'/'\\\\''/g; 1s/^/'/; \$s/\$/'/"
 }
@@ -413,6 +501,7 @@ init_write_generated() {
   generator="$4"
   update="${5:-0}"
   legacy_generator="${6:-}"
+  legacy_generator_two="${7:-}"
   tmp=$(mktemp)
   "$generator" >"$tmp"
 
@@ -422,9 +511,11 @@ init_write_generated() {
       rm -f "$tmp"
       return 0
     fi
-    if [ "$update" -eq 1 ] && [ -n "$legacy_generator" ]; then
+    if [ "$update" -eq 1 ]; then
+      for legacy_gen in "$legacy_generator" "$legacy_generator_two"; do
+        [ -n "$legacy_gen" ] || continue
       legacy_tmp=$(mktemp)
-      "$legacy_generator" >"$legacy_tmp"
+        "$legacy_gen" >"$legacy_tmp"
       if cmp -s "$legacy_tmp" "$dest"; then
         if [ "$dry_run" -eq 1 ]; then
           init_log "would update generated file: $dest"
@@ -437,6 +528,7 @@ init_write_generated() {
         return 0
       fi
       rm -f "$legacy_tmp"
+      done
     fi
     test "$force" -eq 1 || {
       rm -f "$tmp"
@@ -606,11 +698,61 @@ This project-local registry records accepted HyperAgent capabilities for this re
 
 No project-local capabilities have been accepted yet.
 
+Add accepted capabilities only after a proposal in `.hyperagent/workshop/proposals/` has a matching human decision in `.hyperagent/workshop/decisions/`.
+EOF
+}
+
+generate_init_registry_legacy_top_level() {
+  cat <<'EOF'
+# HyperAgent Capability Registry
+
+This project-local registry records accepted HyperAgent capabilities for this repository.
+
+- Default activation mode: human review required
+- Silent activation allowed: no
+- Permission, deployment, account, or secrets changes require explicit human approval.
+
+## Accepted Capabilities
+
+No project-local capabilities have been accepted yet.
+
 Add accepted capabilities only after a proposal in `workshop/proposals/` has a matching human decision in `workshop/decisions/`.
 EOF
 }
 
 generate_init_backlog() {
+  cat <<'EOF'
+# HyperAgent Project Upgrade Backlog
+
+This project-local backlog tracks proposed HyperAgent, Suit, and workflow upgrades after they have evidence from mission records.
+
+Default activation mode: `human review required`.
+
+## Intake Rules
+
+- Every backlog item must link to a proposal in `.hyperagent/workshop/proposals/`.
+- Every proposal must link to at least one mission record or Forge review.
+- The highest-priority item must name its first implementation step and acceptance test.
+- Accepted items require a decision record in `.hyperagent/workshop/decisions/`.
+- Accepted local capabilities are recorded in `.hyperagent/hyperagent/capability-registry.md`.
+
+## Priority Rubric
+
+Score each item with `.hyperagent/workshop/rubric.md`.
+
+- `P0`: Blocks the Mission -> Workshop -> Forge loop or creates a serious safety gap.
+- `P1`: Removes repeated friction from real missions or improves verification quality.
+- `P2`: Improves ergonomics, docs, or contributor onboarding.
+- `P3`: Useful later, but not needed for local reliability.
+
+## Backlog
+
+| Priority | Status | Proposal | Evidence | Next action |
+| --- | --- | --- | --- | --- |
+EOF
+}
+
+generate_init_backlog_legacy_top_level() {
   cat <<'EOF'
 # HyperAgent Project Upgrade Backlog
 
@@ -643,6 +785,48 @@ EOF
 }
 
 generate_init_config() {
+  cat <<'EOF'
+# HyperAgent project config
+
+hyperagent_version = "v0.1.0-alpha"
+config_version = 1
+install_mode = "global-runtime"
+
+[paths]
+project_instructions = "AGENTS.md"
+missions = ".hyperagent/missions"
+workshop_proposals = ".hyperagent/workshop/proposals"
+workshop_decisions = ".hyperagent/workshop/decisions"
+workshop_backlog = ".hyperagent/workshop/backlog.md"
+workshop_rubric = ".hyperagent/workshop/rubric.md"
+forge_reviews = ".hyperagent/forge/reviews"
+forge_quality_rubric = ".hyperagent/forge/process/quality-rubric.md"
+templates = ".hyperagent/templates"
+capability_registry = ".hyperagent/hyperagent/capability-registry.md"
+project_readme = ".hyperagent/hyperagent/README.md"
+local_helper = "scripts/hyperagent.sh"
+evidence_log = ".hyperagent/evidence/commands.log"
+workbench_trace_log = ".hyperagent/evidence/workbench/traces.jsonl"
+
+[runtime]
+helper = "scripts/hyperagent.sh"
+operating_prompt = ".hyperagent/hyperagent/operating-prompt.md"
+override_env = "HYPERAGENT_RUNTIME_ROOT"
+
+[adapters]
+codex = true
+
+[verification]
+commands = [
+  "sh scripts/hyperagent.sh verify-config",
+  "sh scripts/hyperagent.sh status",
+  "sh scripts/hyperagent.sh sense --pr off",
+  "sh scripts/hyperagent.sh doctor",
+]
+EOF
+}
+
+generate_init_config_legacy_global_runtime_top_level() {
   cat <<'EOF'
 # HyperAgent project config
 
@@ -720,6 +904,98 @@ EOF
 }
 
 generate_init_readme() {
+  cat <<'EOF'
+# HyperAgent Project Setup
+
+This repository has local HyperAgent memory and workflow files under `.hyperagent/`.
+
+The `.hyperagent/config.toml` file is the machine-readable project anchor. Scripts
+and adapters can read it to find the HyperAgent version, install mode, initialized
+paths, enabled adapters, verification commands, and instruction files.
+
+Use these files to keep agent work inspectable:
+
+- `.hyperagent/missions/`: mission records from meaningful tasks.
+- `.hyperagent/workshop/proposals/`: proposed improvements backed by mission or Forge review evidence.
+- `.hyperagent/workshop/decisions/`: explicit human approvals or rejections.
+- `.hyperagent/forge/reviews/`: reviews of Workshop proposal quality.
+- `.hyperagent/templates/`: markdown templates for records, proposals, decisions, and Forge reviews.
+- `.hyperagent/hyperagent/capability-registry.md`: accepted local capabilities.
+
+## Init Output Categories
+
+- Project-local artifacts: `.hyperagent/missions/`, `.hyperagent/workshop/proposals/`, `.hyperagent/workshop/decisions/`, `.hyperagent/forge/reviews/`, `AGENTS.md`, `.hyperagent/workshop/backlog.md`, and `.hyperagent/hyperagent/capability-registry.md`.
+- Copied templates and rubrics: `.hyperagent/templates/`, `.hyperagent/workshop/rubric.md`, and `.hyperagent/forge/process/quality-rubric.md`.
+- Generated config and docs: `.hyperagent/config.toml`, `.hyperagent/hyperagent/README.md`, and this repository's HyperAgent block in `AGENTS.md`.
+- Global runtime dependency: the local `scripts/hyperagent.sh` shim delegates to the installed HyperAgent runtime instead of copying the full runtime helper or operating prompt into this repo.
+
+## Four Primary Flows
+
+```bash
+sh scripts/hyperagent.sh init --target /path/to/project
+sh scripts/hyperagent.sh sense
+sh scripts/hyperagent.sh mission closeout --request "Describe the task" --slug task-slug
+sh scripts/hyperagent.sh review workshop --mission .hyperagent/missions/MISSION.md --title "Improve the Suit" --problem "Concrete friction from the mission"
+```
+
+Optional cockpit helper:
+
+```bash
+sh scripts/hyperagent.sh ui
+```
+
+Compatibility aliases remain available for at least one release:
+
+```bash
+sh scripts/hyperagent.sh verify-config
+sh scripts/hyperagent.sh status
+sh scripts/hyperagent.sh record-check --status passed --command "sh scripts/verify-mvp.sh"
+sh scripts/hyperagent.sh doctor
+sh scripts/hyperagent.sh new-mission --request "Describe the task" --slug task-slug
+sh scripts/hyperagent.sh mission-closeout --request "Describe the task" --slug task-slug
+sh scripts/hyperagent.sh workshop-prompt
+sh scripts/hyperagent.sh forge-prompt
+sh scripts/hyperagent.sh propose-upgrade --forge-review .hyperagent/forge/reviews/REVIEW.md --title "Improve Workshop quality" --problem "The Workshop process needs a concrete fix"
+```
+
+## Verification
+
+Run Forge reviews after proposal decisions, eval changes, release-readiness checks, or repeated vague Workshop output. Forge process improvements should become normal Workshop proposals linked to the Forge review and remain `human review required`.
+
+For this project, the lightweight check is:
+
+```bash
+sh scripts/hyperagent.sh verify-config
+sh scripts/hyperagent.sh sense
+```
+
+To capture local task evidence for mission records:
+
+```bash
+sh scripts/hyperagent.sh record-check --status passed --command "sh scripts/verify-mvp.sh"
+sh scripts/hyperagent.sh sense
+sh scripts/hyperagent.sh mission closeout --request "Describe the task" --slug task-slug
+```
+
+The sensing summary reads Git metadata, the opt-in local command log, and local Workbench trace metadata when the default ignored trace log exists. It does not inspect repository file contents or environment values, and command text is redacted for secret-like tokens before storage and output.
+
+Add any project-specific build, test, lint, or smoke commands to `AGENTS.md` so future agents know the strongest relevant verification path.
+
+## Copy And Symlink Behavior
+
+`hyperagent init` copies stable markdown templates and rubrics into the target repository. It generates blank project-local backlog and capability registry files, and it installs a small `scripts/hyperagent.sh` shim that runs the global HyperAgent runtime against this project.
+
+If you installed the global Codex skill with `scripts/install-codex-skill.sh --symlink`, only the Codex skill install is symlinked. Project-local files created by `hyperagent init` are still normal files.
+
+Existing files are left alone when they are identical. Conflicting generated files are not overwritten unless `--force` is passed.
+
+## Updating Existing Projects
+
+Run `hyperagent init --target /path/to/project --update` after updating the HyperAgent install. Update mode migrates older initialized repos from top-level HyperAgent folders into `.hyperagent/`, and from copied runtime files to the project shim, when the generated files match known HyperAgent output. Locally changed generated files are refused unless `--force` is passed.
+EOF
+}
+
+generate_init_readme_legacy_global_runtime_top_level() {
   cat <<'EOF'
 # HyperAgent Project Setup
 
@@ -902,9 +1178,9 @@ Run the full Mission -> Workshop -> Forge loop when a task:
 For full-loop tasks:
 
 1. Complete the task with focused changes and explicit verification.
-2. Write a mission record in `missions/`.
-3. Create a Workshop proposal in `workshop/proposals/` only when there is concrete Suit friction, Forge review evidence, or a worthwhile improvement.
-4. Create a Forge review in `forge/reviews/` only when the Workshop process itself needs review.
+2. Write a mission record in `.hyperagent/missions/`.
+3. Create a Workshop proposal in `.hyperagent/workshop/proposals/` only when there is concrete Suit friction, Forge review evidence, or a worthwhile improvement.
+4. Create a Forge review in `.hyperagent/forge/reviews/` only when the Workshop process itself needs review.
 5. Keep persistent behavior changes `human review required`.
 
 Skip the full loop only for clearly isolated one-off tasks such as simple factual answers, trivial commands, small clarifications, or status restatements without new investigation. When skipping, say that HyperAgent triage classified the task as an isolated one-off and no mission record was written.
@@ -1033,14 +1309,24 @@ init_project() {
     init_log "Dry run: no files will be changed."
   fi
 
+  init_prepare_config_dir "$target_root" "$force" "$dry_run" "$update"
+  init_migrate_dir "$target_root/missions" "$target_root/.hyperagent/missions" "$force" "$dry_run" "$update"
+  init_migrate_dir "$target_root/workshop" "$target_root/.hyperagent/workshop" "$force" "$dry_run" "$update"
+  init_migrate_dir "$target_root/forge" "$target_root/.hyperagent/forge" "$force" "$dry_run" "$update"
+  init_migrate_dir "$target_root/templates" "$target_root/.hyperagent/templates" "$force" "$dry_run" "$update"
+  init_migrate_dir "$target_root/hyperagent" "$target_root/.hyperagent/hyperagent" "$force" "$dry_run" "$update"
+  init_migrate_dir "$target_root/.hyperagent-evidence" "$target_root/.hyperagent/evidence" "$force" "$dry_run" "$update"
+
   for dir in \
-    "$target_root/missions" \
-    "$target_root/workshop/proposals" \
-    "$target_root/workshop/decisions" \
-    "$target_root/forge/reviews" \
-    "$target_root/forge/process" \
-    "$target_root/templates" \
-    "$target_root/hyperagent" \
+    "$target_root/.hyperagent/missions" \
+    "$target_root/.hyperagent/workshop/proposals" \
+    "$target_root/.hyperagent/workshop/decisions" \
+    "$target_root/.hyperagent/forge/reviews" \
+    "$target_root/.hyperagent/forge/process" \
+    "$target_root/.hyperagent/templates" \
+    "$target_root/.hyperagent/hyperagent" \
+    "$target_root/.hyperagent/evidence" \
+    "$target_root/.hyperagent/evidence/workbench" \
     "$target_root/scripts"
   do
     if [ "$dry_run" -eq 1 ]; then
@@ -1055,24 +1341,24 @@ init_project() {
     fi
   done
 
-  init_touch_file "$target_root/missions/.gitkeep" "$dry_run"
-  init_touch_file "$target_root/workshop/proposals/.gitkeep" "$dry_run"
-  init_touch_file "$target_root/workshop/decisions/.gitkeep" "$dry_run"
-  init_touch_file "$target_root/forge/reviews/.gitkeep" "$dry_run"
+  init_touch_file "$target_root/.hyperagent/missions/.gitkeep" "$dry_run"
+  init_touch_file "$target_root/.hyperagent/workshop/proposals/.gitkeep" "$dry_run"
+  init_touch_file "$target_root/.hyperagent/workshop/decisions/.gitkeep" "$dry_run"
+  init_touch_file "$target_root/.hyperagent/forge/reviews/.gitkeep" "$dry_run"
 
-  init_install_file "$runtime_root/templates/mission-record.md" "$target_root/templates/mission-record.md" "$force" "$dry_run"
-  init_install_file "$runtime_root/templates/upgrade-proposal.md" "$target_root/templates/upgrade-proposal.md" "$force" "$dry_run"
-  init_install_file "$runtime_root/templates/upgrade-decision.md" "$target_root/templates/upgrade-decision.md" "$force" "$dry_run"
-  init_install_file "$runtime_root/templates/forge-review.md" "$target_root/templates/forge-review.md" "$force" "$dry_run"
-  init_install_file "$runtime_root/workshop/rubric.md" "$target_root/workshop/rubric.md" "$force" "$dry_run"
-  init_install_file "$runtime_root/forge/process/quality-rubric.md" "$target_root/forge/process/quality-rubric.md" "$force" "$dry_run"
-  init_migrate_runtime_prompt "$target_root/hyperagent/operating-prompt.md" "$force" "$dry_run" "$update"
+  init_install_file "$runtime_root/templates/mission-record.md" "$target_root/.hyperagent/templates/mission-record.md" "$force" "$dry_run"
+  init_install_file "$runtime_root/templates/upgrade-proposal.md" "$target_root/.hyperagent/templates/upgrade-proposal.md" "$force" "$dry_run"
+  init_install_file "$runtime_root/templates/upgrade-decision.md" "$target_root/.hyperagent/templates/upgrade-decision.md" "$force" "$dry_run"
+  init_install_file "$runtime_root/templates/forge-review.md" "$target_root/.hyperagent/templates/forge-review.md" "$force" "$dry_run"
+  init_install_file "$runtime_root/workshop/rubric.md" "$target_root/.hyperagent/workshop/rubric.md" "$force" "$dry_run"
+  init_install_file "$runtime_root/forge/process/quality-rubric.md" "$target_root/.hyperagent/forge/process/quality-rubric.md" "$force" "$dry_run"
+  init_migrate_runtime_prompt "$target_root/.hyperagent/hyperagent/operating-prompt.md" "$force" "$dry_run" "$update"
   init_write_project_helper "$target_root/scripts/hyperagent.sh" "$force" "$dry_run" "$update"
 
-  init_write_generated "$target_root/.hyperagent" "$force" "$dry_run" generate_init_config "$update" generate_init_config_legacy_copy
-  init_write_generated "$target_root/workshop/backlog.md" "$force" "$dry_run" generate_init_backlog "$update"
-  init_write_generated "$target_root/hyperagent/capability-registry.md" "$force" "$dry_run" generate_init_registry "$update"
-  init_write_generated "$target_root/hyperagent/README.md" "$force" "$dry_run" generate_init_readme "$update" generate_init_readme_legacy_copy
+  init_write_generated "$target_root/.hyperagent/config.toml" "$force" "$dry_run" generate_init_config "$update" generate_init_config_legacy_copy generate_init_config_legacy_global_runtime_top_level
+  init_write_generated "$target_root/.hyperagent/workshop/backlog.md" "$force" "$dry_run" generate_init_backlog "$update" generate_init_backlog_legacy_top_level
+  init_write_generated "$target_root/.hyperagent/hyperagent/capability-registry.md" "$force" "$dry_run" generate_init_registry "$update" generate_init_registry_legacy_top_level
+  init_write_generated "$target_root/.hyperagent/hyperagent/README.md" "$force" "$dry_run" generate_init_readme "$update" generate_init_readme_legacy_copy generate_init_readme_legacy_global_runtime_top_level
   init_update_agents "$target_root" "$force" "$dry_run"
 
   init_log "HyperAgent init complete."
@@ -2100,6 +2386,7 @@ create_mission_closeout() {
   stamp=$(now_stamp)
   if [ -n "$mission_path" ]; then
     file=$mission_path
+    test ! -e "$file" || fail "mission already exists: $file (closeout writes a full record; refusing to overwrite — pass a new path)"
     case "$file" in
       */*) mkdir -p "$(dirname "$file")" ;;
     esac
@@ -2243,7 +2530,7 @@ redact_check_file() {
   test -f "$file" || fail "redact-check path is not a file: $file"
 
   findings=$(
-    grep -nE '(/Users/[^[:space:]`)]+|/private/(tmp|var)/[^[:space:]`)]+|/var/folders/[^[:space:]`)]+|/tmp/[^[:space:]`)]+|https://linear\.app/[^[:space:]`)]+|[A-Z][A-Z0-9]+-[0-9]+|\.hyperagent-evidence/|workbench/traces\.jsonl|api[_-]?key|access[_-]?key|private[_-]?key|bearer[[:space:]]+[A-Za-z0-9._~+/-]+|token[=:][^[:space:]`)]+|secret[=:][^[:space:]`)]+|password[=:][^[:space:]`)]+)' "$file" 2>/dev/null || true
+    grep -nE '(/Users/[^[:space:]`)]+|/private/(tmp|var)/[^[:space:]`)]+|/var/folders/[^[:space:]`)]+|/tmp/[^[:space:]`)]+|https://linear\.app/[^[:space:]`)]+|\.hyperagent-evidence/|workbench/traces\.jsonl|api[_-]?key|access[_-]?key|private[_-]?key|bearer[[:space:]]+[A-Za-z0-9._~+/-]+|token[=:][^[:space:]`)]+|secret[=:][^[:space:]`)]+|password[=:][^[:space:]`)]+)' "$file" 2>/dev/null || true
   )
 
   if [ -n "$findings" ]; then
@@ -2433,8 +2720,8 @@ verify_registry_safety() {
 verify_safety() {
   verify_config >/dev/null
 
-  verify_proposal_template_safety templates/upgrade-proposal.md
-  verify_decision_template_safety templates/upgrade-decision.md
+  verify_proposal_template_safety "$template_dir/upgrade-proposal.md"
+  verify_decision_template_safety "$template_dir/upgrade-decision.md"
   verify_registry_safety
 
   printf 'HyperAgent safety verification passed.\n'
@@ -2730,7 +3017,7 @@ print_workshop_prompt() {
   cat <<'EOF'
 Use HyperAgent Workshop Mode.
 
-Read recent mission records in missions/. Identify concrete Suit friction supported by evidence. Choose the highest-value friction, then create or update a proposal in workshop/proposals/ using templates/upgrade-proposal.md. Include the linked mission record, proposed capability, safety risk, eval or acceptance test, rollback plan, and an Implementation Plan with the highest-priority step first. If the evidence is a Forge review about Workshop quality, create the proposal with --forge-review instead of --mission. Do not activate the upgrade. Default the activation mode to human review required.
+Read recent mission records in the configured missions directory (new installs default to `.hyperagent/missions/`). Identify concrete Suit friction supported by evidence. Choose the highest-value friction, then create or update a proposal in the configured Workshop proposals directory using the configured upgrade proposal template. Include the linked mission record, proposed capability, safety risk, eval or acceptance test, rollback plan, and an Implementation Plan with the highest-priority step first. If the evidence is a Forge review about Workshop quality, create the proposal with --forge-review instead of --mission. Do not activate the upgrade. Default the activation mode to human review required.
 EOF
 }
 

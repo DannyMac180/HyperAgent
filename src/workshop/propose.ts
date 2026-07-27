@@ -58,6 +58,15 @@ export interface DraftedProposal {
   evidence: ProposalEvidence;
   holdoutSessionIds: string[];
   drafterVersion: string;
+  /**
+   * Scope inherited from the friction cluster. A cluster confined to one repo
+   * (or one agent) produces a proposal scoped to it; anything wider is null.
+   * Install and the replay eval both derive scope from these fields, so a
+   * memory judged as repo-scoped can never silently install as global (the
+   * eval/install scope-widening defect the DAN-204 live probe caught).
+   */
+  repo: string | null;
+  agent: string | null;
 }
 
 export interface ProposeResult {
@@ -352,6 +361,8 @@ function parseProposal(
     },
     holdoutSessionIds: [...partition.holdoutSessionIds],
     drafterVersion: WORKSHOP_DRAFTER_VERSION,
+    repo: cluster.repos.length === 1 ? cluster.repos[0] ?? null : null,
+    agent: cluster.agents.length === 1 ? cluster.agents[0] ?? null : null,
   };
   const durability = applyDurabilityTest(proposal);
   return durability.ok

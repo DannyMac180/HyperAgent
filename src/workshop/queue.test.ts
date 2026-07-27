@@ -53,6 +53,8 @@ function draft(title = "Remember durable queue authority"): DraftedProposal {
     },
     holdoutSessionIds: ["holdout-1"],
     drafterVersion: "queue-test-v1",
+    repo: "/repo",
+    agent: null,
   };
 }
 

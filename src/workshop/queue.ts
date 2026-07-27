@@ -356,6 +356,14 @@ function assertDraft(value: unknown, index: number): asserts value is DraftedPro
   assertEvidence(value.evidence, `${label}.evidence`);
   assertStringArray(value.holdoutSessionIds, `${label}.holdoutSessionIds`);
   assertNonEmptyString(value.drafterVersion, `${label}.drafterVersion`);
+  assertNullableString(value.repo, `${label}.repo`);
+  assertNullableString(value.agent, `${label}.agent`);
+}
+
+function assertNullableString(value: unknown, label: string): void {
+  if (value !== null && typeof value !== "string") {
+    throw new Error(`${label} must be a string or null`);
+  }
 }
 
 function canonicalContent(
@@ -730,7 +738,7 @@ export function openWorkshopQueue(
         id, type, durability, title, rationale, body, evidence, holdout,
         content_hash, eval, status, repo, agent, created_at, updated_at,
         installed_at, receipt
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'draft', NULL, NULL, ?, ?, NULL, NULL)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'draft', ?, ?, ?, ?, NULL, NULL)
     `);
     const insertTransition = db.query(`
       INSERT INTO workshop_proposal_transitions (
@@ -840,6 +848,8 @@ export function openWorkshopQueue(
               evaluation === undefined
                 ? null
                 : jsonStringify(evaluation, `draft ${id} eval`),
+              draft.repo,
+              draft.agent,
               now,
               now,
             );

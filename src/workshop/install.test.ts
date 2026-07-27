@@ -95,6 +95,8 @@ function verificationDraft(
     evidence: evidence(`cluster:${title}`),
     holdoutSessionIds: ["holdout-1"],
     drafterVersion: "install-test-v1",
+    repo: "/repo",
+    agent: null,
   };
 }
 
@@ -112,6 +114,8 @@ function memoryDraft(
     evidence: proposalEvidence,
     holdoutSessionIds: ["holdout-1"],
     drafterVersion: "install-test-v1",
+    repo: "/repo",
+    agent: null,
   };
 }
 
@@ -128,6 +132,8 @@ function manualDraft(
     evidence: evidence(`cluster:${type}`),
     holdoutSessionIds: ["holdout-1"],
     drafterVersion: "install-test-v1",
+    repo: "/repo",
+    agent: null,
   };
 }
 
@@ -321,6 +327,8 @@ describe("Workshop memory installs", (): void => {
     }
     expect(installed.status).toBe("approved");
     expect(installed.claim_hash).toBe(claimHash(claim));
+    expect(installed.scope).toBe("repo");
+    expect(installed.scope_key).toBe("/repo");
     expect(installed.evidence).toEqual([
       {
         session_id: "session-1",
@@ -343,7 +351,7 @@ describe("Workshop memory installs", (): void => {
         description: "Added an approved memory and its managed mirror.",
       },
     ]);
-    const mirrorPath = join(memoryDir, "global", `${installed.id}.md`);
+    const mirrorPath = join(memoryDir, "repo", `${installed.id}.md`);
     const mirrorBeforeRetry = await readFile(mirrorPath, "utf8");
 
     const duplicateReceipt = expectSuccess(
@@ -356,7 +364,7 @@ describe("Workshop memory installs", (): void => {
     expect(duplicateReceipt.writes).toEqual([]);
     expect(store.listMemories()).toHaveLength(1);
     expect(await readFile(mirrorPath, "utf8")).toBe(mirrorBeforeRetry);
-    expect(await readdir(join(memoryDir, "global"))).toEqual([
+    expect(await readdir(join(memoryDir, "repo"))).toEqual([
       `${installed.id}.md`,
     ]);
   });

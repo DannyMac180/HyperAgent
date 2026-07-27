@@ -81,6 +81,8 @@ function draft(title: string): DraftedProposal {
     },
     holdoutSessionIds: ["workshop-cli-holdout-session"],
     drafterVersion: "workshop-cli-test-v1",
+    repo: "/repo",
+    agent: null,
   };
 }
 

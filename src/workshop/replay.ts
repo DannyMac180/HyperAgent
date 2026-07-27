@@ -737,7 +737,16 @@ export function evaluateProposal(
       proposal,
       built.fixtures,
       {
-        scope: options.scope,
+        // Scope follows the proposal's declared scope so the eval judges the
+        // same memory install would write. A cluster spanning repos yields a
+        // global proposal, which this eval honestly scores no_effect — it can
+        // never be judged repo-scoped and then installed global.
+        scope: options.scope
+          ?? (proposal.repo !== null
+            ? "repo"
+            : proposal.agent !== null
+              ? "agent"
+              : "global"),
         scopeKey: options.scopeKey,
         dataDir: options.dataDir,
       },

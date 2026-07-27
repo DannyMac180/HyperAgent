@@ -12,6 +12,11 @@
  * existing contracts.
  */
 
+import type {
+  GateDecision,
+  GateHookInput,
+  GateHookKind,
+} from "../gate/eval.ts";
 import type { InjectionResult } from "../memory/inject.ts";
 import type { MemoryRow } from "../memory/store.ts";
 import type { EventInput } from "../schema/events.ts";
@@ -120,4 +125,21 @@ export interface GateAdapter {
   install(repoPath: string): Promise<GateInstallResult>;
   uninstall(repoPath: string): Promise<GateInstallResult>;
   status(repoPath: string): Promise<GateStatus>;
+
+  /**
+   * Translate this harness's hook stdin into the canonical, vendor-neutral
+   * shape. Returns null when the payload is unusable so the hook runtime can
+   * fail open.
+   *
+   * Hook dialects live behind the adapter for the same reason transcript
+   * formats do: the daemon and the CLI stay vendor-blind, and adding a harness
+   * never edits them.
+   */
+  parseHookStdin(hook: GateHookKind, raw: unknown): GateHookInput | null;
+
+  /**
+   * Render a decision as the bytes this harness expects on stdout. An empty
+   * string means "no decision output" — the non-decision path.
+   */
+  renderHookOutput(hook: GateHookKind, decision: GateDecision): string;
 }

@@ -373,3 +373,41 @@ describe("evaluateContract protected paths", () => {
     expectNoInstructionText(failures);
   });
 });
+
+describe("evaluateContract read-only sessions", (): void => {
+  test("a session that mutated nothing satisfies required checks vacuously", (): void => {
+    const contract: VerificationContract = {
+      schema_version: CONTRACT_SCHEMA_VERSION,
+      requiredChecks: [{
+        id: "tests",
+        description: "the repo test suite must pass",
+        commandPattern: "bun\\s+test",
+      }],
+      protectedPaths: [],
+    };
+
+    // No touched files at all: the agent answered a question and changed
+    // nothing, so demanding a test run would bounce it for no reason.
+    expect(evaluateContract(contract, { commands: [], touchedFiles: [] }))
+      .toEqual([]);
+  });
+
+  test("a required check is still enforced once the session mutates a file", (): void => {
+    const contract: VerificationContract = {
+      schema_version: CONTRACT_SCHEMA_VERSION,
+      requiredChecks: [{
+        id: "tests",
+        description: "the repo test suite must pass",
+        commandPattern: "bun\\s+test",
+      }],
+      protectedPaths: [],
+    };
+
+    const failures = evaluateContract(contract, {
+      commands: [],
+      touchedFiles: [{ path: "/repo/src/a.ts", sequence: 1 }],
+    });
+    expect(failures.length).toBe(1);
+    expect(failures[0]?.checkId).toBe("tests");
+  });
+});

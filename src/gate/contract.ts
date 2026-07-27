@@ -233,8 +233,13 @@ export function evaluateContract(
   // Verification must follow the last mutation; an earlier passing check says
   // nothing about the final file state.
   const requiredAfterSequence = lastMutationSequence(context);
+  // A session that mutated nothing has nothing to verify, so required checks
+  // are vacuously satisfied. Demanding tests from a read-only session would be
+  // a false bounce of exactly the kind protectedPaths avoids by ignoring
+  // pre-session dirt.
+  const mutatedSomething = context.touchedFiles.length > 0;
 
-  for (const check of contract.requiredChecks) {
+  for (const check of mutatedSomething ? contract.requiredChecks : []) {
     const passedAfterLastMutation = context.commands.some(
       (command): boolean =>
         command.passed

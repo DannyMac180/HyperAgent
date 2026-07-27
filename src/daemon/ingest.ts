@@ -26,7 +26,19 @@ import {
   SCORER_VERSION,
   scoreSession,
 } from "../scoring/score.ts";
+import {
+  detectViolations,
+} from "../gate/detect.ts";
+import {
+  policyPath,
+} from "../gate/paths.ts";
+import {
+  loadPolicy,
+} from "../gate/policy.ts";
 import { openStore } from "../store/store.ts";
+import {
+  ingestGateSpool,
+} from "./gate-ingest.ts";
 
 export interface IngestOptions {
   dataDir?: string;
@@ -34,6 +46,7 @@ export interface IngestOptions {
   quiesceMs?: number;
   now?: () => number;
   scoring?: boolean;
+  gate?: boolean;
   missions?: boolean;
   missionQueue?: MissionQueue;
   memory?: boolean;
@@ -61,6 +74,8 @@ export interface IngestRunResult {
   finishedAt: string;
   adapters: AdapterRunStats[];
   sessionsScored: number;
+  gateEventsAppended: number;
+  sessionsDetected: number;
   missionsEnqueued: number;
   memoryExtractionsEnqueued: number;
 }
@@ -176,6 +191,10 @@ function isIngestRunResult(value: unknown): value is IngestRunResult {
     value.adapters.every(isAdapterRunStats) &&
     (value.sessionsScored === undefined ||
       typeof value.sessionsScored === "number") &&
+    (value.gateEventsAppended === undefined ||
+      typeof value.gateEventsAppended === "number") &&
+    (value.sessionsDetected === undefined ||
+      typeof value.sessionsDetected === "number") &&
     (value.missionsEnqueued === undefined ||
       typeof value.missionsEnqueued === "number") &&
     (value.memoryExtractionsEnqueued === undefined ||
@@ -354,6 +373,8 @@ export async function runIngestOnce(
             finishedAt: new Date(now()).toISOString(),
             adapters: adapterStats,
             sessionsScored: 0,
+            gateEventsAppended: 0,
+            sessionsDetected: 0,
             missionsEnqueued: 0,
             memoryExtractionsEnqueued: 0,
           };
@@ -483,6 +504,8 @@ export async function runIngestOnce(
         finishedAt: new Date(now()).toISOString(),
         adapters: adapterStats,
         sessionsScored: 0,
+        gateEventsAppended: 0,
+        sessionsDetected: 0,
         missionsEnqueued: 0,
         memoryExtractionsEnqueued: 0,
       };
@@ -556,6 +579,32 @@ export async function runIngestOnce(
             `Failed to score ingested session "${sessionId}": ${errorMessage(error)}`,
           );
         }
+      }
+    }
+
+    let gateEventsAppended = 0;
+    let sessionsDetected = 0;
+    if (options.gate !== false) {
+      try {
+        const policy = loadPolicy(policyPath(dataDir)).policy;
+        const gateIngest = await ingestGateSpool({ store, dataDir });
+        gateEventsAppended = gateIngest.eventsAppended;
+        for (const sessionId of closedThisPass) {
+          try {
+            detectViolations(store, sessionId, policy);
+            sessionsDetected += 1;
+          } catch (error: unknown) {
+            console.error(
+              `Failed to detect policy violations for ingested session "${sessionId}": ${
+                errorMessage(error)
+              }`,
+            );
+          }
+        }
+      } catch (error: unknown) {
+        console.error(
+          `Failed to process gate outcomes after ingest: ${errorMessage(error)}`,
+        );
       }
     }
 
@@ -642,6 +691,8 @@ export async function runIngestOnce(
       finishedAt: new Date(now()).toISOString(),
       adapters: adapterStats,
       sessionsScored,
+      gateEventsAppended,
+      sessionsDetected,
       missionsEnqueued,
       memoryExtractionsEnqueued,
     };

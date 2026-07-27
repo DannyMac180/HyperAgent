@@ -502,6 +502,20 @@ describe("runGateEval stop", () => {
       ]),
     );
 
+    // Required checks only bind once the session has actually mutated
+    // something, so the session must record a write before Stop can fail.
+    await runGateEval({
+      dataDir,
+      input: {
+        ...hookInput(repo, {
+          hook: "post_tool_use",
+          sessionId: "test-harness:bounce-session",
+        }),
+        toolName: "Write",
+        writePaths: [join(repo, "src", "changed.ts")],
+      },
+    });
+
     const first: GateDecision = await runGateEval({ dataDir, input });
     const second: GateDecision = await runGateEval({ dataDir, input });
     const third: GateDecision = await runGateEval({ dataDir, input });

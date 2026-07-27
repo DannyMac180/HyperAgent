@@ -1,7 +1,6 @@
 import { createHash } from "node:crypto";
 import { mkdir, rename, writeFile } from "node:fs/promises";
 
-import { ClaudeCodeGateAdapter } from "../adapters/claude-code/gate.ts";
 import type { GateInstallState } from "../adapters/types.ts";
 import {
   gateDir,
@@ -25,6 +24,7 @@ import type {
 } from "../schema/events.ts";
 import { deterministicEventId } from "../schema/ids.ts";
 import type { Store } from "../store/store.ts";
+import { builtinGateAdapters } from "./registry.ts";
 
 export const GATE_ADAPTER_VERSION = "0.1.0";
 
@@ -189,7 +189,9 @@ export async function readGateHealth(options: {
   repos: string[];
 }): Promise<GateHealth> {
   const policy = loadPolicy(policyPath(options.dataDir));
-  const adapter = new ClaudeCodeGateAdapter({ dataDir: options.dataDir });
+  // Adapters come from the registry so this module names no vendor; health is
+  // read-only here by design (see the install/uninstall anti-test).
+  const adapters = builtinGateAdapters({ dataDir: options.dataDir });
   const [backlogBytes, repos] = await Promise.all([
     spoolBacklogBytes(options.dataDir),
     Promise.all(
@@ -201,7 +203,22 @@ export async function readGateHealth(options: {
           state: GateInstallState;
           detail: string;
         }> => {
-          const status = await adapter.status(repo);
+          // Every registered harness is asked; the first that reports an
+          // installed gate wins, otherwise the first answer stands.
+          const statuses = await Promise.all(
+            adapters.map((adapter) => adapter.status(repo)),
+          );
+          const installed = statuses.find(
+            (candidate): boolean => candidate.state === "installed",
+          );
+          const status = installed ?? statuses[0];
+          if (status === undefined) {
+            return {
+              repo,
+              state: "not-installed",
+              detail: "No gate adapters are registered.",
+            };
+          }
           return {
             repo,
             state: status.state,

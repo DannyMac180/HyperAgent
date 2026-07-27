@@ -173,7 +173,8 @@ function commandForHook(
   const parts = [
     shellQuote(runtimePath),
     shellQuote(cliPath),
-    GATE_MARKER,
+    "gate",
+    "eval",
     "--harness",
     "claude-code",
     "--hook",
@@ -182,6 +183,12 @@ function commandForHook(
   if (dataDir !== undefined) {
     parts.push("--data-dir", shellQuote(dataDir));
   }
+  // The ownership marker rides a trailing shell comment rather than the
+  // executed words: the CLI's verb is `gate eval`, so splicing the marker in
+  // as arguments would invoke a command that does not exist. A comment is
+  // inert at execution time and still makes the entry unambiguously ours,
+  // which matters because extra JSON keys on hook entries are undocumented.
+  parts.push("#", GATE_MARKER);
   return parts.join(" ");
 }
 
@@ -244,18 +251,20 @@ function cliPathFromCommand(command: string): string | null {
   if (words === null) {
     return null;
   }
-  for (let index = 1; index < words.length - 2; index += 1) {
+  // The ownership marker sits in a trailing shell comment, so only the words
+  // the shell would actually execute can be searched: otherwise the marker's
+  // own "gate eval" wins and the CLI path resolves to "#".
+  const commentIndex = words.indexOf("#");
+  const executedWords = commentIndex === -1
+    ? words
+    : words.slice(0, commentIndex);
+
+  for (let index = 1; index < executedWords.length - 1; index += 1) {
     if (
-      words[index] === "hyperagent"
-      && words[index + 1] === "gate"
-      && words[index + 2] === "eval"
+      executedWords[index] === "gate"
+      && executedWords[index + 1] === "eval"
     ) {
-      return words[index - 1] ?? null;
-    }
-  }
-  for (let index = 1; index < words.length - 1; index += 1) {
-    if (words[index] === "gate" && words[index + 1] === "eval") {
-      return words[index - 1] ?? null;
+      return executedWords[index - 1] ?? null;
     }
   }
   return null;
@@ -570,6 +579,14 @@ export class ClaudeCodeGateAdapter implements GateAdapter {
       targetPath,
       changed: true,
     };
+  }
+
+  parseHookStdin(hook: GateHookKind, raw: unknown): GateHookInput | null {
+    return parseClaudeCodeHookStdin(hook, raw);
+  }
+
+  renderHookOutput(hook: GateHookKind, decision: GateDecision): string {
+    return renderClaudeCodeHookOutput(hook, decision);
   }
 
   async status(repoPath: string): Promise<GateStatus> {

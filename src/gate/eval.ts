@@ -217,6 +217,10 @@ function policyCandidate(
     writePaths: input.writePaths.filter(
       (path: string): boolean => !isSuitRuntimeWritePath(path, dataDir),
     ),
+    // cwd is the repo the hook fired in — the same root the contract is
+    // resolved from — so a user-authored relative pathPattern matches the
+    // absolute paths the harness reports.
+    ...(input.cwd.length > 0 ? { repoRoot: input.cwd } : {}),
   };
 }
 
@@ -415,7 +419,11 @@ async function evaluateStopHook(
     spool.outcomes,
     input.sessionId,
   );
-  const failures = evaluateContract(loadedContract, sessionContext);
+  // The contract was resolved from cwd, so cwd is the root its relative
+  // protectedPaths are written against.
+  const failures = evaluateContract(loadedContract, sessionContext, {
+    repoRoot: input.cwd,
+  });
   ensureWithinDeadline(context);
   const failedChecks: string[] = failures.map(
     (failure): string => failure.checkId,

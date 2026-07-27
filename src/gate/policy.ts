@@ -1,4 +1,5 @@
 import { readFileSync } from "node:fs";
+import { isAbsolute } from "node:path";
 
 import { redactSummary } from "./redact.ts";
 
@@ -422,6 +423,59 @@ export function globMatches(glob: string, candidatePath: string): boolean {
   return new RegExp(globRegexSource(glob)).test(normalizedCandidate);
 }
 
+function normalizeSeparators(value: string): string {
+  return value.replace(/\\/gu, "/");
+}
+
+/**
+ * The path's form relative to `repoRoot`, or null when it does not live under
+ * that root. Deliberately string-based: `path.relative` resolves a relative
+ * input against `process.cwd()`, which in a hook process is the agent's
+ * directory, not the repo we are reasoning about.
+ */
+function repoRelativePath(
+  candidatePath: string,
+  repoRoot: string,
+): string | null {
+  if (!isAbsolute(candidatePath) || !isAbsolute(repoRoot)) {
+    return null;
+  }
+  const normalizedRoot = normalizeSeparators(repoRoot).replace(/\/+$/u, "");
+  const normalizedCandidate = normalizeSeparators(candidatePath);
+  const prefix = `${normalizedRoot}/`;
+  return normalizedCandidate.startsWith(prefix)
+    ? normalizedCandidate.slice(prefix.length)
+    : null;
+}
+
+/**
+ * Match a user-authored glob against a runtime path on BOTH bases.
+ *
+ * Runtime paths arrive absolute (a harness reports `/abs/repo/secrets/key.pem`)
+ * while humans naturally write repo-relative globs (`secrets/**`). Matching only
+ * the absolute form makes every relative pattern silently never fire — a
+ * safety rule that looks configured but is dead. So a pattern matches when it
+ * matches the absolute path OR the path's repo-relative form.
+ *
+ * When no repo root is known, only the absolute form can be compared; patterns
+ * intended to be repo-relative should be written with a leading `**\/` to stay
+ * portable, which is why every shipped default rule does.
+ */
+export function pathMatchesGlob(
+  glob: string,
+  candidatePath: string,
+  repoRoot?: string,
+): boolean {
+  if (globMatches(glob, candidatePath)) {
+    return true;
+  }
+  if (repoRoot === undefined || repoRoot.length === 0) {
+    return false;
+  }
+  const relativeForm = repoRelativePath(candidatePath, repoRoot);
+  return relativeForm !== null && globMatches(glob, relativeForm);
+}
+
 function candidatePaths(
   access: PathAccess,
   candidate: PolicyCandidate,
@@ -456,9 +510,10 @@ function matchRule(
 
   if (rule.match.pathPattern !== undefined) {
     const access = rule.match.pathAccess ?? "any";
+    const pathPattern = rule.match.pathPattern;
     const matchedPath = candidatePaths(access, candidate).find(
       (path: string): boolean =>
-        globMatches(rule.match.pathPattern ?? "", path),
+        pathMatchesGlob(pathPattern, path, candidate.repoRoot),
     );
     if (matchedPath === undefined) {
       return null;
@@ -487,6 +542,12 @@ export interface PolicyCandidate {
   command: string;
   readPaths: string[];
   writePaths: string[];
+  /**
+   * Repo the action happened in, when known. Lets a user-authored relative
+   * pathPattern (`secrets/**`) match an absolute runtime path. Absent means
+   * only the absolute form is compared.
+   */
+  repoRoot?: string;
 }
 
 export interface PolicyMatch {

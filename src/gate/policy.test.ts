@@ -21,6 +21,7 @@ import {
   globMatches,
   loadPolicy,
   matchPolicy,
+  pathMatchesGlob,
 } from "./policy.ts";
 import type {
   PolicyCandidate,
@@ -498,5 +499,52 @@ describe("gate paths", () => {
         dataDir,
       ),
     ).toBe(false);
+  });
+});
+
+describe("pathMatchesGlob dual-basis matching", (): void => {
+  test("a user-authored relative rule matches an absolute runtime path", (): void => {
+    // Same defect class as contract protectedPaths: a hand-written policy rule
+    // like "secrets/**" would otherwise never fire against the absolute paths
+    // harnesses actually report.
+    const policy: PolicyDoc = {
+      schema_version: POLICY_SCHEMA_VERSION,
+      rules: [{
+        id: "user-secrets",
+        description: "Write under the repo secrets directory.",
+        action: "flag",
+        enabled: true,
+        match: { pathPattern: "secrets/**", pathAccess: "write" },
+      }],
+    };
+
+    const matched = matchPolicy(policy, {
+      toolName: "Write",
+      command: "",
+      readPaths: [],
+      writePaths: ["/abs/repo/secrets/key.pem"],
+      repoRoot: "/abs/repo",
+    });
+    expect(matched.map((match): string => match.ruleId)).toEqual([
+      "user-secrets",
+    ]);
+
+    // Without a repo root only the absolute form is comparable.
+    expect(matchPolicy(policy, {
+      toolName: "Write",
+      command: "",
+      readPaths: [],
+      writePaths: ["/abs/repo/secrets/key.pem"],
+    })).toEqual([]);
+  });
+
+  test("matches the absolute form, the relative form, and nothing outside the root", (): void => {
+    expect(pathMatchesGlob("**/*.pem", "/abs/repo/secrets/key.pem")).toBe(true);
+    expect(pathMatchesGlob("secrets/**", "/abs/repo/secrets/key.pem", "/abs/repo")).toBe(true);
+    expect(pathMatchesGlob("secrets/**", "secrets/key.pem")).toBe(true);
+    expect(pathMatchesGlob("secrets/**", "/elsewhere/secrets/key.pem", "/abs/repo")).toBe(false);
+    expect(pathMatchesGlob("secrets/**", "/abs/repo-other/secrets/key.pem", "/abs/repo")).toBe(false);
+    // A trailing separator on the root must not break the prefix comparison.
+    expect(pathMatchesGlob("secrets/**", "/abs/repo/secrets/key.pem", "/abs/repo/")).toBe(true);
   });
 });

@@ -229,6 +229,9 @@ function policyCandidate(
     // Canonical tool_call events do not distinguish read paths today.
     readPaths: [],
     writePaths: resolveWritePaths(event.payload, event.id, repo),
+    // Post-hoc must reach the same verdict as the real-time hook, so it
+    // matches user-authored relative patterns on the same dual basis.
+    ...(repo === null ? {} : { repoRoot: repo }),
   };
 }
 

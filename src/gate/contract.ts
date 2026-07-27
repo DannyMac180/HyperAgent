@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 
 import { contractPath } from "./paths.ts";
-import { globMatches } from "./policy.ts";
+import { pathMatchesGlob } from "./policy.ts";
 
 export const CONTRACT_SCHEMA_VERSION = "0.1.0";
 
@@ -225,9 +225,19 @@ function lastMutationSequence(context: SessionGateContext): number {
   return lastSequence;
 }
 
+export interface ContractEvaluationOptions {
+  /**
+   * Root of the repo that owns this contract. protectedPaths are naturally
+   * written repo-relative while touched paths arrive absolute, so without this
+   * every relative pattern would silently never fire.
+   */
+  repoRoot?: string;
+}
+
 export function evaluateContract(
   contract: VerificationContract,
   context: SessionGateContext,
+  options: ContractEvaluationOptions = {},
 ): ContractFailure[] {
   const failures: ContractFailure[] = [];
   // Verification must follow the last mutation; an earlier passing check says
@@ -256,7 +266,8 @@ export function evaluateContract(
 
   for (const touchedFile of context.touchedFiles) {
     const isProtected = contract.protectedPaths.some(
-      (pattern: string): boolean => globMatches(pattern, touchedFile.path),
+      (pattern: string): boolean =>
+        pathMatchesGlob(pattern, touchedFile.path, options.repoRoot),
     );
     if (isProtected) {
       failures.push({

@@ -411,3 +411,73 @@ describe("evaluateContract read-only sessions", (): void => {
     expect(failures[0]?.checkId).toBe("tests");
   });
 });
+
+describe("evaluateContract repo-relative protected paths", (): void => {
+  const protectedContract: VerificationContract = {
+    schema_version: CONTRACT_SCHEMA_VERSION,
+    requiredChecks: [],
+    protectedPaths: ["secrets/**"],
+  };
+
+  test("a repo-relative protectedPath matches an absolute touched path", (): void => {
+    // Regression: touched paths arrive absolute from the harness while humans
+    // write protectedPaths repo-relative. Matching only the absolute form made
+    // every relative pattern silently dead.
+    const failures = evaluateContract(
+      protectedContract,
+      {
+        commands: [],
+        touchedFiles: [{ path: "/abs/repo/secrets/key.pem", sequence: 1 }],
+      },
+      { repoRoot: "/abs/repo" },
+    );
+
+    expect(failures.length).toBe(1);
+    expect(failures[0]?.checkId).toBe("protected-path");
+    expect(failures[0]?.reason).toContain("secrets/key.pem");
+  });
+
+  test("an absolute protectedPath still matches without a repo root", (): void => {
+    const failures = evaluateContract(
+      {
+        schema_version: CONTRACT_SCHEMA_VERSION,
+        requiredChecks: [],
+        protectedPaths: ["**/secrets/**"],
+      },
+      {
+        commands: [],
+        touchedFiles: [{ path: "/abs/repo/secrets/key.pem", sequence: 1 }],
+      },
+    );
+
+    expect(failures.length).toBe(1);
+  });
+
+  test("a path outside the repo root does not match a relative pattern", (): void => {
+    // Only the absolute form is comparable outside the repo, so a relative
+    // pattern must not reach across into an unrelated directory.
+    const failures = evaluateContract(
+      protectedContract,
+      {
+        commands: [],
+        touchedFiles: [{ path: "/elsewhere/secrets/key.pem", sequence: 1 }],
+      },
+      { repoRoot: "/abs/repo" },
+    );
+
+    expect(failures).toEqual([]);
+  });
+
+  test("a sibling directory sharing the root's name prefix is not treated as inside it", (): void => {
+    const failures = evaluateContract(
+      protectedContract,
+      {
+        commands: [],
+        touchedFiles: [{ path: "/abs/repo-other/secrets/key.pem", sequence: 1 }],
+      },
+      { repoRoot: "/abs/repo" },
+    );
+
+    expect(failures).toEqual([]);
+  });
+});

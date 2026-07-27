@@ -40,6 +40,26 @@ Vendor-neutral, versioned, and yours to edit: `~/.hyperagent/policy.json`.
 | `match.pathPattern` | glob (`*` does not cross `/`, `**` does, `?` is one char) |
 | `match.pathAccess` | `read`, `write`, or `any` (default) — the read/write distinction |
 
+### How path globs are matched
+
+Harnesses report **absolute** paths; humans naturally write **repo-relative** globs. So every path glob — `match.pathPattern` in a policy rule and `protectedPaths` in a contract — is matched against **both** the absolute path and, when the file lives inside the repo, its repo-relative form.
+
+```
+touched:  /home/you/code/app/secrets/key.pem
+repo:     /home/you/code/app
+
+"secrets/**"           ✓ matches (repo-relative form)
+"**/secrets/**"        ✓ matches (absolute form)
+"/home/you/code/app/secrets/**"  ✓ matches (absolute form)
+```
+
+Without this, `"secrets/**"` would silently never fire — a rule that looks configured but is dead. Two consequences worth knowing:
+
+- A path **outside** the repo is only compared against the absolute form, so a relative pattern cannot reach across into unrelated directories.
+- When no repo context is available, only the absolute form is comparable. Every shipped default rule is written with a leading `**/` so it stays correct either way; prefer that style for rules meant to be portable.
+
+Real-time evaluation and post-hoc detection use the same matcher, so they cannot disagree about whether a rule fired.
+
 A rule needs at least one matcher. All matchers present must match for the rule to fire.
 
 ### Load states
@@ -86,7 +106,7 @@ Per repo, optional: `<repo>/.hyperagent/contract.json`. **An absent contract mea
 Evaluated at Stop, against **spooled session context only**:
 
 - A `requiredCheck` passes when a matching command **ran and passed after the last file the session mutated**. An earlier green test run says nothing about the code as it now stands.
-- A `protectedPath` fails when a **session-touched** file matches it. Deliberately not `git diff HEAD`: your pre-existing uncommitted work is not the agent's doing and must never bounce it.
+- A `protectedPath` fails when a **session-touched** file matches it, on either path basis (see [How path globs are matched](#how-path-globs-are-matched)) — `secrets/**` and `**/secrets/**` both work. Deliberately not `git diff HEAD`: your pre-existing uncommitted work is not the agent's doing and must never bounce it.
 - **A session that mutated nothing satisfies every required check vacuously.** A read-only session has nothing to verify, and demanding tests from it would be a false bounce of the same class.
 
 Bounce reasons name the failed check and nothing else. The pilot flies; the suit reports facts, never instructions on how to work.

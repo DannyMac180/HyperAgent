@@ -13,6 +13,12 @@ export interface AgentRunnerConfig {
   cwd?: string;
   dataDir?: string;
   env?: NodeJS.ProcessEnv;
+  /**
+   * Tool names the spawned CLI must refuse. Workshop drafting runs unattended,
+   * so it passes the file-mutating tools here: an unattended nightly run must
+   * carry zero filesystem authority through the LLM.
+   */
+  disallowedTools?: string[];
 }
 
 const MAX_CAPTURE_BYTES = 1024 * 1024;
@@ -53,6 +59,36 @@ export function sanitizeChildEnv(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
     sanitized[key] = value;
   }
   return sanitized;
+}
+
+export function buildAgentRunnerArgv(
+  config: Pick<AgentRunnerConfig, "model" | "disallowedTools"> = {},
+): string[] {
+  const argv = [
+    "-p",
+    "--model",
+    config.model ?? "haiku",
+    "--output-format",
+    "text",
+  ];
+  const disallowedTools = config.disallowedTools;
+  if (disallowedTools === undefined || disallowedTools.length === 0) {
+    return argv;
+  }
+  for (const [index, tool] of disallowedTools.entries()) {
+    if (typeof tool !== "string" || tool.trim().length === 0) {
+      throw new Error(
+        `disallowedTools[${index}] must be a non-empty string`,
+      );
+    }
+    if (tool.includes(",")) {
+      throw new Error(
+        `disallowedTools[${index}] must not contain a comma`,
+      );
+    }
+  }
+  argv.push("--disallowedTools", disallowedTools.join(","));
+  return argv;
 }
 
 export function isSuitOwnSession(
@@ -179,7 +215,10 @@ export function spawnAgentRunner(
       try {
         child = spawn(
           cliPath,
-          ["-p", "--model", model, "--output-format", "text"],
+          buildAgentRunnerArgv({
+            model,
+            disallowedTools: config.disallowedTools,
+          }),
           {
             cwd,
             env,

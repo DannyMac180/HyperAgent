@@ -11,6 +11,19 @@ import {
   writeMissionRecord,
 } from "../missions/generate.ts";
 import { spawnAgentRunner } from "../missions/runner.ts";
+import { computeTargetRepos } from "../memory/inject.ts";
+import type { InjectionResult } from "../memory/inject.ts";
+import {
+  openMemoryStore,
+} from "../memory/store.ts";
+import type {
+  MemoryFilter,
+  MemoryKind,
+  MemoryRow,
+  MemoryScope,
+  MemoryStatus,
+  MemoryStore,
+} from "../memory/store.ts";
 import {
   SCORER_VERSION,
   getTrends,
@@ -31,6 +44,7 @@ import type {
   AdapterRunStats,
   IngestRunResult,
 } from "./ingest.ts";
+import { syncMemoryTargets } from "./memory-sync.ts";
 import { builtinAdaptersForProjectsRoot } from "./registry.ts";
 
 interface CommonOptions {
@@ -45,6 +59,13 @@ const usage = `Usage:
   bun src/daemon/cli.ts score [--session <id> | --all] [--data-dir D]
   bun src/daemon/cli.ts report [--days N] [--data-dir D]
   bun src/daemon/cli.ts missions [--session <id>] [--data-dir D]
+  bun src/daemon/cli.ts memory list [--status S] [--scope S] [--stale --days N] [--data-dir D]
+  bun src/daemon/cli.ts memory show <id> [--data-dir D]
+  bun src/daemon/cli.ts memory approve <id> [--data-dir D]
+  bun src/daemon/cli.ts memory reject <id> [--data-dir D]
+  bun src/daemon/cli.ts memory retire <id> [--data-dir D]
+  bun src/daemon/cli.ts memory add --claim C --kind K --scope S [--scope-key K] [--data-dir D]
+  bun src/daemon/cli.ts memory sync [--repo <path>] [--data-dir D]
   bun src/daemon/cli.ts install-plist [--write]
 `;
 
@@ -63,7 +84,12 @@ function parseOptions(
     if (!allowedFlags.has(flag)) {
       throw new ArgumentError(`Unknown flag: ${flag}`);
     }
-    if (flag === "--once" || flag === "--write" || flag === "--all") {
+    if (
+      flag === "--once"
+      || flag === "--write"
+      || flag === "--all"
+      || flag === "--stale"
+    ) {
       parsed.set(flag, true);
       continue;
     }
@@ -599,6 +625,312 @@ async function missionsCommand(args: string[]): Promise<number> {
   }
 }
 
+const MEMORY_KINDS: ReadonlySet<string> = new Set([
+  "factual",
+  "gotcha",
+  "preference",
+  "behavior",
+]);
+const MEMORY_SCOPES: ReadonlySet<string> = new Set([
+  "global",
+  "repo",
+  "agent",
+]);
+const MEMORY_STATUSES: ReadonlySet<string> = new Set([
+  "candidate",
+  "approved",
+  "rejected",
+  "retired",
+]);
+
+function memoryDataDir(
+  options: Map<string, string | true>,
+): string {
+  return stringOption(options, "--data-dir")
+    ?? join(homedir(), ".hyperagent");
+}
+
+function openCliMemoryStore(dataDir: string): MemoryStore {
+  return openMemoryStore({
+    dbPath: join(dataDir, "hyperagent.db"),
+    memoryDir: join(dataDir, "memory"),
+  });
+}
+
+function requiredStringOption(
+  options: Map<string, string | true>,
+  name: string,
+): string {
+  const value = stringOption(options, name);
+  if (value === undefined || value.trim().length === 0) {
+    throw new ArgumentError(`Missing value for ${name}`);
+  }
+  return value;
+}
+
+function memoryKind(value: string): MemoryKind {
+  if (!MEMORY_KINDS.has(value)) {
+    throw new ArgumentError(
+      `Invalid memory kind: ${value}; expected factual, gotcha, preference, or behavior.`,
+    );
+  }
+  return value as MemoryKind;
+}
+
+function memoryScope(value: string): MemoryScope {
+  if (!MEMORY_SCOPES.has(value)) {
+    throw new ArgumentError(
+      `Invalid memory scope: ${value}; expected global, repo, or agent.`,
+    );
+  }
+  return value as MemoryScope;
+}
+
+function memoryStatus(value: string): MemoryStatus {
+  if (!MEMORY_STATUSES.has(value)) {
+    throw new ArgumentError(
+      `Invalid memory status: ${value}; expected candidate, approved, rejected, or retired.`,
+    );
+  }
+  return value as MemoryStatus;
+}
+
+function printMemoryTable(memories: MemoryRow[]): void {
+  if (memories.length === 0) {
+    console.log("No memories found.");
+    return;
+  }
+  const headers = ["ID", "STATUS", "KIND", "SCOPE", "CLAIM"];
+  const rows = memories.map((memory: MemoryRow): string[] => [
+    memory.id,
+    memory.status,
+    memory.kind,
+    memory.scope_key === null
+      ? memory.scope
+      : `${memory.scope}:${memory.scope_key}`,
+    memory.claim.replace(/\s+/gu, " ").trim(),
+  ]);
+  const widths = headers.map((header, index): number =>
+    Math.max(
+      header.length,
+      ...rows.map((row: string[]): number => row[index]?.length ?? 0),
+    )
+  );
+  const render = (row: string[]): string =>
+    row.map((cell, index): string =>
+      cell.padEnd(widths[index] ?? cell.length)
+    ).join("  ").trimEnd();
+
+  console.log(render(headers));
+  for (const row of rows) {
+    console.log(render(row));
+  }
+}
+
+function printInjectionResults(results: InjectionResult[]): void {
+  if (results.length === 0) {
+    console.log("No memory injection targets.");
+    return;
+  }
+  for (const result of results) {
+    if (result.changed) {
+      console.log(`changed\t${result.targetPath}`);
+    } else if (
+      result.reason === undefined
+      || result.reason === "Injection target is already byte-identical."
+    ) {
+      console.log(`unchanged\t${result.targetPath}`);
+    } else {
+      console.log(`refused\t${result.targetPath}\t${result.reason}`);
+    }
+  }
+}
+
+async function syncMemoryStore(
+  memoryStore: MemoryStore,
+  explicitRepo?: string,
+  previousTargets?: string[],
+): Promise<void> {
+  printInjectionResults(
+    await syncMemoryTargets({
+      memoryStore,
+      ...(explicitRepo === undefined ? {} : { explicitRepo }),
+      ...(previousTargets === undefined ? {} : { previousTargets }),
+    }),
+  );
+}
+
+function memoryListCommand(args: string[]): number {
+  const options = parseOptions(
+    args,
+    new Set(["--status", "--scope", "--stale", "--days", "--data-dir"]),
+  );
+  const statusValue = stringOption(options, "--status");
+  const scopeValue = stringOption(options, "--scope");
+  const stale = options.get("--stale") === true;
+  const daysValue = stringOption(options, "--days");
+  if (!stale && daysValue !== undefined) {
+    throw new ArgumentError("--days requires --stale.");
+  }
+  const filter: MemoryFilter = {
+    ...(statusValue === undefined ? {} : { status: memoryStatus(statusValue) }),
+    ...(scopeValue === undefined ? {} : { scope: memoryScope(scopeValue) }),
+    ...(stale
+      ? {
+        staleBefore: new Date(
+          Date.now() - positiveDays(daysValue) * 24 * 60 * 60 * 1_000,
+        ).toISOString(),
+      }
+      : {}),
+  };
+  const memoryStore = openCliMemoryStore(memoryDataDir(options));
+  try {
+    printMemoryTable(memoryStore.listMemories(filter));
+    return 0;
+  } finally {
+    memoryStore.close();
+  }
+}
+
+function memoryIdAndOptions(
+  args: string[],
+): { id: string; options: Map<string, string | true> } {
+  const id = args[0];
+  if (id === undefined || id.startsWith("--")) {
+    throw new ArgumentError("Missing memory id.");
+  }
+  return {
+    id,
+    options: parseOptions(args.slice(1), new Set(["--data-dir"])),
+  };
+}
+
+function memoryShowCommand(args: string[]): number {
+  const { id, options } = memoryIdAndOptions(args);
+  const memoryStore = openCliMemoryStore(memoryDataDir(options));
+  try {
+    const memory = memoryStore.getMemory(id);
+    if (memory === null) {
+      console.error(`Memory not found: ${id}`);
+      return 1;
+    }
+    console.log(JSON.stringify(memory, null, 2));
+    return 0;
+  } finally {
+    memoryStore.close();
+  }
+}
+
+async function memoryTransitionCommand(
+  action: "approve" | "reject" | "retire",
+  args: string[],
+): Promise<number> {
+  const { id, options } = memoryIdAndOptions(args);
+  const memoryStore = openCliMemoryStore(memoryDataDir(options));
+  try {
+    const prior = memoryStore.getMemory(id);
+    if (prior === null) {
+      console.error(`Memory not found: ${id}`);
+      return 1;
+    }
+    // Captured BEFORE the transition: a repo dropping out of the target set
+    // must still be re-rendered (to an empty block) by this same mutation.
+    const previousTargets = computeTargetRepos(memoryStore.listMemories());
+    const updated = memoryStore[action](id);
+    const pastTense = action === "approve"
+      ? "approved"
+      : action === "reject"
+        ? "rejected"
+        : "retired";
+    console.log(`${pastTense}\t${updated.id}`);
+    await syncMemoryStore(memoryStore, undefined, previousTargets);
+    return 0;
+  } finally {
+    memoryStore.close();
+  }
+}
+
+function memoryAddCommand(args: string[]): number {
+  const options = parseOptions(
+    args,
+    new Set([
+      "--claim",
+      "--kind",
+      "--scope",
+      "--scope-key",
+      "--data-dir",
+    ]),
+  );
+  const claim = requiredStringOption(options, "--claim");
+  const kind = memoryKind(requiredStringOption(options, "--kind"));
+  const scope = memoryScope(requiredStringOption(options, "--scope"));
+  const scopeKey = stringOption(options, "--scope-key");
+  if (scope === "global" && scopeKey !== undefined) {
+    throw new ArgumentError("--scope-key is not allowed for global memories.");
+  }
+  if (
+    scope !== "global"
+    && (scopeKey === undefined || scopeKey.trim().length === 0)
+  ) {
+    throw new ArgumentError(`--scope-key is required for ${scope} memories.`);
+  }
+
+  const memoryStore = openCliMemoryStore(memoryDataDir(options));
+  try {
+    const memory = memoryStore.addManual({
+      claim,
+      kind,
+      scope,
+      scope_key: scope === "global" ? null : scopeKey,
+      confidence: 1,
+      evidence: [{ session_id: "manual", raw_ref: null }],
+      source: "manual",
+    });
+    console.log(`added\t${memory.id}`);
+    return 0;
+  } finally {
+    memoryStore.close();
+  }
+}
+
+async function memorySyncCommand(args: string[]): Promise<number> {
+  const options = parseOptions(args, new Set(["--repo", "--data-dir"]));
+  const memoryStore = openCliMemoryStore(memoryDataDir(options));
+  try {
+    await syncMemoryStore(memoryStore, stringOption(options, "--repo"));
+    return 0;
+  } finally {
+    memoryStore.close();
+  }
+}
+
+async function memoryCommand(args: string[]): Promise<number> {
+  const subcommand = args[0];
+  const rest = args.slice(1);
+  if (subcommand === "list") {
+    return memoryListCommand(rest);
+  }
+  if (subcommand === "show") {
+    return memoryShowCommand(rest);
+  }
+  if (
+    subcommand === "approve"
+    || subcommand === "reject"
+    || subcommand === "retire"
+  ) {
+    return memoryTransitionCommand(subcommand, rest);
+  }
+  if (subcommand === "add") {
+    return memoryAddCommand(rest);
+  }
+  if (subcommand === "sync") {
+    return memorySyncCommand(rest);
+  }
+  throw new ArgumentError(
+    `Unknown memory subcommand: ${subcommand ?? "(missing)"}`,
+  );
+}
+
 function xmlEscape(value: string): string {
   return value
     .replaceAll("&", "&amp;")
@@ -688,6 +1020,9 @@ async function main(args: string[]): Promise<number> {
   }
   if (command === "missions") {
     return missionsCommand(rest);
+  }
+  if (command === "memory") {
+    return memoryCommand(rest);
   }
   if (command === "install-plist") {
     return installPlistCommand(rest);

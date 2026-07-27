@@ -7,12 +7,16 @@
  * hooks) into canonical events; they never require the working agent to
  * self-report anything.
  *
- * Inject and Gate are deliberately absent: this is the observe-only slice
- * of the three-verb contract. They arrive with the memory engine (DAN-202)
- * and gates (DAN-203) and will extend — not modify — this contract.
+ * Inject extends this contract additively with the memory engine (DAN-202).
+ * Gate remains future work for DAN-203 and will likewise extend — not modify —
+ * the existing contracts.
  */
 
-import type { EventInput } from "../schema/events";
+import type { InjectionResult } from "../memory/inject.ts";
+import type { MemoryRow } from "../memory/store.ts";
+import type { EventInput } from "../schema/events.ts";
+
+export type { InjectionResult } from "../memory/inject.ts";
 
 /** A harness session source an adapter has located on disk. */
 export interface DiscoveredSession {
@@ -81,4 +85,15 @@ export interface ObserveAdapter {
     session: DiscoveredSession,
     resumeToken: string,
   ): Promise<ParseResult>;
+}
+
+export interface InjectAdapter {
+  /** Vendor slug used to select agent-scoped memories (e.g. "claude-code"). */
+  readonly vendor: string;
+
+  /** Render approved memories into this harness's native dialect for one repo. */
+  renderInjection(
+    targetRepo: string,
+    memories: MemoryRow[],
+  ): Promise<InjectionResult>;
 }

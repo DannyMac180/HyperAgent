@@ -11,6 +11,14 @@ import {
   createMissionQueue,
   type MissionQueue,
 } from "../missions/queue.ts";
+import {
+  createMemoryQueue,
+  type MemoryQueue,
+} from "../memory/queue.ts";
+import {
+  openMemoryStore,
+  type MemoryStore,
+} from "../memory/store.ts";
 import { spawnAgentRunner } from "../missions/runner.ts";
 import { deterministicEventId } from "../schema/ids.ts";
 import type { EventInput } from "../schema/events.ts";
@@ -28,6 +36,8 @@ export interface IngestOptions {
   scoring?: boolean;
   missions?: boolean;
   missionQueue?: MissionQueue;
+  memory?: boolean;
+  memoryQueue?: MemoryQueue;
 }
 
 export interface AdapterRunStats {
@@ -52,6 +62,7 @@ export interface IngestRunResult {
   adapters: AdapterRunStats[];
   sessionsScored: number;
   missionsEnqueued: number;
+  memoryExtractionsEnqueued: number;
 }
 
 export interface IngestState {
@@ -166,7 +177,9 @@ function isIngestRunResult(value: unknown): value is IngestRunResult {
     (value.sessionsScored === undefined ||
       typeof value.sessionsScored === "number") &&
     (value.missionsEnqueued === undefined ||
-      typeof value.missionsEnqueued === "number")
+      typeof value.missionsEnqueued === "number") &&
+    (value.memoryExtractionsEnqueued === undefined ||
+      typeof value.memoryExtractionsEnqueued === "number")
   );
 }
 
@@ -318,6 +331,8 @@ export async function runIngestOnce(
   const adapterStats: AdapterRunStats[] = [];
   const closedThisPass = new Set<string>();
   let internallyCreatedMissionQueue: MissionQueue | undefined;
+  let internallyCreatedMemoryQueue: MemoryQueue | undefined;
+  let internallyCreatedMemoryStore: MemoryStore | undefined;
 
   try {
     for (const adapter of options.adapters) {
@@ -340,6 +355,7 @@ export async function runIngestOnce(
             adapters: adapterStats,
             sessionsScored: 0,
             missionsEnqueued: 0,
+            memoryExtractionsEnqueued: 0,
           };
           await persistState(dataDir, state);
           continue;
@@ -468,6 +484,7 @@ export async function runIngestOnce(
         adapters: adapterStats,
         sessionsScored: 0,
         missionsEnqueued: 0,
+        memoryExtractionsEnqueued: 0,
       };
       await persistState(dataDir, state);
     }
@@ -575,23 +592,75 @@ export async function runIngestOnce(
       }
     }
 
+    let memoryExtractionsEnqueued = 0;
+    if (options.memory === true && closedThisPass.size > 0) {
+      let memoryQueue = options.memoryQueue;
+      try {
+        if (memoryQueue === undefined) {
+          const memoryStore = openMemoryStore({
+            dbPath: join(dataDir, "hyperagent.db"),
+            memoryDir: join(dataDir, "memory"),
+          });
+          try {
+            memoryQueue = createMemoryQueue({
+              dataDir,
+              store,
+              memoryStore,
+              onError: (sessionId: string, error: unknown): void => {
+                console.error(
+                  `Failed to extract memory for ingested session "${sessionId}": ${
+                    errorMessage(error)
+                  }`,
+                );
+              },
+            });
+          } catch (error: unknown) {
+            memoryStore.close();
+            throw error;
+          }
+          internallyCreatedMemoryStore = memoryStore;
+          internallyCreatedMemoryQueue = memoryQueue;
+        }
+        for (const sessionId of closedThisPass) {
+          // Injection is deliberately not automatic here. Context changes only
+          // after an explicit status transition or `memory sync`.
+          if (memoryQueue.enqueue(sessionId)) {
+            memoryExtractionsEnqueued += 1;
+          }
+        }
+      } catch (error: unknown) {
+        console.error(
+          `Failed to enqueue memory extractions after ingest: ${
+            errorMessage(error)
+          }`,
+        );
+      }
+    }
+
     const result: IngestRunResult = {
       startedAt,
       finishedAt: new Date(now()).toISOString(),
       adapters: adapterStats,
       sessionsScored,
       missionsEnqueued,
+      memoryExtractionsEnqueued,
     };
     state.lastRun = result;
     await persistState(dataDir, state);
     return result;
   } finally {
-    if (internallyCreatedMissionQueue === undefined) {
+    const drains: Promise<void>[] = [];
+    if (internallyCreatedMissionQueue !== undefined) {
+      drains.push(internallyCreatedMissionQueue.drain());
+    }
+    if (internallyCreatedMemoryQueue !== undefined) {
+      drains.push(internallyCreatedMemoryQueue.drain());
+    }
+    try {
+      await Promise.all(drains);
+    } finally {
+      internallyCreatedMemoryStore?.close();
       store.close();
-    } else {
-      void internallyCreatedMissionQueue.drain().finally((): void => {
-        store.close();
-      });
     }
   }
 }

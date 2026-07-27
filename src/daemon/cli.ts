@@ -62,6 +62,24 @@ import type {
   SessionScore,
 } from "../scoring/score.ts";
 import { openStore } from "../store/store.ts";
+import { installProposal } from "../workshop/install.ts";
+import { measureInstalled } from "../workshop/measure.ts";
+import {
+  humanApprovalFromCli,
+  openWorkshopQueue,
+} from "../workshop/queue.ts";
+import type {
+  WorkshopProposalFilter,
+  WorkshopProposalRow,
+} from "../workshop/queue.ts";
+import {
+  acquireWorkshopRunGuard,
+  runWorkshop,
+} from "../workshop/run.ts";
+import type {
+  WorkshopRunResult,
+  WorkshopStage,
+} from "../workshop/run.ts";
 import {
   readGateHealth,
 } from "./gate-ingest.ts";
@@ -88,7 +106,7 @@ interface CommonOptions {
 
 const usage = `Usage:
   bun src/daemon/cli.ts ingest --once [--data-dir D] [--projects-root P]
-  bun src/daemon/cli.ts watch [--data-dir D] [--projects-root P]
+  bun src/daemon/cli.ts watch [--workshop] [--data-dir D] [--projects-root P]
   bun src/daemon/cli.ts status [--data-dir D]
   bun src/daemon/cli.ts score [--session <id> | --all] [--data-dir D]
   bun src/daemon/cli.ts report [--days N] [--data-dir D]
@@ -110,6 +128,12 @@ const usage = `Usage:
   bun src/daemon/cli.ts gate test --hook <PreToolUse|PostToolUse|Stop> [--harness H] [--data-dir D] [--stdin-file F]
   bun src/daemon/cli.ts gate eval --harness H --hook <PreToolUse|PostToolUse|Stop> [--data-dir D]
   bun src/daemon/cli.ts violations [--session S] [--days N] [--data-dir D]
+  bun src/daemon/cli.ts workshop run [--until cluster|propose] [--repo P] [--data-dir D]
+  bun src/daemon/cli.ts workshop list [--status S] [--type T] [--data-dir D]
+  bun src/daemon/cli.ts workshop show <id> [--data-dir D]
+  bun src/daemon/cli.ts workshop approve <id> [--yes] [--data-dir D]
+  bun src/daemon/cli.ts workshop reject <id> [--data-dir D]
+  bun src/daemon/cli.ts workshop measure [--data-dir D]
   bun src/daemon/cli.ts install-plist [--write]
 `;
 
@@ -133,6 +157,8 @@ function parseOptions(
       || flag === "--write"
       || flag === "--all"
       || flag === "--stale"
+      || flag === "--yes"
+      || flag === "--workshop"
     ) {
       parsed.set(flag, true);
       continue;
@@ -204,16 +230,19 @@ function watchedRoots(
 async function watchCommand(args: string[]): Promise<number> {
   const options = parseOptions(
     args,
-    new Set(["--data-dir", "--projects-root"]),
+    new Set(["--workshop", "--data-dir", "--projects-root"]),
   );
   const dataDir =
     stringOption(options, "--data-dir") ?? join(homedir(), ".hyperagent");
   const projectsRoot = stringOption(options, "--projects-root");
+  const workshopEnabled = options.get("--workshop") === true;
   const adapters = builtinAdaptersForProjectsRoot(projectsRoot);
   const watchers = new Map<string, FSWatcher>();
   let debounceTimer: ReturnType<typeof setTimeout> | undefined;
   let inFlight = false;
   let pending = false;
+  let workshopInFlight = false;
+  let workshopPending = false;
   let stopping = false;
 
   const syncWatchers = (): void => {
@@ -267,9 +296,48 @@ async function watchCommand(args: string[]): Promise<number> {
     }
   };
 
+  const triggerWorkshop = async (): Promise<void> => {
+    if (stopping || !workshopEnabled) {
+      return;
+    }
+    if (workshopInFlight) {
+      workshopPending = true;
+      return;
+    }
+    workshopInFlight = true;
+    try {
+      do {
+        workshopPending = false;
+        const guard = await acquireWorkshopRunGuard({ dataDir });
+        if (!guard.acquired) {
+          console.error(
+            `Workshop skipped: ${guard.diagnostics.join("; ") || "another run is active"}`,
+          );
+          continue;
+        }
+        try {
+          const result = await runWorkshopPipeline(dataDir);
+          printWorkshopRunSummary(result);
+        } catch (error: unknown) {
+          const message =
+            error instanceof Error ? error.message : String(error);
+          console.error(`Workshop failed: ${message}`);
+        } finally {
+          await guard.release();
+        }
+      } while (workshopPending && !stopping);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.error(`Workshop failed: ${message}`);
+    } finally {
+      workshopInFlight = false;
+    }
+  };
+
   await trigger();
   const rescanTimer = setInterval(() => {
     void trigger();
+    void triggerWorkshop();
   }, 60_000);
 
   await new Promise<void>((resolveShutdown) => {
@@ -1014,6 +1082,363 @@ async function memoryCommand(args: string[]): Promise<number> {
   );
 }
 
+function workshopDataDir(
+  options: Map<string, string | true>,
+): string {
+  return stringOption(options, "--data-dir")
+    ?? join(homedir(), ".hyperagent");
+}
+
+function workshopStage(value: string | undefined): WorkshopStage | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+  if (value === "cluster" || value === "propose") {
+    return value;
+  }
+  throw new ArgumentError(
+    `Invalid value for --until: ${value}; expected cluster or propose.`,
+  );
+}
+
+async function runWorkshopPipeline(
+  dataDir: string,
+  repo?: string,
+  until?: WorkshopStage,
+): Promise<WorkshopRunResult> {
+  const store = openStore(join(dataDir, "hyperagent.db"));
+  if (until === "cluster") {
+    try {
+      return await runWorkshop(
+        { store },
+        {
+          dataDir,
+          ...(repo === undefined ? {} : { repo }),
+          until,
+        },
+      );
+    } finally {
+      store.close();
+    }
+  }
+
+  const queue = openWorkshopQueue({ dataDir });
+  try {
+    return await runWorkshop(
+      {
+        store,
+        queue,
+        propose: { runAgent: spawnAgentRunner({ dataDir }) },
+      },
+      {
+        dataDir,
+        ...(repo === undefined ? {} : { repo }),
+        ...(until === undefined ? {} : { until }),
+      },
+    );
+  } finally {
+    queue.close();
+    store.close();
+  }
+}
+
+function printWorkshopRunSummary(result: WorkshopRunResult): void {
+  console.log(`Workshop run: ${result.runId}`);
+  console.log(`Status: ${result.status}`);
+  console.log(`Clusters forwarded: ${result.clustersForwarded}`);
+  console.log(`Proposals drafted: ${result.proposalsDrafted}`);
+  console.log(`Proposals pending: ${result.proposalsPending}`);
+  console.log(`Proposals held at draft: ${result.proposalsHeldAtDraft}`);
+  if (result.error !== null) {
+    console.log(`Error: ${result.error}`);
+  }
+  for (const diagnostic of result.diagnostics) {
+    console.log(`Diagnostic: ${diagnostic}`);
+  }
+}
+
+async function workshopRunCommand(args: string[]): Promise<number> {
+  const options = parseOptions(
+    args,
+    new Set(["--until", "--repo", "--data-dir"]),
+  );
+  const until = workshopStage(stringOption(options, "--until"));
+  const result = await runWorkshopPipeline(
+    workshopDataDir(options),
+    stringOption(options, "--repo"),
+    until,
+  );
+  if (until === "cluster") {
+    console.log("Clusters:");
+    console.log(JSON.stringify(result.analysis, null, 2));
+    console.log("Fragmentation report:");
+    console.log(JSON.stringify(result.analysis.fragmentation, null, 2));
+  } else {
+    printWorkshopRunSummary(result);
+  }
+  return result.status === "completed" ? 0 : 1;
+}
+
+function printWorkshopTable(proposals: WorkshopProposalRow[]): void {
+  if (proposals.length === 0) {
+    console.log("No workshop proposals found.");
+    return;
+  }
+  const headers = ["ID", "STATUS", "TYPE", "DURABILITY", "TITLE"];
+  const rows = proposals.map((proposal): string[] => [
+    proposal.id,
+    proposal.status,
+    proposal.type,
+    proposal.durability,
+    proposal.title.replace(/\s+/gu, " ").trim(),
+  ]);
+  const widths = headers.map((header, index): number =>
+    Math.max(
+      header.length,
+      ...rows.map((row): number => row[index]?.length ?? 0),
+    )
+  );
+  const render = (row: string[]): string =>
+    row.map((cell, index): string =>
+      cell.padEnd(widths[index] ?? cell.length)
+    ).join("  ").trimEnd();
+
+  console.log(render(headers));
+  for (const row of rows) {
+    console.log(render(row));
+  }
+}
+
+function workshopListCommand(args: string[]): number {
+  const options = parseOptions(
+    args,
+    new Set(["--status", "--type", "--data-dir"]),
+  );
+  const status = stringOption(options, "--status");
+  const type = stringOption(options, "--type");
+  const filter: WorkshopProposalFilter = {
+    ...(status === undefined
+      ? {}
+      : { status: status as WorkshopProposalFilter["status"] }),
+    ...(type === undefined
+      ? {}
+      : { type: type as WorkshopProposalFilter["type"] }),
+  };
+  const queue = openWorkshopQueue({ dataDir: workshopDataDir(options) });
+  try {
+    printWorkshopTable(queue.list(filter));
+    return 0;
+  } finally {
+    queue.close();
+  }
+}
+
+function workshopIdAndOptions(
+  args: string[],
+  allowedFlags: ReadonlySet<string> = new Set(["--data-dir"]),
+): { id: string; options: Map<string, string | true> } {
+  const id = args[0];
+  if (id === undefined || id.startsWith("--")) {
+    throw new ArgumentError("Missing workshop proposal id.");
+  }
+  return {
+    id,
+    options: parseOptions(args.slice(1), allowedFlags),
+  };
+}
+
+function workshopShowCommand(args: string[]): number {
+  const { id, options } = workshopIdAndOptions(args);
+  const queue = openWorkshopQueue({ dataDir: workshopDataDir(options) });
+  try {
+    const proposal = queue.get(id);
+    if (proposal === null) {
+      console.error(`Workshop proposal not found: ${id}`);
+      return 1;
+    }
+    console.log(`ID: ${proposal.id}`);
+    console.log(`Title: ${proposal.title}`);
+    console.log(`Type: ${proposal.type}`);
+    console.log(`Durability: ${proposal.durability}`);
+    console.log(`Status: ${proposal.status}`);
+    console.log(`Content hash: ${proposal.contentHash}`);
+    console.log(`Rationale: ${proposal.rationale}`);
+    console.log("Body:");
+    console.log(JSON.stringify(proposal.body, null, 2));
+    console.log("Evidence:");
+    console.log(JSON.stringify(proposal.evidence, null, 2));
+    console.log("Eval verdict:");
+    console.log(
+      proposal.eval === null
+        ? "not evaluated"
+        : JSON.stringify(proposal.eval, null, 2),
+    );
+    console.log("Transition history:");
+    for (const transition of queue.transitions(id)) {
+      console.log(
+        `${transition.ts}  ${transition.fromStatus ?? "(none)"} -> ` +
+          `${transition.toStatus}  actor=${transition.actor}` +
+          `${transition.note === null ? "" : `  note=${transition.note}`}`,
+      );
+    }
+    return 0;
+  } finally {
+    queue.close();
+  }
+}
+
+function printWorkshopInstallPlan(
+  proposal: WorkshopProposalRow,
+  dataDir: string,
+): void {
+  console.log(`Proposal: ${proposal.id}`);
+  if (proposal.type === "memory") {
+    console.log(`Target store: ${join(dataDir, "hyperagent.db")}`);
+  } else if (proposal.type === "verification_check") {
+    console.log(
+      `Target path: ${
+        proposal.repo === null
+          ? "(proposal has no target repo)"
+          : join(proposal.repo, ".hyperagent", "contract.json")
+      }`,
+    );
+  } else {
+    console.log("Target: manual placement required");
+    console.log("This proposal must be placed by hand.");
+  }
+  console.log("What will be written:");
+  console.log(JSON.stringify(proposal.body, null, 2));
+}
+
+function workshopApproveCommand(args: string[]): number {
+  const { id, options } = workshopIdAndOptions(
+    args,
+    new Set(["--yes", "--data-dir"]),
+  );
+  const dataDir = workshopDataDir(options);
+  const queue = openWorkshopQueue({ dataDir });
+  try {
+    const proposal = queue.get(id);
+    if (proposal === null) {
+      console.error(`Workshop proposal not found: ${id}`);
+      return 1;
+    }
+    if (options.get("--yes") !== true) {
+      printWorkshopInstallPlan(proposal, dataDir);
+      console.log("Refusing to proceed without explicit confirmation.");
+      console.log(`Re-run with --yes to approve and install proposal ${id}.`);
+      return 1;
+    }
+    try {
+      const approved = queue.approve(
+        id,
+        humanApprovalFromCli({ proposalId: id, confirmed: true }),
+        proposal.contentHash,
+      );
+      const outcome = installProposal(approved, {
+        openMemoryStore: () => openCliMemoryStore(dataDir),
+      }, {
+        ...(approved.repo === null ? {} : { targetRepo: approved.repo }),
+      });
+      if (!outcome.ok) {
+        console.error(`Workshop approval failed: ${outcome.reason}`);
+        return 1;
+      }
+      queue.markInstalled(id, outcome.receipt);
+      console.log(JSON.stringify(outcome.receipt, null, 2));
+      return 0;
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.error(`Workshop approval failed: ${message}`);
+      return 1;
+    }
+  } finally {
+    queue.close();
+  }
+}
+
+function workshopRejectCommand(args: string[]): number {
+  const { id, options } = workshopIdAndOptions(args);
+  const queue = openWorkshopQueue({ dataDir: workshopDataDir(options) });
+  try {
+    if (queue.get(id) === null) {
+      console.error(`Workshop proposal not found: ${id}`);
+      return 1;
+    }
+    try {
+      const rejected = queue.reject(id, "human");
+      console.log(`rejected\t${rejected.id}`);
+      return 0;
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.error(`Workshop rejection failed: ${message}`);
+      return 1;
+    }
+  } finally {
+    queue.close();
+  }
+}
+
+function workshopMeasureCommand(args: string[]): number {
+  const options = parseOptions(args, new Set(["--data-dir"]));
+  const dataDir = workshopDataDir(options);
+  const queue = openWorkshopQueue({ dataDir });
+  const store = openStore(join(dataDir, "hyperagent.db"));
+  try {
+    const measurements = measureInstalled(
+      store,
+      queue.list({ status: "installed" }),
+      { dataDir },
+    );
+    if (measurements.length === 0) {
+      console.log("No installed workshop proposals found.");
+      return 0;
+    }
+    console.log(
+      "PROPOSAL  STATUS             BEFORE  AFTER  DELTA  REASON",
+    );
+    for (const measurement of measurements) {
+      console.log(
+        `${measurement.proposalId}  ${measurement.status}  ` +
+          `${measurement.before.sessionCount}  ` +
+          `${measurement.after.sessionCount}  ` +
+          `${measurement.delta === null ? "n/a" : measurement.delta}  ` +
+          measurement.reason,
+      );
+    }
+    return 0;
+  } finally {
+    store.close();
+    queue.close();
+  }
+}
+
+async function workshopCommand(args: string[]): Promise<number> {
+  const subcommand = args[0];
+  const rest = args.slice(1);
+  if (subcommand === "run") {
+    return workshopRunCommand(rest);
+  }
+  if (subcommand === "list") {
+    return workshopListCommand(rest);
+  }
+  if (subcommand === "show") {
+    return workshopShowCommand(rest);
+  }
+  if (subcommand === "approve") {
+    return workshopApproveCommand(rest);
+  }
+  if (subcommand === "reject") {
+    return workshopRejectCommand(rest);
+  }
+  if (subcommand === "measure") {
+    return workshopMeasureCommand(rest);
+  }
+  throw new ArgumentError(
+    `Unknown workshop subcommand: ${subcommand ?? "(missing)"}`,
+  );
+}
+
 function gateDataDir(
   options: Map<string, string | true>,
 ): string {
@@ -1420,6 +1845,9 @@ async function main(args: string[]): Promise<number> {
   }
   if (command === "violations") {
     return violationsCommand(rest);
+  }
+  if (command === "workshop") {
+    return workshopCommand(rest);
   }
   if (command === "install-plist") {
     return installPlistCommand(rest);

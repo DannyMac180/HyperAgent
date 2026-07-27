@@ -41,7 +41,7 @@ Because this repo is the HyperAgent testbed, prefer recording mission telemetry 
 
 ## Core And Extensions (testbed-only verification tiers)
 
-Use `docs/roadmap.md` as the current source for what belongs to the PRD core versus optional extensions or release support.
+Use `docs/archive/roadmap.md` as the current source for what belongs to the PRD core versus optional extensions or release support.
 
 - Core changes should preserve the Codex-first Suit, local mission evidence, Workshop, Forge, human review, and markdown-first memory.
 - Optional extension changes include the local UI, sensing extras, Workbench traces, and reliability scoring.
@@ -73,8 +73,8 @@ The GitHub README is the initial user-facing landing page. Keep its high-level a
 
 When a task changes user-visible modules, review and update these files as needed:
 
-- `docs/architecture/hyperagent.mmd`: editable diagram source.
-- `docs/assets/hyperagent-architecture.svg`: rendered README asset.
+- `docs/archive/hyperagent-v1.mmd`: editable diagram source.
+- `docs/archive/assets/hyperagent-architecture.svg`: rendered README asset.
 - `README.md`: surrounding architecture copy if the public story changes.
 
 For PRs that change user-visible modules, confirm that the architecture diagram was reviewed or updated.

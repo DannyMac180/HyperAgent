@@ -2168,7 +2168,7 @@ The hosted cockpit is not part of this local alpha. Use these local cockpit view
   sh scripts/hyperagent.sh ui serve
 
 Product state:
-  docs/roadmap.md
+  docs/archive/roadmap.md
 EOF
 }
 

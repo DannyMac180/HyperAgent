@@ -1,0 +1,56 @@
+# Archive — HyperAgent v1 documentation
+
+Everything in this folder documents **HyperAgent v1**: the Codex-only bash CLI
+(`scripts/hyperagent.sh`) whose central mechanism asked the working agent to operate its own
+suit — writing mission records, filing Workshop proposals, and reporting on itself.
+
+`docs/architecture-v2.md` §8 ("What carries forward from v1, what dies") is the authority for
+the split below. v2 is a meta-harness: it observes agents involuntarily through transcripts and
+lifecycle hooks, and the working agent carries zero HyperAgent ceremony. The documents here
+describe the mechanism v2 abolishes.
+
+Nothing was deleted. Every file moved with `git mv`, so `git log --follow` still resolves its
+full history.
+
+## What stayed in `docs/`
+
+| File | Why it is still current |
+|---|---|
+| `architecture-v2.md` | The source of truth. CLAUDE.md declares this exact path. |
+| `schema.md` | Canonical cross-vendor event schema (DAN-198), §6.1. |
+| `memory.md` | Memory engine design (DAN-202), §6.3. |
+| `gates.md` | Gate policy and verification contracts (DAN-203), §6.4. |
+| `insights.md` | CLAUDE.md mandates reading it before any user-facing copy. |
+| `hyperagent-prd.md` | Live but subordinate — architecture-v2 wins on conflict, which is precedence, not staleness. |
+| `evidence-policy.md` | §8 carries the evidence policy forward; CLAUDE.md cites it for the private `missions/` boundary. |
+| `safety-policy.md` | §6.5 — "carries forward unchanged, as code instead of prose." Referent for the DAN-203 gates. |
+| `decisions/` | v2 architecture decision records. |
+| `examples/` | §8 keeps the mission/proposal/decision *formats* as generated outputs. |
+
+## What was archived
+
+| Entry | Why it was retired |
+|---|---|
+| `adapters.md` | v1 adapter model — superseded by the vendor-blind adapter contract in §6.1. |
+| `article-outline.md` | v1-era launch narrative; the v2 essay is DAN-212 with a different thesis. |
+| `clean-install-uat.md` | UAT script for the v1 bash CLI install. |
+| `concepts.md` | v1 vocabulary (missions, proposals, Workshop ceremony) the schema replaces. |
+| `config.md` | Config reference for the retired `scripts/hyperagent.sh`. |
+| `dogfooding.md` | The v1 self-reporting loop — the exact mechanism §8 kills. |
+| `extensions.md` | v1 extension surface; no v2 equivalent yet. |
+| `iron-man-suit-essence.md` | v1 narrative source material; `insights.md` is the current companion. |
+| `product-state.md` | Point-in-time snapshot of the v1 product. |
+| `quickstart.md` | Getting-started guide for the v1 CLI. |
+| `release-checklist.md` | Release process for v1 artifacts. |
+| `roadmap.md` | v1 roadmap, superseded by the DAN-198…DAN-215 build order in §9. |
+| `ui-architecture.md` | The v1 local web UI; v2's paid surface is the Cockpit Mac app. |
+| `hyperagent-v1.mmd` | v1 architecture diagram (was `docs/architecture/hyperagent.mmd`). |
+| `releases/` | v1 release notes. |
+| `reviews/` | v1 Forge review records. |
+| `assets/` | Images referenced only by archived documents. |
+
+---
+
+These documents contain claims that are no longer true of HyperAgent. Read them as history.
+Do not quote them in user-facing copy, and do not treat their verification scripts as gates
+for v2 code.

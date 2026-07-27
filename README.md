@@ -17,9 +17,9 @@ HyperAgent is currently `v0.1.0-alpha`: a developer preview for testing the loca
 
 This alpha is ready for early open-source use by Codex users who are comfortable with local markdown artifacts and shell scripts. It is not a hosted service, does not provide a polished hosted dashboard, does not support every agent platform, and does not autonomously modify itself.
 
-Release notes: `docs/releases/v0.1.0-alpha.md`
+Release notes: `docs/archive/releases/v0.1.0-alpha.md`
 
-Current product state and roadmap: `docs/roadmap.md`
+Current product state and roadmap: `docs/archive/roadmap.md`
 
 ## Architecture
 
@@ -28,11 +28,11 @@ HyperAgent is designed to sit at the Codex Mac app level as a user-level operati
 Mission records capture evidence from real work. The Workshop turns that evidence into proposed Suit upgrades. The Forge improves the Workshop itself by checking whether proposals are specific, evidence-backed, safe, testable, worth installing, and actually improving behavior after acceptance. Forge reviews use anchored 0-5 scores, evidence references, deterministic gates, and small payoff counters so the process can be inspected over time. `forge audit` adds a concise process-health check for stale decisions, weak proposals, traceability gaps, and eval coverage. Human review approves persistent behavior changes before they become part of the Suit.
 
 <p align="center">
-  <img src="docs/assets/hyperagent-architecture.svg" alt="HyperAgent high-level architecture diagram">
+  <img src="docs/archive/assets/hyperagent-architecture.svg" alt="HyperAgent high-level architecture diagram">
 </p>
 
 <p align="center">
-  <sub>Editable diagram source: <a href="docs/architecture/hyperagent.mmd">docs/architecture/hyperagent.mmd</a></sub>
+  <sub>Editable diagram source: <a href="docs/archive/hyperagent-v1.mmd">docs/archive/hyperagent-v1.mmd</a></sub>
 </p>
 
 ## Try HyperAgent In Codex Mac
@@ -78,11 +78,11 @@ Codex should do the setup work for you. It will clone or update this repo, run l
 
 The MVP is file-based on purpose. There is no hosted service, no hidden database, and no autonomous self-modification. If you run `hyperagent ui`, treat it as an optional local cockpit over the same markdown and evidence files, not as a separate source of truth.
 
-For the manual and one-command setup paths, see `docs/quickstart.md`.
+For the manual and one-command setup paths, see `docs/archive/quickstart.md`.
 
-For current product boundaries, see `docs/roadmap.md` and `docs/extensions.md`.
+For current product boundaries, see `docs/archive/roadmap.md` and `docs/archive/extensions.md`.
 
-For repeated human dogfooding, see `docs/dogfooding.md`.
+For repeated human dogfooding, see `docs/archive/dogfooding.md`.
 
 The primary CLI model has four primary flows:
 
@@ -97,38 +97,38 @@ sh scripts/hyperagent.sh review workshop --mission .hyperagent/missions/MISSION.
 
 Development helpers such as `status`, `doctor`, `new-mission`, `mission-closeout`, `propose-upgrade`, `new-forge-review`, `forge audit`, and `decide-upgrade` remain available as compatibility aliases for at least one release.
 
-For the project config contract, see `docs/config.md`.
+For the project config contract, see `docs/archive/config.md`.
 
-For the optional local cockpit boundary, see `docs/ui-architecture.md`.
+For the optional local cockpit boundary, see `docs/archive/ui-architecture.md`.
 
-For clean-install acceptance testing, see `docs/clean-install-uat.md`.
+For clean-install acceptance testing, see `docs/archive/clean-install-uat.md`.
 
-For early release readiness, see `docs/release-checklist.md`.
+For early release readiness, see `docs/archive/release-checklist.md`.
 
 ## Updating
 
-HyperAgent updates use normal Git workflows. See `docs/quickstart.md#12-update-later` for the copy-install and symlink-install command paths, then restart Codex Desktop or open a fresh thread after updating the installed skill.
+HyperAgent updates use normal Git workflows. See `docs/archive/quickstart.md#12-update-later` for the copy-install and symlink-install command paths, then restart Codex Desktop or open a fresh thread after updating the installed skill.
 
 ## What Is Included
 
 - `docs/hyperagent-prd.md`: product requirements and milestone plan.
-- `docs/concepts.md`: the Suit, Mission, Workshop, and Forge mental model.
-- `docs/roadmap.md`: product-state source of truth for shipped, accepted, in-review, deferred, stale, core, optional extension, and release-support surfaces.
-- `docs/extensions.md`: optional sensing, UI, Workbench, and reliability surfaces.
-- `docs/adapters.md`: adapter boundary for Codex-first alpha and future platforms.
+- `docs/archive/concepts.md`: the Suit, Mission, Workshop, and Forge mental model.
+- `docs/archive/roadmap.md`: product-state source of truth for shipped, accepted, in-review, deferred, stale, core, optional extension, and release-support surfaces.
+- `docs/archive/extensions.md`: optional sensing, UI, Workbench, and reliability surfaces.
+- `docs/archive/adapters.md`: adapter boundary for Codex-first alpha and future platforms.
 - `docs/safety-policy.md`: authority boundary and activation policy.
-- `docs/config.md`: `.hyperagent` schema, stable fields, adapter-owned fields, and verification command contract.
+- `docs/archive/config.md`: `.hyperagent` schema, stable fields, adapter-owned fields, and verification command contract.
 - `adapters/contract.md`: generic adapter contract for future platform work.
 - `adapters/codex.md`: Codex-specific adapter responsibilities for the current alpha.
-- `docs/clean-install-uat.md`: repeatable clean-install acceptance test for the README prompt.
-- `docs/dogfooding.md`: human UAT and repeated-use dogfooding guide.
+- `docs/archive/clean-install-uat.md`: repeatable clean-install acceptance test for the README prompt.
+- `docs/archive/dogfooding.md`: human UAT and repeated-use dogfooding guide.
 - `docs/evidence-policy.md`: committed-versus-local mission evidence policy, redaction checklist, and public example rules.
-- `docs/release-checklist.md`: alpha release criteria, clean-clone test, and update model.
-- `docs/releases/v0.1.0-alpha.md`: first alpha release notes.
-- `docs/releases/next-alpha.md`: unreleased next-alpha notes.
-- `docs/product-state.md`: compatibility pointer to the roadmap for older links.
-- `docs/ui-architecture.md`: optional local cockpit boundary, including read-mostly behavior, constrained commands, and markdown source-of-truth rules.
-- `docs/article-outline.md`: public essay outline for the Iron Man Suit thesis.
+- `docs/archive/release-checklist.md`: alpha release criteria, clean-clone test, and update model.
+- `docs/archive/releases/v0.1.0-alpha.md`: first alpha release notes.
+- `docs/archive/releases/next-alpha.md`: unreleased next-alpha notes.
+- `docs/archive/product-state.md`: compatibility pointer to the roadmap for older links.
+- `docs/archive/ui-architecture.md`: optional local cockpit boundary, including read-mostly behavior, constrained commands, and markdown source-of-truth rules.
+- `docs/archive/article-outline.md`: public essay outline for the Iron Man Suit thesis.
 - `skills/codex-hyperagent/`: Codex skill instructions.
 - `bin/hyperagent`: small command wrapper for `scripts/hyperagent.sh`.
 - `.hyperagent`: machine-readable project config for this development repo. Newly initialized projects use `.hyperagent/config.toml` plus HyperAgent-owned project folders under `.hyperagent/`.
@@ -217,7 +217,7 @@ The sensing smoke test records passed and failed checks, verifies changed-file d
 
 HyperAgent Mark I is a working local prototype. It includes a static README architecture visual, local markdown/shell workflows, and may include an optional local cockpit for inspecting those files. It does not provide a polished hosted dashboard, autonomously modify itself, or support every agent platform yet. The point of this version is to prove the Mission -> Workshop -> Forge loop with durable local artifacts and explicit human review.
 
-For the current status of `init`, `sense`, reliability evals, Forge checks, and other newer surfaces, see `docs/roadmap.md`.
+For the current status of `init`, `sense`, reliability evals, Forge checks, and other newer surfaces, see `docs/archive/roadmap.md`.
 
 ## License
 

@@ -365,8 +365,8 @@ Initial repo contents should include:
 
 - `README.md`: category definition, quick start, Codex setup, safety model.
 - `docs/hyperagent-prd.md`: this PRD.
-- `docs/concepts.md`: Suit, Mission, Workshop, Forge.
-- `docs/article-outline.md`: public essay draft.
+- `docs/archive/concepts.md`: Suit, Mission, Workshop, Forge.
+- `docs/archive/article-outline.md`: public essay draft.
 - `skills/codex-hyperagent/`: Codex skill instructions.
 - `hyperagent/`: local suit runtime, templates, and project conventions.
 - `.hyperagent/templates/mission-record.md`: initialized-project mission telemetry template.
@@ -402,7 +402,7 @@ We are building HyperAgent: an open source Iron Man Suit for AI agents.
 Your first task is not to implement a full product. Your first task is to create the smallest Codex-first HyperAgent prototype that proves the Mission -> Workshop loop.
 
 Read these inputs first:
-- docs/iron-man-suit-essence.md
+- docs/archive/iron-man-suit-essence.md
 - docs/hyperagent-prd.md
 - Codex skill documentation or examples available locally in the project/developer environment.
 
@@ -489,5 +489,5 @@ Deferred until the Codex adapter boundary is reviewed. Future platform work shou
 
 ## References
 
-- Iron Man Suit essence: `docs/iron-man-suit-essence.md`
+- Iron Man Suit essence: `docs/archive/iron-man-suit-essence.md`
 - Hyperagents paper: https://arxiv.org/abs/2603.19461

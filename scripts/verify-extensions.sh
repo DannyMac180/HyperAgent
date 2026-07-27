@@ -16,7 +16,7 @@ require_text() {
   grep -F -e "$text" "$file" >/dev/null || fail "missing text in $file: $text"
 }
 
-require_file docs/extensions.md
+require_file docs/archive/extensions.md
 require_file scripts/hyperagent-ui.mjs
 require_file ui/index.html
 require_file ui/styles.css
@@ -28,9 +28,9 @@ require_file evals/reliability-rubric.md
 require_file evals/fixtures/reliability/baseline-no-suit.md
 require_file evals/fixtures/reliability/hyperagent-suit.md
 
-require_text docs/extensions.md "Local UI Cockpit"
-require_text docs/extensions.md "Workbench Trace Enrichment"
-require_text docs/extensions.md "Reliability Scoring"
+require_text docs/archive/extensions.md "Local UI Cockpit"
+require_text docs/archive/extensions.md "Workbench Trace Enrichment"
+require_text docs/archive/extensions.md "Reliability Scoring"
 require_text scripts/hyperagent.sh "sense --doctor"
 require_text scripts/hyperagent.sh ".hyperagent-evidence"
 require_text scripts/hyperagent.sh "workbench/traces.jsonl"

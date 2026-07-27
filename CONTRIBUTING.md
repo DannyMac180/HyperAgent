@@ -9,7 +9,7 @@ HyperAgent is an early alpha, Codex-first, file-based project. Contributions sho
 - Do not add autonomous self-modification.
 - Do not broaden filesystem, shell, network, deployment, account, or secrets access without explicit review.
 - Prefer markdown templates, small shell scripts, and focused evals before adding heavier infrastructure.
-- Keep the PRD core small. Put optional UI, sensing, Workbench, reliability, or release-support work behind the extension/release boundary described in `docs/roadmap.md`.
+- Keep the PRD core small. Put optional UI, sensing, Workbench, reliability, or release-support work behind the extension/release boundary described in `docs/archive/roadmap.md`.
 - Use `docs/safety-policy.md` for authority-boundary checks and `docs/evidence-policy.md` before committing mission or trace evidence.
 
 ## How To Propose A Suit Upgrade
@@ -114,13 +114,13 @@ When a contribution changes user-visible product state, reconcile the inspectabl
 
 Checklist:
 
-- Update `docs/roadmap.md` when a surface becomes shipped, accepted, in review, deferred, or stale.
-- Keep `README.md` high level and link to `docs/roadmap.md` instead of duplicating detailed status tables.
-- Update `docs/releases/v0.1.0-alpha.md` only for first-alpha truth; put unreleased next-alpha notes in `docs/releases/next-alpha.md`.
+- Update `docs/archive/roadmap.md` when a surface becomes shipped, accepted, in review, deferred, or stale.
+- Keep `README.md` high level and link to `docs/archive/roadmap.md` instead of duplicating detailed status tables.
+- Update `docs/archive/releases/v0.1.0-alpha.md` only for first-alpha truth; put unreleased next-alpha notes in `docs/archive/releases/next-alpha.md`.
 - Add accepted capabilities to `hyperagent/capability-registry.md` only after a human decision record exists in `workshop/decisions/`.
 - Put implemented-but-unaccepted surfaces in the registry and backlog as `in review`, not `accepted`.
 - Update `workshop/backlog.md` when a new proposal-backed item, review candidate, or deferred PRD area changes.
-- Review `docs/architecture/hyperagent.mmd` and `docs/assets/hyperagent-architecture.svg` when user-visible modules are added, removed, renamed, or materially changed.
+- Review `docs/archive/hyperagent-v1.mmd` and `docs/archive/assets/hyperagent-architecture.svg` when user-visible modules are added, removed, renamed, or materially changed.
 - Run `sh scripts/verify-mvp.sh` after reconciliation.
 
 ## Pull Requests

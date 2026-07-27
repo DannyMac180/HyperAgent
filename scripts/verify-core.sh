@@ -26,14 +26,14 @@ require_file .hyperagent
 require_file adapters/contract.md
 require_file adapters/codex.md
 require_file docs/hyperagent-prd.md
-require_file docs/concepts.md
-require_file docs/config.md
-require_file docs/product-state.md
-require_file docs/roadmap.md
-require_file docs/adapters.md
+require_file docs/archive/concepts.md
+require_file docs/archive/config.md
+require_file docs/archive/product-state.md
+require_file docs/archive/roadmap.md
+require_file docs/archive/adapters.md
 require_file docs/evidence-policy.md
 require_file docs/safety-policy.md
-require_file docs/quickstart.md
+require_file docs/archive/quickstart.md
 require_file docs/examples/missions/public-safe-mission.md
 require_file skills/codex-hyperagent/SKILL.md
 require_file skills/codex-hyperagent/agents/openai.yaml
@@ -73,15 +73,15 @@ require_dir workshop/proposals
 require_dir workshop/decisions
 require_dir forge/reviews
 
-require_text docs/product-state.md "compatibility pointer"
-require_text docs/roadmap.md "PRD core"
-require_text docs/roadmap.md "Verification Tiers"
-require_text docs/roadmap.md "Optional extension"
-require_text docs/roadmap.md "PRD Milestone Map"
-require_text docs/roadmap.md "PRD Faithfulness Improvement Map"
-require_text docs/roadmap.md "Current Focus"
-require_text docs/roadmap.md "Deferred By Design"
-require_text docs/adapters.md "Adapter Responsibilities"
+require_text docs/archive/product-state.md "compatibility pointer"
+require_text docs/archive/roadmap.md "PRD core"
+require_text docs/archive/roadmap.md "Verification Tiers"
+require_text docs/archive/roadmap.md "Optional extension"
+require_text docs/archive/roadmap.md "PRD Milestone Map"
+require_text docs/archive/roadmap.md "PRD Faithfulness Improvement Map"
+require_text docs/archive/roadmap.md "Current Focus"
+require_text docs/archive/roadmap.md "Deferred By Design"
+require_text docs/archive/adapters.md "Adapter Responsibilities"
 require_text docs/evidence-policy.md "Default Boundary"
 require_text docs/safety-policy.md "human review required"
 require_text skills/codex-hyperagent/SKILL.md "Workshop Review Prompt"
@@ -129,17 +129,17 @@ require_text adapters/codex.md "Codex Adapter"
 require_text adapters/codex.md "Doctrine Ownership"
 require_text adapters/codex.md 'keep persistent behavior changes `human review required`'
 require_text README.md "v0.1.0-alpha"
-require_text README.md "docs/roadmap.md"
-require_text README.md "docs/extensions.md"
-require_text README.md "docs/config.md"
-require_text README.md "docs/dogfooding.md"
+require_text README.md "docs/archive/roadmap.md"
+require_text README.md "docs/archive/extensions.md"
+require_text README.md "docs/archive/config.md"
+require_text README.md "docs/archive/dogfooding.md"
 require_text README.md "https://github.com/DannyMac180/HyperAgent"
 require_text README.md "~/HyperAgent"
-require_text docs/quickstart.md "Manual Quickstart"
-require_text docs/quickstart.md "sh scripts/hyperagent.sh init --target"
-require_text docs/quickstart.md "sh scripts/hyperagent.sh mission new"
-require_text docs/quickstart.md "sh scripts/hyperagent.sh review workshop"
-require_text docs/quickstart.md "sh scripts/hyperagent.sh verify-config"
+require_text docs/archive/quickstart.md "Manual Quickstart"
+require_text docs/archive/quickstart.md "sh scripts/hyperagent.sh init --target"
+require_text docs/archive/quickstart.md "sh scripts/hyperagent.sh mission new"
+require_text docs/archive/quickstart.md "sh scripts/hyperagent.sh review workshop"
+require_text docs/archive/quickstart.md "sh scripts/hyperagent.sh verify-config"
 require_text evals/README.md "Verification Tiers"
 require_text evals/README.md "CLI Help Smoke Eval"
 require_text evals/README.md "Forge Audit Smoke Eval"

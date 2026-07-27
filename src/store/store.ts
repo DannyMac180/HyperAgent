@@ -211,6 +211,7 @@ export function openStore(storePath?: string): Store {
       // In-memory SQLite databases cannot use WAL; a failure is harmless here.
     }
     db.exec("PRAGMA foreign_keys = ON;");
+    db.exec("PRAGMA busy_timeout = 5000;");
     db.exec(STORE_DDL);
 
     const storedVersionRow = db

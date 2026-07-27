@@ -75,6 +75,13 @@ afterEach((): void => {
 });
 
 describe("store contract", (): void => {
+  test("sets a five-second busy timeout", (): void => {
+    const store = trackedStore(":memory:");
+    expect(store.db.query("PRAGMA busy_timeout").get()).toEqual({
+      timeout: 5000,
+    });
+  });
+
   test("opening the same store twice is idempotent", (): void => {
     const path = tempStorePath();
     const first = trackedStore(path);

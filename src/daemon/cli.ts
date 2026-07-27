@@ -72,10 +72,7 @@ import type {
   WorkshopProposalFilter,
   WorkshopProposalRow,
 } from "../workshop/queue.ts";
-import {
-  acquireWorkshopRunGuard,
-  runWorkshop,
-} from "../workshop/run.ts";
+import { runWorkshop } from "../workshop/run.ts";
 import type {
   WorkshopRunResult,
   WorkshopStage,
@@ -308,13 +305,9 @@ async function watchCommand(args: string[]): Promise<number> {
     try {
       do {
         workshopPending = false;
-        const guard = await acquireWorkshopRunGuard({ dataDir });
-        if (!guard.acquired) {
-          console.error(
-            `Workshop skipped: ${guard.diagnostics.join("; ") || "another run is active"}`,
-          );
-          continue;
-        }
+        // runWorkshop acquires the cross-process run lock itself. Taking it
+        // here as well would deadlock the daemon against its own run, which
+        // would then report "already running" and never execute the pipeline.
         try {
           const result = await runWorkshopPipeline(dataDir);
           printWorkshopRunSummary(result);
@@ -322,8 +315,6 @@ async function watchCommand(args: string[]): Promise<number> {
           const message =
             error instanceof Error ? error.message : String(error);
           console.error(`Workshop failed: ${message}`);
-        } finally {
-          await guard.release();
         }
       } while (workshopPending && !stopping);
     } catch (error: unknown) {

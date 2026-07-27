@@ -4,7 +4,10 @@ evals/out/
 # into a reviewed, redacted public example under docs/examples/missions/.
 .hyperagent-evidence/
 .workflow/
-missions/
+# Root-anchored on purpose: the private v1 evidence dir is `/missions/` only.
+# An unanchored `missions/` also matches `src/missions/`, which would silently
+# untrack the v2 mission-generation source (DAN-201).
+/missions/
 
 # v2 (Bun) toolchain
 node_modules/

@@ -18,13 +18,22 @@ import type { EventInput } from "../../schema/events.ts";
 import type {
   ConformanceContext,
   ConformanceDescriptor,
+  GateFixtureSet,
+  InjectFixtureSet,
   ObserveFixtureSet,
   ObserveVariant,
   ResumeFixture,
   TruncationFixture,
 } from "../../conformance/types.ts";
+import type {
+  GateDecision,
+  GateHookKind,
+} from "../../gate/eval.ts";
+import type { MemoryRow } from "../../memory/store.ts";
 import goldenEvents from "./conformance-golden.json" with { type: "json" };
 import { ClaudeCodeAdapter } from "./adapter.ts";
+import { ClaudeCodeGateAdapter } from "./gate.ts";
+import { ClaudeCodeInjectAdapter } from "./inject.ts";
 
 export const CLAUDE_CODE_DIALECT_VERSION =
   "claude-code-jsonl-2026-07-26-v1";
@@ -323,6 +332,171 @@ async function createObserveFixtures(
   };
 }
 
+async function createInjectFixtures(
+  context: ConformanceContext,
+): Promise<InjectFixtureSet> {
+  const tempRoot: string = requireTempRoot(context);
+  const refusalRoot: string = join(tempRoot, "claude-code-inject-home");
+  await mkdir(refusalRoot, { recursive: true });
+
+  const sentinel = "CLAUDE_CODE_CONFORMANCE_MEMORY_SENTINEL";
+  const timestamp = "2026-07-27T12:00:00.000Z";
+  const memories: MemoryRow[] = [{
+    id: "01K14CLAUDECODECONFORMANCE01",
+    claim: `${sentinel}: preserve user-authored content around managed memory.`,
+    kind: "gotcha",
+    scope: "repo",
+    scope_key: "claude-code-conformance",
+    confidence: 0.98,
+    status: "approved",
+    evidence: [{
+      session_id: "claude-code:conformance-inject",
+      raw_ref: "fixture://claude-code/inject",
+    }],
+    source: "manual",
+    claim_hash:
+      "8e850bf59fd9ac32aa1844e371c0e7d96b30c91709221145f5f76968da2d93f2",
+    created_at: timestamp,
+    updated_at: timestamp,
+    last_validated_at: timestamp,
+  }];
+
+  return {
+    adapter: new ClaudeCodeInjectAdapter({ homeDir: refusalRoot }),
+    memories,
+    sentinel,
+    managedArtifactPath(repoPath: string): string {
+      return join(repoPath, "CLAUDE.local.md");
+    },
+    foreignContent:
+      "# Local Claude instructions\n\nKeep this user-authored guidance intact.\n",
+    refusalRoot,
+  };
+}
+
+function gateDecision(kind: GateHookKind): GateDecision {
+  if (kind === "pre_tool_use") {
+    return {
+      kind: "deny",
+      reason: "Conformance fixture denied this tool call.",
+      matchedRules: ["fixture.pre-tool-deny"],
+      failedChecks: [],
+    };
+  }
+  if (kind === "stop") {
+    return {
+      kind: "block",
+      reason: "Conformance fixture requires the session to continue.",
+      matchedRules: ["fixture.stop-block"],
+      failedChecks: [],
+    };
+  }
+  return {
+    kind: "allow",
+    reason: "Conformance fixture observed a successful tool call.",
+    matchedRules: [],
+    failedChecks: [],
+  };
+}
+
+function validateGateHookOutput(
+  kind: GateHookKind,
+  decision: GateDecision,
+  rendered: string,
+): string | null {
+  if (kind === "post_tool_use") {
+    return rendered === ""
+      ? null
+      : `post_tool_use expected empty output, got ${JSON.stringify(rendered)}`;
+  }
+
+  let actual: unknown;
+  try {
+    actual = JSON.parse(rendered);
+  } catch (error: unknown) {
+    return `${kind} expected JSON output: ${errorMessage(error)}`;
+  }
+
+  const expected: unknown = kind === "pre_tool_use"
+    ? {
+      hookSpecificOutput: {
+        hookEventName: "PreToolUse",
+        permissionDecision: "deny",
+        permissionDecisionReason: decision.reason ?? "",
+      },
+    }
+    : {
+      decision: "block",
+      reason: decision.reason ?? "",
+    };
+  return JSON.stringify(actual) === JSON.stringify(expected)
+    ? null
+    : `${kind} output mismatch: expected ${JSON.stringify(expected)}, got ${
+      JSON.stringify(actual)
+    }`;
+}
+
+async function createGateFixtures(
+  context: ConformanceContext,
+): Promise<GateFixtureSet> {
+  const tempRoot: string = requireTempRoot(context);
+  const homeDir: string = join(tempRoot, "claude-code-gate-home");
+  const dataDir: string = join(tempRoot, "claude-code-gate-data");
+  await Promise.all([
+    mkdir(homeDir, { recursive: true }),
+    mkdir(dataDir, { recursive: true }),
+  ]);
+
+  return {
+    adapter: new ClaudeCodeGateAdapter({ dataDir, homeDir }),
+    managedArtifactPath(repoPath: string): string {
+      return join(repoPath, ".claude", "settings.local.json");
+    },
+    foreignContent: `${JSON.stringify({
+      permissions: {
+        allow: ["Read(./user-owned/**)"],
+      },
+    }, null, 2)}\n`,
+    hookStdin(kind: GateHookKind): unknown {
+      const common = {
+        session_id: `conformance-${kind}`,
+        cwd: join(tempRoot, "hook-repo"),
+      };
+      if (kind === "stop") {
+        return {
+          ...common,
+          stop_hook_active: false,
+        };
+      }
+      if (kind === "post_tool_use") {
+        return {
+          ...common,
+          tool_name: "Bash",
+          tool_input: { command: "bun test" },
+          tool_response: { interrupted: false },
+        };
+      }
+      return {
+        ...common,
+        tool_name: "Read",
+        tool_input: { file_path: join(tempRoot, "hook-repo", "README.md") },
+      };
+    },
+    decisionFor: gateDecision,
+    validateHookOutput: validateGateHookOutput,
+    malformedHookStdin(): readonly unknown[] {
+      return [
+        null,
+        42,
+        "string",
+        {},
+        { session_id: "" },
+        { session_id: "x" },
+      ];
+    },
+  };
+}
+
 /**
  * To regenerate conformance-golden.json after a dialect-version bump, run the
  * descriptor's observe factory in a disposable system temp root, discover and
@@ -343,5 +517,7 @@ export const claudeCodeConformanceDescriptor: ConformanceDescriptor = {
   forbiddenTargetPatterns: [".claude", ".hyperagent"],
   factories: {
     observe: createObserveFixtures,
+    inject: createInjectFixtures,
+    gate: createGateFixtures,
   },
 };

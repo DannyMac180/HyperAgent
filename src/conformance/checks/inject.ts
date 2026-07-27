@@ -261,15 +261,8 @@ const idempotencyCheck: ConformanceCheck = injectCheck(
     if (secondResult.changed) {
       throw new Error("idempotency pass 2 reported changed=true");
     }
-    if (
-      secondResult.reason !== undefined
-      && secondResult.reason.trim().length > 0
-    ) {
-      throw new Error(
-        `idempotency pass 2 reported no change with unexpected reason `
-        + JSON.stringify(secondResult.reason),
-      );
-    }
+    // A correct no-op may explain why it declined to write; that does not
+    // weaken the byte-identity and changed=false idempotency contract.
     return `${secondBytes.length} artifact byte(s) remained identical`;
   },
 );

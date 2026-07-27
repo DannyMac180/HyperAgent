@@ -1,6 +1,7 @@
 import {
   mkdirSync,
   mkdtempSync,
+  realpathSync,
   rmSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
@@ -338,8 +339,22 @@ export async function runConformance(
    * creates. A supplied root remains caller-owned even when a run fails.
    */
   const ownsTempRoot: boolean = options.tempRoot === undefined;
-  const tempRoot: string = options.tempRoot
-    ?? mkdtempSync(join(tmpdir(), "hyperagent-conformance-"));
+  /**
+   * Adapters legitimately canonicalize targets with realpathSync before
+   * deciding refusals or writing files. Canonicalizing once here keeps every
+   * suite path comparison like-for-like on platforms such as macOS, where
+   * /var is a symlink to /private/var.
+   */
+  const tempRoot: string = (() => {
+    if (options.tempRoot !== undefined) {
+      mkdirSync(options.tempRoot, { recursive: true });
+      return realpathSync(options.tempRoot);
+    }
+    const created: string = mkdtempSync(
+      join(tmpdir(), "hyperagent-conformance-"),
+    );
+    return realpathSync(created);
+  })();
   const context: ConformanceContext = { tempRoot };
   const states = new Map<ConformanceCapability, FixtureState>();
 

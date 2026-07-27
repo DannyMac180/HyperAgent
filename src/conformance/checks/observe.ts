@@ -218,6 +218,51 @@ function compact(value: unknown): string {
   return rendered.length <= 600 ? rendered : `${rendered.slice(0, 597)}...`;
 }
 
+function deterministicJson(value: unknown): string {
+  const serialized: string | undefined = JSON.stringify(
+    value,
+    (_key: string, candidate: unknown): unknown => {
+      if (!isPlainObject(candidate)) {
+        return candidate;
+      }
+      return Object.fromEntries(
+        Object.keys(candidate)
+          .sort()
+          .map((key: string): [string, unknown] => [key, candidate[key]]),
+      );
+    },
+  );
+  return serialized ?? "undefined";
+}
+
+/**
+ * The canonical event schema does not guarantee ordering among events that
+ * share a timestamp. Pinning that arbitrary tie-break would make the golden
+ * check assert behavior outside the contract and would be flaky for adapters
+ * whose ids are derived from absolute artifact paths. Sorting normalized
+ * events by recursively key-sorted JSON keeps event count and content fully
+ * pinned while normalizing away only that unsupported ordering distinction.
+ */
+function canonicalGoldenOrder(events: readonly unknown[]): unknown[] {
+  return events
+    .map((event: unknown): { event: unknown; key: string } => ({
+      event,
+      key: deterministicJson(event),
+    }))
+    .sort(
+      (
+        left: { event: unknown; key: string },
+        right: { event: unknown; key: string },
+      ): number => {
+        if (left.key === right.key) {
+          return 0;
+        }
+        return left.key < right.key ? -1 : 1;
+      },
+    )
+    .map(({ event }: { event: unknown; key: string }): unknown => event);
+}
+
 function sameStringSet(
   left: ReadonlySet<string>,
   right: ReadonlySet<string>,
@@ -323,20 +368,27 @@ const goldenCheck: ConformanceCheck = observeCheck(
       (event: EventInput): unknown => fixtures.normalizeEvent(event, context),
     );
     const expected: readonly unknown[] = fixtures.goldenEvents;
-    if (!isDeepStrictEqual(actual, expected)) {
-      const sharedLength: number = Math.min(actual.length, expected.length);
+    const canonicalActual: unknown[] = canonicalGoldenOrder(actual);
+    const canonicalExpected: unknown[] = canonicalGoldenOrder(expected);
+    if (!isDeepStrictEqual(canonicalActual, canonicalExpected)) {
+      const sharedLength: number = Math.min(
+        canonicalActual.length,
+        canonicalExpected.length,
+      );
       let firstDifference: number = sharedLength;
       for (let index = 0; index < sharedLength; index += 1) {
-        if (!isDeepStrictEqual(actual[index], expected[index])) {
+        if (
+          !isDeepStrictEqual(canonicalActual[index], canonicalExpected[index])
+        ) {
           firstDifference = index;
           break;
         }
       }
       throw new Error(
         `golden mismatch at index ${firstDifference}; `
-        + `expected=${compact(expected[firstDifference])}; `
-        + `actual=${compact(actual[firstDifference])}; `
-        + `lengths=${expected.length}/${actual.length}`,
+        + `expected=${compact(canonicalExpected[firstDifference])}; `
+        + `actual=${compact(canonicalActual[firstDifference])}; `
+        + `lengths=${canonicalExpected.length}/${canonicalActual.length}`,
       );
     }
     return `${actual.length} normalized event(s) matched`;

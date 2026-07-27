@@ -1,0 +1,36 @@
+[
+  {
+    "id": "<ID>",
+    "ts": "2026-07-26T15:00:00.000Z",
+    "type": "session_start",
+    "session_id": "claude-code:44444444-4444-4444-8444-444444444444",
+    "vendor": "claude-code",
+    "adapter_version": "0.1.0",
+    "raw_ref": "<TEMP>/claude-code-observe-clean/projects/-conformance-project/44444444-4444-4444-8444-444444444444.jsonl#L1",
+    "payload": {
+      "agent": "claude-code",
+      "parent_session_id": null,
+      "model": "claude-opus-4",
+      "harness_version": "1.0.42",
+      "repo": "/home/user/project",
+      "cwd": "/home/user/project",
+      "git_branch": "main"
+    }
+  },
+  {
+    "id": "<ID>",
+    "ts": "2026-07-26T15:00:00.000Z",
+    "type": "turn_start",
+    "session_id": "claude-code:44444444-4444-4444-8444-444444444444",
+    "vendor": "claude-code",
+    "adapter_version": "0.1.0",
+    "raw_ref": "<TEMP>/claude-code-observe-clean/projects/-conformance-project/44444444-4444-4444-8444-444444444444.jsonl#L1",
+    "payload": {
+      "turn_index": 0,
+      "role": "user",
+      "text_digest": "54bfab71bde052851860a4e4f39c56eb6db331c01bced5a1ae0b681964116637",
+      "text_chars": 17,
+      "is_correction": null
+    }
+  }
+]

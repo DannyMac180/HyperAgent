@@ -320,13 +320,13 @@ describe("gate outcome spool", () => {
     }
   });
 
-  test("fails open with the allowing sentinel on counter I/O failure", async (): Promise<void> => {
+  test("treats counter I/O failure as a first bounce so enforcement is not inverted", async (): Promise<void> => {
     const dataDir: string = makeTempDir("hyperagent-bounce-io-failure-");
     writeFileSync(gateDir(dataDir), "not a directory");
 
     expect(
       await incrementBounceCount(dataDir, "claude-code:blocked-counter"),
-    ).toBe(Number.MAX_SAFE_INTEGER);
+    ).toBe(1);
     expect(
       await readBounceCount(dataDir, "claude-code:blocked-counter"),
     ).toBe(0);
@@ -346,7 +346,7 @@ describe("gate outcome spool", () => {
         expect(await appendOutcome(dataDir, outcome())).toBe(false);
         expect(
           await incrementBounceCount(dataDir, "claude-code:permission-denied"),
-        ).toBe(Number.MAX_SAFE_INTEGER);
+        ).toBe(1);
       } finally {
         chmodSync(gateDir(dataDir), 0o700);
       }

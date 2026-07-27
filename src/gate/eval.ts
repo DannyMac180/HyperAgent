@@ -161,6 +161,31 @@ async function requireOutcome(
   }
 }
 
+/**
+ * Once a deny/block decision is computed, recording it is bookkeeping —
+ * a spool-write or deadline failure must not invert enforcement into an
+ * allow. Fail-open remains the doctrine only for errors that prevent
+ * REACHING a decision.
+ */
+async function bestEffortOutcome(
+  context: EvaluationContext,
+  gateOutcome: GateOutcome,
+): Promise<void> {
+  try {
+    const appended: boolean = await appendOutcome(
+      context.options.dataDir,
+      gateOutcome,
+    );
+    if (!appended) {
+      writeDiagnostic(
+        new Error("GATE_SPOOL_WRITE_ERROR: gate outcome was not recorded."),
+      );
+    }
+  } catch (error: unknown) {
+    writeDiagnostic(error);
+  }
+}
+
 function writeDiagnostic(error: unknown): void {
   try {
     const message: string = redactSummary(errorMessage(error));
@@ -317,17 +342,19 @@ async function evaluatePolicyHook(
   const reason: string | undefined = blockingMatches.length > 0
     ? denyReason(blockingMatches)
     : undefined;
-  await requireOutcome(
+  const preToolOutcome = outcome(
     context,
-    outcome(
-      context,
-      "pre_tool_use",
-      kind,
-      reason ?? "Pre-tool use allowed.",
-      ruleIds,
-      [],
-    ),
+    "pre_tool_use",
+    kind,
+    reason ?? "Pre-tool use allowed.",
+    ruleIds,
+    [],
   );
+  if (kind === "deny") {
+    await bestEffortOutcome(context, preToolOutcome);
+  } else {
+    await requireOutcome(context, preToolOutcome);
+  }
   return decision(
     kind,
     ruleIds,
@@ -443,10 +470,17 @@ async function evaluateStopHook(
     return decision("allow");
   }
 
-  const bounceCount: number = await incrementBounceCount(
-    dataDir,
-    input.sessionId,
-  );
+  // Contract failures are already computed; the counter is loop-guard
+  // bookkeeping. If it cannot persist, treat this as a first bounce and
+  // still block — stop_hook_active plus the harness's own consecutive-block
+  // cap bound the loop even when the counter never advances.
+  let bounceCount: number;
+  try {
+    bounceCount = await incrementBounceCount(dataDir, input.sessionId);
+  } catch (error: unknown) {
+    writeDiagnostic(error);
+    bounceCount = 1;
+  }
   ensureWithinDeadline(context);
   const maxBounces: number = context.options.maxBounces
     ?? DEFAULT_MAX_BOUNCES;
@@ -471,7 +505,7 @@ async function evaluateStopHook(
   }
 
   const reason: string = blockReason(failedChecks);
-  await requireOutcome(
+  await bestEffortOutcome(
     context,
     outcome(
       context,

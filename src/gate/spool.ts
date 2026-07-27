@@ -352,9 +352,12 @@ export async function incrementBounceCount(
     const path: string = bounceCounterPath(dataDir, sessionId);
     const current: BounceRead = await readBounceFile(path);
     if (current.ioFailed) {
-      // A high sentinel trips the bounce guard toward ALLOW, so broken
-      // bookkeeping can never trap a user in repeated denials.
-      return Number.MAX_SAFE_INTEGER;
+      // Contract failures are computed before the counter runs; broken
+      // bookkeeping must not invert that enforcement into an allow. A
+      // first-bounce result still blocks exactly once — stop_hook_active
+      // and the harness's own consecutive-block cap bound the loop even
+      // when the counter never advances, so this can never trap a user.
+      return 1;
     }
     const next: number = Math.min(
       current.value + 1,
@@ -363,8 +366,7 @@ export async function incrementBounceCount(
     await writeFile(path, `${next}\n`, "utf8");
     return next;
   } catch {
-    // Counter persistence is advisory; I/O failure must fail open.
-    return Number.MAX_SAFE_INTEGER;
+    return 1;
   }
 }
 

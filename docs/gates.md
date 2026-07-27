@@ -6,7 +6,9 @@ The suit already observes and remembers. Gates are how it *acts*: a forbidden ac
 
 ## The two doctrines (they are deliberately asymmetric)
 
-**Fail open on infrastructure.** Bad stdin, a missing or malformed policy, an unwritable spool, an overrun deadline — any internal problem allows the action. A bug in HyperAgent must never brick your agent.
+**Fail open on infrastructure.** Bad stdin, a missing or malformed policy, an overrun deadline — any internal problem that prevents *reaching* a decision allows the action. A bug in HyperAgent must never brick your agent.
+
+**But a computed decision is never inverted by bookkeeping.** Once a block rule has matched or a contract failure is established, recording the outcome (spool append, bounce counter) is telemetry — if it fails, the deny/block stands and a diagnostic goes to stderr. Fail-open applies only to errors upstream of the decision; otherwise a full disk or a tampered spool directory would silently disarm every enabled block rule.
 
 **Fail closed on policy.** An actual match against an enabled `block` rule denies, even when that is inconvenient.
 

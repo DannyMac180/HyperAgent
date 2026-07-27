@@ -280,8 +280,10 @@ describe("runGateEval pre_tool_use", () => {
   });
 
   test.skipIf(runningAsRoot)(
-    "fails open when the spool directory is unwritable",
+    "still denies a computed block when the spool directory is unwritable",
     async (): Promise<void> => {
+      // A deny that is already computed is enforcement; recording it is
+      // bookkeeping. Telemetry loss must never invert the decision.
       const root: string = makeTempDir("hyperagent-eval-unwritable-");
       const dataDir: string = join(root, "data");
       const gateDir: string = join(dataDir, "gate");
@@ -300,8 +302,78 @@ describe("runGateEval pre_tool_use", () => {
           ]),
         });
 
+        expect(decision.kind).toBe("deny");
+        expect(decision.matchedRules).toEqual(["would-block"]);
+      } finally {
+        chmodSync(gateDir, 0o700);
+      }
+    },
+  );
+
+  test.skipIf(runningAsRoot)(
+    "fails open on an unwritable spool when no block rule matched",
+    async (): Promise<void> => {
+      // Without a computed deny there is no decision to protect; losing the
+      // outcome record is an infrastructure failure and allows.
+      const root: string = makeTempDir("hyperagent-eval-unwritable-allow-");
+      const dataDir: string = join(root, "data");
+      const gateDir: string = join(dataDir, "gate");
+      mkdirSync(gateDir, { recursive: true });
+      chmodSync(gateDir, 0o500);
+      try {
+        const decision: GateDecision = await runGateEval({
+          dataDir,
+          input: hookInput(root, { command: "harmless" }),
+          policyLoad: loadedPolicy([
+            policyRule({
+              id: "would-block",
+              action: "block",
+              match: { commandPattern: "dangerous" },
+            }),
+          ]),
+        });
+
         expect(decision.kind).toBe("allow");
         expect(decision.failedOpen).toBe(true);
+      } finally {
+        chmodSync(gateDir, 0o700);
+      }
+    },
+  );
+
+  test.skipIf(runningAsRoot)(
+    "stop still blocks an unmet contract when the spool directory is unwritable",
+    async (): Promise<void> => {
+      // Same inversion class as the pre_tool_use deny: computed contract
+      // failures are enforcement; spool + bounce-counter writes are
+      // bookkeeping and must not flip a block into an allow.
+      const root: string = makeTempDir("hyperagent-eval-stop-unwritable-");
+      const dataDir: string = join(root, "data");
+      const gateDir: string = join(dataDir, "gate");
+      mkdirSync(gateDir, { recursive: true });
+      writeContract(root, contract());
+      // Record a mutation while the spool is writable, then lose the spool
+      // before Stop — the realistic mid-session failure.
+      await runGateEval({
+        dataDir,
+        input: hookInput(root, {
+          hook: "post_tool_use",
+          toolName: "Write",
+          writePaths: [join(root, "src", "changed.ts")],
+          toolPassed: true,
+        }),
+        policyLoad: loadedPolicy([]),
+      });
+      chmodSync(gateDir, 0o500);
+      try {
+        const decision: GateDecision = await runGateEval({
+          dataDir,
+          input: hookInput(root, { hook: "stop" }),
+          policyLoad: loadedPolicy([]),
+        });
+
+        expect(decision.kind).toBe("block");
+        expect(decision.failedChecks).toEqual(["unit-tests"]);
       } finally {
         chmodSync(gateDir, 0o700);
       }

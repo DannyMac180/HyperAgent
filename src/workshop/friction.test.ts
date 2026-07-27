@@ -175,9 +175,14 @@ describe("normalizeSignature", (): void => {
     ).toBe("index.ts:<line> and readme.md:<line>, failed");
   });
 
-  test("replaces standalone integer runs of at least two digits", (): void => {
+  test("replaces all standalone integer runs, including single digits", (): void => {
     expect(normalizeSignature("attempt 12 of 345, x9 and v1")).toBe(
       "attempt <n> of <n>, x9 and v1",
+    );
+    // Regression for the live-probe fragmentation defect: v6.24.0 and v6.3.0
+    // must produce the same signature.
+    expect(normalizeSignature("re-read v6.24.0.md")).toBe(
+      normalizeSignature("re-read v6.3.0.md"),
     );
   });
 

@@ -128,7 +128,11 @@ const CLOCK_TIME_PATTERN = /\b\d{2}:\d{2}:\d{2}(?:\.\d+)?\b/gu;
 const PID_PATTERN = /\bpid\s*(?:=|:)?\s*\d+\b/giu;
 const LINE_COLUMN_PATTERN = /:\d+:\d+(?=$|[\s"'`,;)\]}])/gu;
 const LINE_PATTERN = /:\d+(?=$|[\s"'`,;)\]}])/gu;
-const INTEGER_PATTERN = /\b\d{2,}\b/gu;
+// All standalone integer runs, including single digits: live-probe data showed
+// `v6.24.0` and `v6.3.0` fragmenting into separate clusters because only the
+// two-digit component normalized. Fragmentation silently under-counts friction;
+// an over-merged cluster is still splittable by a human via its evidence links.
+const INTEGER_PATTERN = /\b\d+\b/gu;
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);

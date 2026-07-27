@@ -1,10 +1,36 @@
 import { existsSync, watch } from "node:fs";
 import type { FSWatcher } from "node:fs";
-import { mkdir, readdir, stat, writeFile } from "node:fs/promises";
+import { mkdir, readFile, readdir, stat, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import type {
+  GateAdapter,
+  GateInstallResult,
+} from "../adapters/types.ts";
+import {
+  loadContract,
+} from "../gate/contract.ts";
+import {
+  listViolations,
+} from "../gate/detect.ts";
+import type {
+  PolicyViolation,
+} from "../gate/detect.ts";
+import {
+  runGateEval,
+} from "../gate/eval.ts";
+import type {
+  GateDecision,
+  GateHookKind,
+} from "../gate/eval.ts";
+import {
+  policyPath,
+} from "../gate/paths.ts";
+import {
+  loadPolicy,
+} from "../gate/policy.ts";
 import {
   buildMissionInput,
   generateMission,
@@ -37,6 +63,9 @@ import type {
 } from "../scoring/score.ts";
 import { openStore } from "../store/store.ts";
 import {
+  readGateHealth,
+} from "./gate-ingest.ts";
+import {
   readIngestState,
   runIngestOnce,
 } from "./ingest.ts";
@@ -45,7 +74,12 @@ import type {
   IngestRunResult,
 } from "./ingest.ts";
 import { syncMemoryTargets } from "./memory-sync.ts";
-import { builtinAdaptersForProjectsRoot } from "./registry.ts";
+import {
+  builtinAdaptersForProjectsRoot,
+  builtinGateAdapters,
+  gateAdapterForHarness,
+  gateHarnessNames,
+} from "./registry.ts";
 
 interface CommonOptions {
   dataDir?: string;
@@ -66,6 +100,16 @@ const usage = `Usage:
   bun src/daemon/cli.ts memory retire <id> [--data-dir D]
   bun src/daemon/cli.ts memory add --claim C --kind K --scope S [--scope-key K] [--data-dir D]
   bun src/daemon/cli.ts memory sync [--repo <path>] [--data-dir D]
+  bun src/daemon/cli.ts gate install [--repo P] [--harness H] [--data-dir D]
+  bun src/daemon/cli.ts gate uninstall [--repo P] [--harness H] [--data-dir D]
+  bun src/daemon/cli.ts gate status [--repo P] [--harness H] [--data-dir D]
+  bun src/daemon/cli.ts gate policy show [--data-dir D]
+  bun src/daemon/cli.ts gate policy validate [--data-dir D]
+  bun src/daemon/cli.ts gate contract show [--repo P]
+  bun src/daemon/cli.ts gate contract validate [--repo P]
+  bun src/daemon/cli.ts gate test --hook <PreToolUse|PostToolUse|Stop> [--harness H] [--data-dir D] [--stdin-file F]
+  bun src/daemon/cli.ts gate eval --harness H --hook <PreToolUse|PostToolUse|Stop> [--data-dir D]
+  bun src/daemon/cli.ts violations [--session S] [--days N] [--data-dir D]
   bun src/daemon/cli.ts install-plist [--write]
 `;
 
@@ -283,6 +327,45 @@ function statusCommand(args: string[]): number {
       `events: ${formatTotalEventCount(eventCounts)}`,
   );
   return 0;
+}
+
+function gateHealthRepos(dataDir: string): string[] {
+  const dbPath = join(dataDir, "hyperagent.db");
+  if (!existsSync(dbPath)) {
+    return [];
+  }
+  const store = openStore(dbPath);
+  try {
+    return [...new Set(
+      store.getSessions().flatMap((session): string[] =>
+        session.repo === null ? [] : [session.repo]
+      ),
+    )].sort();
+  } finally {
+    store.close();
+  }
+}
+
+async function statusWithGateHealthCommand(args: string[]): Promise<number> {
+  const exitCode = statusCommand(args);
+  const options = parseOptions(args, new Set(["--data-dir"]));
+  const dataDir =
+    stringOption(options, "--data-dir") ?? join(homedir(), ".hyperagent");
+  const health = await readGateHealth({
+    dataDir,
+    repos: gateHealthRepos(dataDir),
+  });
+  console.log(`Gate policy: ${health.policyState}.`);
+  if (health.policyError !== undefined) {
+    console.log(`Gate policy error: ${health.policyError}`);
+  }
+  console.log(`Gate spool backlog: ${health.spoolBacklogBytes} bytes.`);
+  for (const repo of health.repos) {
+    console.log(
+      `Gate repo ${repo.repo}: ${repo.state}; ${repo.detail}`,
+    );
+  }
+  return exitCode;
 }
 
 interface EventCounts {
@@ -931,6 +1014,314 @@ async function memoryCommand(args: string[]): Promise<number> {
   );
 }
 
+function gateDataDir(
+  options: Map<string, string | true>,
+): string {
+  return stringOption(options, "--data-dir")
+    ?? join(homedir(), ".hyperagent");
+}
+
+function gateHookKind(value: string): GateHookKind {
+  if (value === "PreToolUse") {
+    return "pre_tool_use";
+  }
+  if (value === "PostToolUse") {
+    return "post_tool_use";
+  }
+  if (value === "Stop") {
+    return "stop";
+  }
+  throw new ArgumentError(
+    `Invalid value for --hook: ${value}; expected PreToolUse, PostToolUse, or Stop.`,
+  );
+}
+
+/**
+ * Resolves `--harness` through the adapter registry rather than a hardcoded
+ * name, so the CLI carries no vendor knowledge and a new harness is a registry
+ * entry, not an edit here. Defaults to the sole registered adapter when the
+ * flag is absent and optional.
+ */
+function gateAdapter(
+  options: Map<string, string | true>,
+  dataDir: string,
+  harnessRequired: boolean,
+): GateAdapter {
+  const harness = stringOption(options, "--harness");
+  const names = gateHarnessNames();
+  if (harness === undefined) {
+    const [only] = builtinGateAdapters({ dataDir });
+    if (harnessRequired || only === undefined) {
+      throw new ArgumentError(
+        `Missing value for --harness; expected one of ${names.join(", ")}.`,
+      );
+    }
+    return only;
+  }
+  const selected = gateAdapterForHarness(harness, { dataDir });
+  if (selected === undefined) {
+    throw new ArgumentError(
+      `Invalid value for --harness: ${harness}; expected one of ${names.join(", ")}.`,
+    );
+  }
+  return selected;
+}
+
+function printGateInstallResult(result: GateInstallResult): void {
+  console.log(`${result.changed ? "changed" : "unchanged"}\t${result.targetPath}`);
+  if (result.reason !== undefined) {
+    console.log(`  ${result.reason}`);
+  }
+}
+
+async function gateInstallCommand(
+  action: "install" | "uninstall",
+  args: string[],
+): Promise<number> {
+  const options = parseOptions(args, new Set(["--repo", "--data-dir", "--harness"]));
+  const dataDir = gateDataDir(options);
+  const repo = stringOption(options, "--repo") ?? process.cwd();
+  const adapter = gateAdapter(options, dataDir, false);
+  const result = action === "install"
+    ? await adapter.install(repo)
+    : await adapter.uninstall(repo);
+  printGateInstallResult(result);
+  return 0;
+}
+
+async function gateStatusCommand(args: string[]): Promise<number> {
+  const options = parseOptions(args, new Set(["--repo", "--data-dir", "--harness"]));
+  const dataDir = gateDataDir(options);
+  const repo = stringOption(options, "--repo") ?? process.cwd();
+  const status = await gateAdapter(options, dataDir, false).status(repo);
+  console.log(
+    `${status.state}\t${status.targetPath}\t${status.ownedEntries}\t${status.detail}`,
+  );
+  return 0;
+}
+
+function gatePolicyCommand(args: string[]): number {
+  const subcommand = args[0];
+  const options = parseOptions(args.slice(1), new Set(["--data-dir"]));
+  const loaded = loadPolicy(policyPath(gateDataDir(options)));
+  if (subcommand === "show") {
+    process.stdout.write(`${JSON.stringify(loaded.policy, null, 2)}\n`);
+    if (loaded.state === "invalid") {
+      console.error(`Policy: ${loaded.state}; ${loaded.error ?? "unknown error"}`);
+      return 1;
+    }
+    return 0;
+  }
+  if (subcommand === "validate") {
+    console.log(`Policy: ${loaded.state}; path: ${loaded.path}`);
+    if (loaded.error !== undefined) {
+      console.error(loaded.error);
+    }
+    return loaded.state === "invalid" ? 1 : 0;
+  }
+  throw new ArgumentError(
+    `Unknown gate policy subcommand: ${subcommand ?? "(missing)"}`,
+  );
+}
+
+function gateContractCommand(args: string[]): number {
+  const subcommand = args[0];
+  const options = parseOptions(args.slice(1), new Set(["--repo"]));
+  const repo = stringOption(options, "--repo") ?? process.cwd();
+  const loaded = loadContract(repo);
+  if (subcommand === "show") {
+    if (loaded.contract === null) {
+      console.log(`Contract: ${loaded.state}; path: ${loaded.path}`);
+      if (loaded.error !== undefined) {
+        console.error(loaded.error);
+      }
+      return loaded.state === "invalid" ? 1 : 0;
+    }
+    process.stdout.write(`${JSON.stringify(loaded.contract, null, 2)}\n`);
+    return 0;
+  }
+  if (subcommand === "validate") {
+    console.log(`Contract: ${loaded.state}; path: ${loaded.path}`);
+    if (loaded.error !== undefined) {
+      console.error(loaded.error);
+    }
+    return loaded.state === "invalid" ? 1 : 0;
+  }
+  throw new ArgumentError(
+    `Unknown gate contract subcommand: ${subcommand ?? "(missing)"}`,
+  );
+}
+
+async function readGateInput(stdinFile: string | undefined): Promise<unknown> {
+  const raw = stdinFile === undefined
+    ? await Bun.stdin.text()
+    : await readFile(stdinFile, "utf8");
+  return JSON.parse(raw) as unknown;
+}
+
+async function evaluateGate(
+  adapter: GateAdapter,
+  hook: GateHookKind,
+  dataDir: string,
+  raw: unknown,
+): Promise<{ decision: GateDecision; output: string }> {
+  const input = adapter.parseHookStdin(hook, raw);
+  if (input === null) {
+    throw new Error(
+      `Hook stdin is not a valid ${adapter.vendor} payload.`,
+    );
+  }
+  const decision = await runGateEval({ dataDir, input });
+  return {
+    decision,
+    output: adapter.renderHookOutput(hook, decision),
+  };
+}
+
+function gateEvalDiagnostic(error: unknown): void {
+  const message = (error instanceof Error ? error.message : String(error))
+    .replace(/\s+/gu, " ")
+    .trim();
+  console.error(`HyperAgent gate failed open: ${message}`);
+}
+
+async function gateEvalCommand(args: string[]): Promise<number> {
+  try {
+    const options = parseOptions(
+      args,
+      new Set(["--harness", "--hook", "--data-dir"]),
+    );
+    const dataDir = gateDataDir(options);
+    const adapter = gateAdapter(options, dataDir, true);
+    const hook = gateHookKind(requiredStringOption(options, "--hook"));
+    const raw = await readGateInput(undefined);
+    const evaluated = await evaluateGate(adapter, hook, dataDir, raw);
+    if (evaluated.decision.failedOpen === true) {
+      gateEvalDiagnostic("internal evaluation failure");
+      return 0;
+    }
+    if (evaluated.output.length > 0) {
+      process.stdout.write(evaluated.output);
+    }
+  } catch (error: unknown) {
+    gateEvalDiagnostic(error);
+  }
+  return 0;
+}
+
+async function gateTestCommand(args: string[]): Promise<number> {
+  const options = parseOptions(
+    args,
+    new Set(["--harness", "--hook", "--data-dir", "--stdin-file"]),
+  );
+  const dataDir = gateDataDir(options);
+  const adapter = gateAdapter(options, dataDir, false);
+  const hook = gateHookKind(requiredStringOption(options, "--hook"));
+  const evaluated = await evaluateGate(
+    adapter,
+    hook,
+    dataDir,
+    await readGateInput(stringOption(options, "--stdin-file")),
+  );
+  console.log(`Decision: ${evaluated.decision.kind}`);
+  console.log(
+    `Matched rules: ${evaluated.decision.matchedRules.join(", ") || "(none)"}`,
+  );
+  console.log(
+    `Failed checks: ${evaluated.decision.failedChecks.join(", ") || "(none)"}`,
+  );
+  if (evaluated.decision.reason !== undefined) {
+    console.log(`Reason: ${evaluated.decision.reason}`);
+  }
+  console.log("Harness output:");
+  console.log(evaluated.output.length > 0 ? evaluated.output : "(empty)");
+  return 0;
+}
+
+async function gateCommand(args: string[]): Promise<number> {
+  const subcommand = args[0];
+  const rest = args.slice(1);
+  if (subcommand === "install" || subcommand === "uninstall") {
+    return gateInstallCommand(subcommand, rest);
+  }
+  if (subcommand === "status") {
+    return gateStatusCommand(rest);
+  }
+  if (subcommand === "policy") {
+    return gatePolicyCommand(rest);
+  }
+  if (subcommand === "contract") {
+    return gateContractCommand(rest);
+  }
+  if (subcommand === "test") {
+    return gateTestCommand(rest);
+  }
+  if (subcommand === "eval") {
+    return gateEvalCommand(rest);
+  }
+  throw new ArgumentError(
+    `Unknown gate subcommand: ${subcommand ?? "(missing)"}`,
+  );
+}
+
+function printViolationTable(violations: PolicyViolation[]): void {
+  if (violations.length === 0) {
+    console.log("No violations found.");
+    return;
+  }
+  const headers = [
+    "SESSION",
+    "RULE",
+    "ACTION",
+    "DETECTED",
+    "EVENT",
+    "EVIDENCE",
+  ];
+  const rows = violations.map((violation): string[] => [
+    violation.session_id,
+    violation.rule_id,
+    violation.action,
+    violation.detected_at,
+    violation.event_id,
+    violation.evidence,
+  ]);
+  const widths = headers.map((header, index): number =>
+    Math.max(
+      header.length,
+      ...rows.map((row): number => row[index]?.length ?? 0),
+    )
+  );
+  const render = (row: string[]): string =>
+    row.map((cell, index): string =>
+      cell.padEnd(widths[index] ?? cell.length)
+    ).join("  ").trimEnd();
+  console.log(render(headers));
+  for (const row of rows) {
+    console.log(render(row));
+  }
+}
+
+function violationsCommand(args: string[]): number {
+  const options = parseOptions(
+    args,
+    new Set(["--session", "--days", "--data-dir"]),
+  );
+  const store = openStore(join(gateDataDir(options), "hyperagent.db"));
+  try {
+    printViolationTable(listViolations(store, {
+      ...(stringOption(options, "--session") === undefined
+        ? {}
+        : { sessionId: stringOption(options, "--session") }),
+      ...(stringOption(options, "--days") === undefined
+        ? {}
+        : { days: positiveDays(stringOption(options, "--days")) }),
+    }));
+    return 0;
+  } finally {
+    store.close();
+  }
+}
+
 function xmlEscape(value: string): string {
   return value
     .replaceAll("&", "&amp;")
@@ -1010,7 +1401,7 @@ async function main(args: string[]): Promise<number> {
     return watchCommand(rest);
   }
   if (command === "status") {
-    return statusCommand(rest);
+    return statusWithGateHealthCommand(rest);
   }
   if (command === "score") {
     return scoreCommand(rest);
@@ -1023,6 +1414,12 @@ async function main(args: string[]): Promise<number> {
   }
   if (command === "memory") {
     return memoryCommand(rest);
+  }
+  if (command === "gate") {
+    return gateCommand(rest);
+  }
+  if (command === "violations") {
+    return violationsCommand(rest);
   }
   if (command === "install-plist") {
     return installPlistCommand(rest);

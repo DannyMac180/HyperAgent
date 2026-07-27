@@ -36,6 +36,25 @@ import {
   generateMission,
   writeMissionRecord,
 } from "../missions/generate.ts";
+import {
+  renderCapabilityMatrix,
+} from "../conformance/matrix.ts";
+import {
+  ALL_CONFORMANCE_CHECKS,
+  conformanceDescriptors,
+  conformanceVendorNames,
+  descriptorForVendor,
+} from "../conformance/registry.ts";
+import {
+  renderConformanceReport,
+} from "../conformance/render.ts";
+import {
+  runConformance,
+} from "../conformance/runner.ts";
+import type {
+  ConformanceDescriptor,
+  ConformanceReport,
+} from "../conformance/types.ts";
 import { spawnAgentRunner } from "../missions/runner.ts";
 import { computeTargetRepos } from "../memory/inject.ts";
 import type { InjectionResult } from "../memory/inject.ts";
@@ -131,6 +150,8 @@ const usage = `Usage:
   bun src/daemon/cli.ts workshop approve <id> [--yes] [--data-dir D]
   bun src/daemon/cli.ts workshop reject <id> [--data-dir D]
   bun src/daemon/cli.ts workshop measure [--data-dir D]
+  bun src/daemon/cli.ts conformance run [--adapter <vendor>]
+  bun src/daemon/cli.ts conformance matrix [--write]
   bun src/daemon/cli.ts install-plist [--write]
 `;
 
@@ -1433,6 +1454,78 @@ async function workshopCommand(args: string[]): Promise<number> {
   );
 }
 
+async function runRegisteredConformance(
+  descriptors: readonly ConformanceDescriptor[],
+): Promise<ConformanceReport[]> {
+  return Promise.all(
+    descriptors.map((descriptor: ConformanceDescriptor) =>
+      runConformance(descriptor, { checks: ALL_CONFORMANCE_CHECKS })
+    ),
+  );
+}
+
+export function conformanceExitCode(
+  reports: readonly ConformanceReport[],
+): number {
+  return reports.some(
+    (report: ConformanceReport): boolean => !report.passed,
+  )
+    ? 1
+    : 0;
+}
+
+async function conformanceRunCommand(args: string[]): Promise<number> {
+  const options = parseOptions(args, new Set(["--adapter"]));
+  const adapter = stringOption(options, "--adapter");
+  const descriptors = adapter === undefined
+    ? conformanceDescriptors()
+    : [descriptorForVendor(adapter)].filter(
+      (descriptor): descriptor is ConformanceDescriptor =>
+        descriptor !== undefined,
+    );
+  if (adapter !== undefined && descriptors.length === 0) {
+    throw new ArgumentError(
+      `Unknown conformance adapter: ${adapter}; valid adapters: ${conformanceVendorNames().join(", ")}`,
+    );
+  }
+  const reports = await runRegisteredConformance(descriptors);
+  process.stdout.write(
+    `${reports.map(renderConformanceReport).join("\n\n")}\n`,
+  );
+  return conformanceExitCode(reports);
+}
+
+async function conformanceMatrixCommand(args: string[]): Promise<number> {
+  const options = parseOptions(args, new Set(["--write"]));
+  const reports = await runRegisteredConformance(conformanceDescriptors());
+  const markdown = renderCapabilityMatrix(reports);
+  if (options.get("--write") === true) {
+    const repoRoot = join(import.meta.dir, "..", "..");
+    await writeFile(
+      join(repoRoot, "docs", "capability-matrix.md"),
+      markdown,
+      "utf8",
+    );
+  } else {
+    process.stdout.write(markdown);
+  }
+  return conformanceExitCode(reports);
+}
+
+async function conformanceCommand(args: string[]): Promise<number> {
+  const subcommand = args[0];
+  const rest = args.slice(1);
+  if (subcommand === "run") {
+    return conformanceRunCommand(rest);
+  }
+  if (subcommand === "matrix") {
+    return conformanceMatrixCommand(rest);
+  }
+  throw new ArgumentError(
+    `Unknown conformance subcommand: ${subcommand ?? "(missing)"}`,
+  );
+}
+
 function gateDataDir(
   options: Map<string, string | true>,
 ): string {
@@ -1842,6 +1935,9 @@ async function main(args: string[]): Promise<number> {
   }
   if (command === "workshop") {
     return workshopCommand(rest);
+  }
+  if (command === "conformance") {
+    return conformanceCommand(rest);
   }
   if (command === "install-plist") {
     return installPlistCommand(rest);

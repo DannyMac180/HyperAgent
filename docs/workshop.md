@@ -87,7 +87,9 @@ Every draft contains:
 | `holdoutSessionIds` | Reserved sessions not shown to the drafter |
 | `drafterVersion` | Version of the drafting boundary |
 
-The queue stores `holdoutSessionIds` as `holdout`. Proposal IDs and content hashes are the SHA-256 digest of canonicalized `type`, `durability`, `title`, `body`, and `evidence`; rationale and holdout are not part of that hash.
+The queue stores `holdoutSessionIds` as `holdout`. Proposal IDs and content hashes are the SHA-256 digest of canonicalized `type`, `durability`, `title`, `body`, `evidence`, `repo`, and `agent`; rationale and holdout are not part of that hash. Scope (`repo`/`agent`) is hashed because it determines what install writes and where — approval binds the exact artifact install will produce, including its scope.
+
+Proposals inherit scope from their friction cluster: a cluster confined to one repo (or one agent) produces a proposal scoped to it; sessions with no known repo are ignored for this purpose, and a cluster spanning multiple repos yields a null-scoped (global) proposal. **Named consequence:** a multi-repo memory proposal evaluates under global scope, where membership is scored `no_effect`, so it is held at `draft` — the most widely corroborated frictions are deliberately barred from producing memories in v0 rather than shipping an unprovable global memory. Revisit when the replay eval can carry outcome evidence.
 
 The four proposal bodies are:
 

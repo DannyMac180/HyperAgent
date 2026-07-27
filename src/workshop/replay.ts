@@ -605,6 +605,12 @@ export function evaluateMemoryProposal(
     diagnostics.push("memory replay received an incompatible proposal");
     return finalizeEvaluation("memory", fixtures, outcomes, diagnostics);
   }
+  // Every memory eval carries the availability qualifier, not just global
+  // scope: any surface that summarizes verdict counts must inherit the claim's
+  // limit, or a "caught N/N" label quietly overstates availability evidence.
+  diagnostics.push(
+    "memory replay verdicts are availability evidence (the memory would have been in the injection set), never outcome evidence that it would have helped.",
+  );
   if (scope === "global") {
     diagnostics.push(MEMORY_REPLAY_SELECTION_LIMITATION);
   }

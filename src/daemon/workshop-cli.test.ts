@@ -353,3 +353,22 @@ describe("workshop argument errors", (): void => {
     },
   );
 });
+
+describe("daemon workshop trigger path", (): void => {
+  test("runWorkshopPipeline completes without any caller-held lock", async (): Promise<void> => {
+    // Regression for the run-lock deadlock: the daemon trigger used to
+    // acquire the guard before calling this function, which then acquired it
+    // again internally — every daemon-triggered run reported "already
+    // running" and never executed. The daemon now calls this bare, exactly
+    // as this test does, and a bare call must complete.
+    const { runWorkshopPipeline } = await import("./cli.ts");
+    const dataDir = makeTempDir("workshop-daemon-path-");
+    seedFrictionStore(dataDir);
+
+    const result = await runWorkshopPipeline(dataDir, undefined, "cluster");
+
+    expect(result.status).toBe("completed");
+    expect(result.stagesRun).toContain("cluster");
+    expect(result.error).toBeNull();
+  });
+});

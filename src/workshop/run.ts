@@ -78,7 +78,18 @@ interface LedgerRecord {
   proposalsRejected: number;
   proposalsPending: number;
   proposalsHeldAtDraft: number;
+  /** Fragmentation summary from the friction stage, so a decaying normalizer
+   * is visible on every production tick, not only on manual probes. */
+  fragmentation: FragmentationSummary | null;
   error: string | null;
+}
+
+interface FragmentationSummary {
+  totalSignals: number;
+  totalSignatures: number;
+  singletonSignatures: number;
+  singleSessionSignatures: number;
+  forwardedClusters: number;
 }
 
 const STAGE_ORDER: readonly WorkshopStage[] = [
@@ -292,6 +303,14 @@ function ledgerRecord(
     proposalsRejected: result.proposalsRejected,
     proposalsPending: result.proposalsPending,
     proposalsHeldAtDraft: result.proposalsHeldAtDraft,
+    fragmentation: result.analysis === null ? null : {
+      totalSignals: result.analysis.fragmentation.totalSignals,
+      totalSignatures: result.analysis.fragmentation.totalSignatures,
+      singletonSignatures: result.analysis.fragmentation.singletonSignatures,
+      singleSessionSignatures:
+        result.analysis.fragmentation.singleSessionSignatures,
+      forwardedClusters: result.analysis.fragmentation.forwardedClusters,
+    },
     error: result.error,
   };
 }

@@ -261,6 +261,25 @@ describe("Workshop install approval and integrity boundary", (): void => {
     expect(existsSync(join(repo, ".hyperagent"))).toBeFalse();
   });
 
+  test("detects a TOCTOU scope change before any write", async (): Promise<void> => {
+    // Scope determines what install writes and where (the scope-widening
+    // live-probe defect), so repo/agent are inside the content hash and a
+    // post-approval scope mutation must refuse exactly like a body mutation.
+    const queue = await trackedQueue();
+    const repo = await trackedRepo();
+    const approved = approve(queue, verificationDraft());
+    const widened: WorkshopProposalRow = {
+      ...approved,
+      repo: null,
+    };
+
+    expectFailure(
+      installProposal(widened, {}, { targetRepo: repo }),
+      "hash_mismatch",
+    );
+    expect(existsSync(join(repo, ".hyperagent"))).toBeFalse();
+  });
+
   test("installs the same contract check twice without a second write or duplicate", async (): Promise<void> => {
     const queue = await trackedQueue();
     const repo = await trackedRepo();

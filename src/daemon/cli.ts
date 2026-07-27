@@ -1092,7 +1092,10 @@ function workshopStage(value: string | undefined): WorkshopStage | undefined {
   );
 }
 
-async function runWorkshopPipeline(
+/** Exported for the daemon-path regression test: this is the exact function the
+ * watch trigger awaits, and it must complete without any caller-held lock —
+ * the pre-fix deadlock double-acquired and made every daemon run refuse. */
+export async function runWorkshopPipeline(
   dataDir: string,
   repo?: string,
   until?: WorkshopStage,

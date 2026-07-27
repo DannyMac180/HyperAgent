@@ -130,11 +130,11 @@ afterEach(async (): Promise<void> => {
 
 describe("normalizeSignature", (): void => {
   test("reduces plain, quoted, and located absolute paths to basenames", (): void => {
-    expect(normalizeSignature("Read /Users/dan/dev/HyperAgent/src/index.ts")).toBe(
+    expect(normalizeSignature("Read /home/dev/dev/HyperAgent/src/index.ts")).toBe(
       "read index.ts",
     );
     expect(
-      normalizeSignature('Read "/Users/dan/My Project/src/index.ts"'),
+      normalizeSignature('Read "/home/dev/My Project/src/index.ts"'),
     ).toBe('read "index.ts"');
     expect(
       normalizeSignature("Failed at /opt/build/HyperAgent/src/index.ts:84:19"),
@@ -194,7 +194,7 @@ describe("normalizeSignature", (): void => {
 
   test("is idempotent", (): void => {
     const raw =
-      " PID=4512 failed /Users/dan/dev/src/index.ts:98 at 2026-07-27T10:11:12.000Z deadbeef ";
+      " PID=4512 failed /home/dev/dev/src/index.ts:98 at 2026-07-27T10:11:12.000Z deadbeef ";
     const normalized = normalizeSignature(raw);
     expect(normalizeSignature(normalized)).toBe(normalized);
   });
@@ -204,7 +204,7 @@ describe("analyzeFriction", (): void => {
   test("clusters real-world variants into one identical normalized signature", (): void => {
     const store = trackedStore();
     const firstRaw =
-      "Build failed at /Users/dan/dev/HyperAgent/src/workshop/friction.ts:42 at 2026-07-27T10:11:12.000Z commit deadbeef";
+      "Build failed at /home/dev/dev/HyperAgent/src/workshop/friction.ts:42 at 2026-07-27T10:11:12.000Z commit deadbeef";
     const secondRaw =
       "Build failed at /opt/ci/checkout/src/workshop/friction.ts:987 at 2026-07-28T20:21:22.555Z commit cafebabe";
     seedSession(store, {

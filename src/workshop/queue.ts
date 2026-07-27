@@ -153,9 +153,11 @@ interface RawTransitionRow {
 }
 
 interface CanonicalProposalContent {
+  agent: string | null;
   body: ProposalBody;
   durability: DurabilityCategory;
   evidence: ProposalEvidence;
+  repo: string | null;
   title: string;
   type: ProposalType;
 }
@@ -369,13 +371,18 @@ function assertNullableString(value: unknown, label: string): void {
 function canonicalContent(
   value: Pick<
     WorkshopProposalRow,
-    "type" | "durability" | "title" | "body" | "evidence"
+    "type" | "durability" | "title" | "body" | "evidence" | "repo" | "agent"
   >,
 ): CanonicalProposalContent {
+  // repo/agent are part of the hash because they determine install scope: the
+  // approve→install TOCTOU closure must cover the exact fields whose silent
+  // mutation the scope-widening live probe demonstrated.
   return {
+    agent: value.agent,
     body: value.body,
     durability: value.durability,
     evidence: value.evidence,
+    repo: value.repo,
     title: value.title,
     type: value.type,
   };
@@ -384,7 +391,7 @@ function canonicalContent(
 function proposalContentHash(
   value: Pick<
     WorkshopProposalRow,
-    "type" | "durability" | "title" | "body" | "evidence"
+    "type" | "durability" | "title" | "body" | "evidence" | "repo" | "agent"
   >,
 ): string {
   const canonical = jsonStringify(canonicalContent(value), "proposal content");
@@ -828,6 +835,8 @@ export function openWorkshopQueue(
               title: draft.title,
               body: draft.body,
               evidence: draft.evidence,
+              repo: draft.repo,
+              agent: draft.agent,
             });
             const id = contentHash;
             ids.push(id);

@@ -331,13 +331,19 @@ function launchdPlist(dataDir: string): string {
   <string>com.hyperagent.hyperagentd</string>
   <key>ProgramArguments</key>
   <array>
-    <string>bun</string>
+    <string>${xmlEscape(process.execPath)}</string>
     <string>${xmlEscape(cliPath)}</string>
     <string>watch</string>
   </array>
   <key>RunAtLoad</key>
   <true/>
   <key>KeepAlive</key>
+  <true/>
+  <key>ThrottleInterval</key>
+  <integer>30</integer>
+  <key>ProcessType</key>
+  <string>Background</string>
+  <key>LowPriorityIO</key>
   <true/>
   <key>StandardOutPath</key>
   <string>${xmlEscape(outputPath)}</string>

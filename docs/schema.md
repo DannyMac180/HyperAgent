@@ -41,6 +41,8 @@ The enum is closed per schema version; adding a type is a minor bump. Adapters e
 `session_start` payload: `agent` (harness product name), `model` (as reported), `harness_version`, `repo` (git root path), `git_branch`, `cwd`, `parent_session_id` (nullable — session lineage: set when the harness resumes, forks, or compacts a prior session into this one, e.g. Claude Code `--resume`. Downstream consumers treat a lineage chain as one logical body of work; the DAN-200 adapter must populate it rather than inventing its own linkage).
 `session_end` payload: `outcome` (`completed` | `abandoned` | `crashed` | `unknown`), `duration_ms`, `turn_count`, `tool_call_count`. A session with no observed `session_end` is *open*; the daemon may close it with `outcome: unknown` after a timeout — as a new event, never an edit.
 
+**`session_end` is advisory, not terminal.** Harness sessions resume (Claude Code `--resume`, wake-after-sleep) and a quiescence-closed session may append further events afterward. Consumers (memory extraction, scoring) MUST be idempotent per session and MUST NOT treat `session_end` as a promise that no more events arrive; re-derive on new activity after a close.
+
 ### 4.2 `turn` (span: `turn_start` → `turn_end`)
 
 `turn_start` payload: `turn_index` (0-based within session), `role` (`user`), `text_digest` (sha256 of user text), `text_chars`, `is_correction` (boolean, nullable — flagged when the adapter can detect the user correcting/redirecting the agent; a core scoring signal).
@@ -138,6 +140,8 @@ CREATE TRIGGER IF NOT EXISTS events_no_delete BEFORE DELETE ON events
 
 - **Redaction tombstone.** Append-only currently has no remedy for a secret/PII that reaches an event. Planned (minor bump): a `redaction_tombstone` event type that supersedes a prior event by `id`; readers must treat a tombstoned event's payload as `{}`. Until then, the digest-not-raw-text design (§4.2) keeps the exposure surface to `input_summary`/`claim_text`/`message_summary`, which adapters redact before append.
 - **Multi-writer contention.** WAL is specified; the store should also set `PRAGMA busy_timeout` (e.g. 5000ms) before the daemon, CLI, and Cockpit share one file. Decide in DAN-199.
+- **Consumer cursor.** Downstream tailing ("events since my last position") uses SQLite `rowid`: monotonic here *because* deletes are impossible (append-only triggers) — that guarantee is load-bearing, revisit if the triggers ever change. Event `ts` is NOT a cursor: events arrive out of ingest order across sessions.
+- **Derived-event re-derivation.** `completion_claim`/`verification_event` are heuristic extractions; the extractor version rides `adapter_version`. Improved heuristics cannot update already-appended events (same deterministic id → duplicate no-op keeps the old payload). Re-derivation strategy (supersede events, extractor-versioned ids, or a derived-events side table) is decided at DAN-201 before scoring consumes them. Also note: deterministic ids derive from `raw_ref` (path+line), so relocating transcript directories breaks dedupe for already-ingested history — acceptable, transcripts don't move in practice.
 - **Digest algorithm pinning.** All digests in v0.1.0 are sha256; the algorithm is pinned per schema version (a change is a major bump), so undated digests remain interpretable. Adapters must not embed absolute local paths in digested canonical input.
 
 ## Changelog

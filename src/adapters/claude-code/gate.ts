@@ -595,6 +595,20 @@ export class ClaudeCodeGateAdapter implements GateAdapter {
       TARGET_DIRECTORY,
       TARGET_FILENAME,
     );
+    // A permanently ineligible target reports `refused`, not `not-installed` —
+    // the same validation install/uninstall enforce, so status can never
+    // advertise an install that would be rejected.
+    const validation = validateTargetRepo(repoPath, {
+      homeDir: this.homeDir,
+    });
+    if (!validation.ok) {
+      return {
+        state: "refused",
+        targetPath,
+        ownedEntries: 0,
+        detail: validation.reason,
+      };
+    }
     let content: string;
     try {
       content = await readFile(targetPath, "utf8");

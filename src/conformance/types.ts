@@ -110,6 +110,13 @@ export interface InjectFixtureSet {
   managedArtifactPath(repoPath: string): string;
   /** Non-managed content pre-written into the artifact; must survive removal. */
   foreignContent: string;
+  /**
+   * The directory the adapter treats as HOME when deciding refusals. The
+   * runner builds structural look-alikes of the forbidden targets beneath it
+   * (e.g. `<refusalRoot>/.claude/repo`) so refusal is exercised against real
+   * adapter logic without ever touching the user's actual home directory.
+   */
+  refusalRoot: string;
 }
 
 export interface GateFixtureSet {

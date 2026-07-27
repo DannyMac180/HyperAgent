@@ -11,6 +11,7 @@ import {
   writeMissionRecord,
 } from "../missions/generate.ts";
 import { spawnAgentRunner } from "../missions/runner.ts";
+import { computeTargetRepos } from "../memory/inject.ts";
 import type { InjectionResult } from "../memory/inject.ts";
 import {
   openMemoryStore,
@@ -748,11 +749,13 @@ function printInjectionResults(results: InjectionResult[]): void {
 async function syncMemoryStore(
   memoryStore: MemoryStore,
   explicitRepo?: string,
+  previousTargets?: string[],
 ): Promise<void> {
   printInjectionResults(
     await syncMemoryTargets({
       memoryStore,
       ...(explicitRepo === undefined ? {} : { explicitRepo }),
+      ...(previousTargets === undefined ? {} : { previousTargets }),
     }),
   );
 }
@@ -830,6 +833,9 @@ async function memoryTransitionCommand(
       console.error(`Memory not found: ${id}`);
       return 1;
     }
+    // Captured BEFORE the transition: a repo dropping out of the target set
+    // must still be re-rendered (to an empty block) by this same mutation.
+    const previousTargets = computeTargetRepos(memoryStore.listMemories());
     const updated = memoryStore[action](id);
     const pastTense = action === "approve"
       ? "approved"
@@ -837,12 +843,7 @@ async function memoryTransitionCommand(
         ? "rejected"
         : "retired";
     console.log(`${pastTense}\t${updated.id}`);
-    await syncMemoryStore(
-      memoryStore,
-      prior.scope === "repo" && prior.scope_key !== null
-        ? prior.scope_key
-        : undefined,
-    );
+    await syncMemoryStore(memoryStore, undefined, previousTargets);
     return 0;
   } finally {
     memoryStore.close();

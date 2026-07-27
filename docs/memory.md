@@ -119,6 +119,21 @@ Approved global memories render into every target, but global memories never
 create targets by themselves. Approved agent-scoped memories render when their
 scope key matches the renderer vendor.
 
+### Orphaned targets
+
+Because global memories never sustain a target, retiring or rejecting a
+repository's last approved repo-scoped memory drops that repository out of the
+target set. Its managed block would otherwise keep whatever global bullets it
+last rendered forever, because no later mutation or `memory sync` would ever
+visit it again.
+
+So the re-render set for a mutation is `(target set before) ∪ (target set
+after)`. A repository in before-but-not-after is re-rendered to an **empty**
+managed block — markers and the warning comment only, no bullets. The file is
+never deleted. The same rule covers approve flows that change membership: a
+newly approved repo-scoped memory pulls the repository into the target set and
+the global bullets render into it on that same mutation.
+
 Before rendering, each target is canonicalized with `realpath`. Validation
 refuses non-directories, paths without a `.git` entry, `~/.claude`,
 `~/.hyperagent`, and anything beneath those protected directories. Because

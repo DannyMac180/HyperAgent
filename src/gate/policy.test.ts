@@ -332,7 +332,7 @@ describe("DEFAULT_POLICY", () => {
 });
 
 describe("matchPolicy", () => {
-  test("skips disabled rules", (): void => {
+  test("skips disabled rules by default and includes them when requested", (): void => {
     const policy = validPolicy([
       validRule({
         id: "disabled",
@@ -344,6 +344,13 @@ describe("matchPolicy", () => {
     expect(
       matchPolicy(policy, policyCandidate({ command: "match-me" })),
     ).toEqual([]);
+    expect(
+      matchPolicy(
+        policy,
+        policyCandidate({ command: "match-me" }),
+        { includeDisabled: true },
+      ).map((match): string => match.ruleId),
+    ).toEqual(["disabled"]);
   });
 
   test("orders blocks before flags and rule ids within each action", (): void => {

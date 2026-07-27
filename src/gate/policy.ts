@@ -499,10 +499,11 @@ export interface PolicyMatch {
 export function matchPolicy(
   policy: PolicyDoc,
   candidate: PolicyCandidate,
+  options?: { includeDisabled?: boolean },
 ): PolicyMatch[] {
   const matches: PolicyMatch[] = [];
   for (const rule of policy.rules) {
-    if (!rule.enabled) {
+    if (!rule.enabled && options?.includeDisabled !== true) {
       continue;
     }
     const result = matchRule(rule, candidate);

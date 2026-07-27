@@ -8,8 +8,8 @@
  * self-report anything.
  *
  * Inject extends this contract additively with the memory engine (DAN-202).
- * Gate remains future work for DAN-203 and will likewise extend — not modify —
- * the existing contracts.
+ * Gate now extends the contract additively for DAN-203 without modifying the
+ * existing contracts.
  */
 
 import type { InjectionResult } from "../memory/inject.ts";
@@ -96,4 +96,28 @@ export interface InjectAdapter {
     targetRepo: string,
     memories: MemoryRow[],
   ): Promise<InjectionResult>;
+}
+
+export type GateInstallState = "installed" | "stale" | "not-installed" | "foreign";
+
+export interface GateStatus {
+  state: GateInstallState;
+  targetPath: string;
+  /** Number of hyperagent-owned hook entries found. */
+  ownedEntries: number;
+  detail: string;
+}
+
+export interface GateInstallResult {
+  targetPath: string;
+  changed: boolean;
+  /** Populated when refused, failed, or a no-op. */
+  reason?: string;
+}
+
+export interface GateAdapter {
+  readonly vendor: string;
+  install(repoPath: string): Promise<GateInstallResult>;
+  uninstall(repoPath: string): Promise<GateInstallResult>;
+  status(repoPath: string): Promise<GateStatus>;
 }

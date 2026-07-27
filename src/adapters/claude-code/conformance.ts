@@ -215,13 +215,15 @@ function createNormalizer(): ObserveFixtureSet["normalizeEvent"] {
     const normalized: Record<string, unknown> = { ...event };
 
     /*
-     * KNOWN LIMITATION: ClaudeCodeAdapter currently hashes the absolute
-     * artifact path into each event id. A shared placeholder removes that
-     * machine-dependent path entropy without coupling event content to the
-     * adapter's unsupported intra-timestamp order. Determinism separately pins
-     * id stability, and resume pins uniqueness/no-replay. Delete this
-     * normalization and regenerate the golden snapshot when event ids become
-     * path-independent.
+     * KNOWN LIMITATION (DAN-217): ClaudeCodeAdapter currently hashes the
+     * absolute artifact path into each event id. A shared placeholder removes
+     * that machine-dependent path entropy without coupling event content to
+     * the adapter's unsupported intra-timestamp order. Determinism separately
+     * pins id stability, and resume pins uniqueness/no-replay — but while this
+     * normalization stands, the golden cannot catch id-derivation regressions.
+     * When DAN-217 makes event ids path-independent: delete this
+     * normalization, regenerate the golden snapshot, and expand it to the
+     * richer fixture that path-derived tool_call_ids currently block.
      */
     normalized.id = NORMALIZED_ID;
 

@@ -327,6 +327,9 @@ describe("readGateHealth", (): void => {
   test("reports default and invalid policy states, backlog bytes, and repo status", async (): Promise<void> => {
     const dataDir: string = makeTempDir("hyperagent-gate-health-data-");
     const repo: string = makeTempDir("hyperagent-gate-health-repo-");
+    // An eligible target needs a .git entry; without it the adapter reports
+    // `refused`, which the dedicated test below covers.
+    mkdirSync(join(repo, ".git"), { recursive: true });
     expect(await appendOutcome(dataDir, outcome())).toBe(true);
 
     const defaultHealth = await readGateHealth({
@@ -354,6 +357,32 @@ describe("readGateHealth", (): void => {
     expect(invalidHealth.policyError).toContain("POLICY_JSON_ERROR");
     expect(invalidHealth.spoolBacklogBytes).toBeGreaterThan(0);
     expect(invalidHealth.repos[0]?.state).toBe("not-installed");
+  });
+
+  test("reports permanently ineligible targets as refused, not not-installed", async (): Promise<void> => {
+    // `not-installed` invites an install; these targets can never accept one,
+    // so status must say so rather than advertising a doomed action.
+    const dataDir: string = makeTempDir("hyperagent-gate-health-refused-");
+    const home: string = makeTempDir("hyperagent-gate-health-home-");
+    const suitDirectory: string = join(home, ".hyperagent");
+    const paiDirectory: string = join(home, ".claude");
+    const noGitRepo: string = makeTempDir("hyperagent-gate-health-nogit-");
+    for (const directory of [suitDirectory, paiDirectory]) {
+      // Both carry a .git entry on purpose: only the refusal list, not the
+      // missing-.git check, may keep them out.
+      mkdirSync(join(directory, ".git"), { recursive: true });
+    }
+
+    const health = await readGateHealth({
+      dataDir,
+      repos: [suitDirectory, paiDirectory, noGitRepo],
+      homeDir: home,
+    });
+
+    for (const repoHealth of health.repos) {
+      expect(repoHealth.state).toBe("refused");
+      expect(repoHealth.detail.length).toBeGreaterThan(0);
+    }
   });
 });
 

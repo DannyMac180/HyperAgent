@@ -95,6 +95,8 @@ Claude Code applies settings edits **live** via a file watcher — there is no s
 
 Per repo, optional: `<repo>/.hyperagent/contract.json`. **An absent contract means Stop always passes.**
 
+> **Upgrading from v1:** early v1 installs wrote `<repo>/.hyperagent` as a config *file*, which occupies the path this directory needs. `gate contract validate` reports `CONTRACT_PATH_TYPE_ERROR` in that case. Retire the v1 config file (or migrate it to `.hyperagent/config.toml`, the layout later v1 versions already use) to free the path.
+
 ```json
 {
   "schema_version": "0.1.0",
@@ -172,7 +174,7 @@ hyperagent gate test --hook <PreToolUse|PostToolUse|Stop> [--stdin-file F]
 hyperagent violations [--session S] [--days N]
 ```
 
-`gate status` is truthful about four states: `installed`, `stale` (the recorded CLI path no longer resolves), `not-installed`, and `foreign` (the settings file is not valid JSON). It never reports a false `installed`.
+`gate status` is truthful about five states: `installed`, `stale` (the recorded CLI path no longer resolves), `not-installed`, `foreign` (the settings file is not valid JSON), and `refused` (the target is permanently ineligible — no `.git`, or under `~/.claude` or `~/.hyperagent`). It never reports a false `installed`, and it never reports `not-installed` for a target that could never accept an install: `refused` is checked first, using the same validation `install` enforces.
 
 `gate test` dry-runs an evaluation against a fixture stdin and prints what would have happened. `gate eval` is the hook runtime itself — it always exits 0, prints only decision JSON on stdout, and sends diagnostics to stderr.
 

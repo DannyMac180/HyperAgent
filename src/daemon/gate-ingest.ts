@@ -187,11 +187,16 @@ export interface GateHealth {
 export async function readGateHealth(options: {
   dataDir: string;
   repos: string[];
+  /** Overrides the home directory used for refusal checks (tests). */
+  homeDir?: string;
 }): Promise<GateHealth> {
   const policy = loadPolicy(policyPath(options.dataDir));
   // Adapters come from the registry so this module names no vendor; health is
   // read-only here by design (see the install/uninstall anti-test).
-  const adapters = builtinGateAdapters({ dataDir: options.dataDir });
+  const adapters = builtinGateAdapters({
+    dataDir: options.dataDir,
+    ...(options.homeDir === undefined ? {} : { homeDir: options.homeDir }),
+  });
   const [backlogBytes, repos] = await Promise.all([
     spoolBacklogBytes(options.dataDir),
     Promise.all(

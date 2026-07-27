@@ -33,6 +33,8 @@ export function builtinInjectAdapters(): InjectAdapter[] {
 
 export interface BuiltinGateAdapterOptions {
   dataDir?: string;
+  /** Overrides the home directory used for refusal checks (tests). */
+  homeDir?: string;
 }
 
 /**
@@ -44,9 +46,10 @@ export function builtinGateAdapters(
   options: BuiltinGateAdapterOptions = {},
 ): GateAdapter[] {
   return [
-    new ClaudeCodeGateAdapter(
-      options.dataDir === undefined ? {} : { dataDir: options.dataDir },
-    ),
+    new ClaudeCodeGateAdapter({
+      ...(options.dataDir === undefined ? {} : { dataDir: options.dataDir }),
+      ...(options.homeDir === undefined ? {} : { homeDir: options.homeDir }),
+    }),
   ];
 }
 

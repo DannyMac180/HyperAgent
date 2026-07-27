@@ -103,7 +103,18 @@ export interface InjectAdapter {
   ): Promise<InjectionResult>;
 }
 
-export type GateInstallState = "installed" | "stale" | "not-installed" | "foreign";
+/**
+ * `refused` is terminal and distinct from `not-installed`: the target is
+ * permanently ineligible (suit-owned or PAI infrastructure directories, no
+ * `.git`), so reporting it as merely not-yet-installed would imply an install
+ * that can never succeed.
+ */
+export type GateInstallState =
+  | "installed"
+  | "stale"
+  | "not-installed"
+  | "foreign"
+  | "refused";
 
 export interface GateStatus {
   state: GateInstallState;

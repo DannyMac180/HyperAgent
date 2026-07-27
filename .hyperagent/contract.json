@@ -1,0 +1,13 @@
+{
+  "schema_version": "0.1.0",
+  "requiredChecks": [
+    {
+      "id": "unit-tests",
+      "description": "bun test must pass after the last file change in the session",
+      "commandPattern": "bun\\s+test"
+    }
+  ],
+  "protectedPaths": [
+    "missions/**"
+  ]
+}

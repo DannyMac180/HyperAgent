@@ -7,8 +7,17 @@ import type {
   AdapterHealthStatus,
   ObserveAdapter,
 } from "../adapters/types.ts";
+import {
+  createMissionQueue,
+  type MissionQueue,
+} from "../missions/queue.ts";
+import { spawnAgentRunner } from "../missions/runner.ts";
 import { deterministicEventId } from "../schema/ids.ts";
 import type { EventInput } from "../schema/events.ts";
+import {
+  SCORER_VERSION,
+  scoreSession,
+} from "../scoring/score.ts";
 import { openStore } from "../store/store.ts";
 
 export interface IngestOptions {
@@ -16,6 +25,9 @@ export interface IngestOptions {
   adapters: ObserveAdapter[];
   quiesceMs?: number;
   now?: () => number;
+  scoring?: boolean;
+  missions?: boolean;
+  missionQueue?: MissionQueue;
 }
 
 export interface AdapterRunStats {
@@ -38,6 +50,8 @@ export interface IngestRunResult {
   startedAt: string;
   finishedAt: string;
   adapters: AdapterRunStats[];
+  sessionsScored: number;
+  missionsEnqueued: number;
 }
 
 export interface IngestState {
@@ -148,8 +162,95 @@ function isIngestRunResult(value: unknown): value is IngestRunResult {
     typeof value.startedAt === "string" &&
     typeof value.finishedAt === "string" &&
     Array.isArray(value.adapters) &&
-    value.adapters.every(isAdapterRunStats)
+    value.adapters.every(isAdapterRunStats) &&
+    (value.sessionsScored === undefined ||
+      typeof value.sessionsScored === "number") &&
+    (value.missionsEnqueued === undefined ||
+      typeof value.missionsEnqueued === "number")
   );
+}
+
+interface SessionWatermarkRow {
+  session_id: unknown;
+}
+
+interface CurrentScoreRow {
+  current_watermark: unknown;
+  scorer_version: unknown;
+  event_watermark: unknown;
+}
+
+function eventExists(
+  store: ReturnType<typeof openStore>,
+  eventId: string,
+): boolean {
+  const row = store.db
+    .query<{ present: unknown }, [string]>(
+      "SELECT 1 AS present FROM events WHERE id = ?",
+    )
+    .get(eventId);
+  return row !== null;
+}
+
+function grownScoredSessions(store: ReturnType<typeof openStore>): string[] {
+  try {
+    const rows = store.db.query<SessionWatermarkRow, []>(`
+      SELECT scores.session_id
+      FROM session_scores AS scores
+      INNER JOIN (
+        SELECT session_id, MAX(rowid) AS current_watermark
+        FROM events
+        GROUP BY session_id
+      ) AS current
+        ON current.session_id = scores.session_id
+      WHERE current.current_watermark > scores.event_watermark
+    `).all();
+    return rows.flatMap((row: SessionWatermarkRow): string[] =>
+      typeof row.session_id === "string" ? [row.session_id] : []
+    );
+  } catch (error: unknown) {
+    // Scoring may never have run, so session_scores may not exist yet.
+    if (!errorMessage(error).includes("no such table: session_scores")) {
+      console.error(
+        `Failed to identify grown scored sessions: ${errorMessage(error)}`,
+      );
+    }
+    return [];
+  }
+}
+
+function scoreIsCurrent(
+  store: ReturnType<typeof openStore>,
+  sessionId: string,
+): boolean {
+  try {
+    const row = store.db.query<CurrentScoreRow, [string]>(`
+      SELECT
+        MAX(events.rowid) AS current_watermark,
+        scores.scorer_version,
+        scores.event_watermark
+      FROM events
+      LEFT JOIN session_scores AS scores
+        ON scores.session_id = events.session_id
+      WHERE events.session_id = ?
+    `).get(sessionId);
+    return (
+      row !== null &&
+      typeof row.current_watermark === "number" &&
+      row.scorer_version === SCORER_VERSION &&
+      row.event_watermark === row.current_watermark
+    );
+  } catch (error: unknown) {
+    // A missing session_scores table means this session cannot be current.
+    if (!errorMessage(error).includes("no such table: session_scores")) {
+      console.error(
+        `Failed to check score watermark for session "${sessionId}": ${
+          errorMessage(error)
+        }`,
+      );
+    }
+    return false;
+  }
 }
 
 async function loadIngestState(dataDir: string): Promise<IngestState> {
@@ -215,6 +316,8 @@ export async function runIngestOnce(
   const statsByVendor = new Map<string, AdapterRunStats>();
   const adapterByVendor = new Map<string, ObserveAdapter>();
   const adapterStats: AdapterRunStats[] = [];
+  const closedThisPass = new Set<string>();
+  let internallyCreatedMissionQueue: MissionQueue | undefined;
 
   try {
     for (const adapter of options.adapters) {
@@ -235,6 +338,8 @@ export async function runIngestOnce(
             startedAt,
             finishedAt: new Date(now()).toISOString(),
             adapters: adapterStats,
+            sessionsScored: 0,
+            missionsEnqueued: 0,
           };
           await persistState(dataDir, state);
           continue;
@@ -260,6 +365,20 @@ export async function runIngestOnce(
               session,
               prior?.resumeToken ?? "",
             );
+            // Which session_end events are genuinely new must be decided BEFORE
+            // the append, because ids are deterministic and the store dedupes
+            // with INSERT OR IGNORE: after the fact a re-ingested duplicate is
+            // indistinguishable from a fresh close. Appending per-event to read
+            // each insert count individually would cost one transaction per
+            // event, so the batch append is kept and novelty is pre-computed.
+            for (const event of result.events) {
+              if (
+                event.type === "session_end" &&
+                !eventExists(store, event.id)
+              ) {
+                closedThisPass.add(event.session_id);
+              }
+            }
             const inserted = store.append(result.events);
             stats.sessionsParsed += 1;
             stats.eventsAppended += inserted;
@@ -347,6 +466,8 @@ export async function runIngestOnce(
         startedAt,
         finishedAt: new Date(now()).toISOString(),
         adapters: adapterStats,
+        sessionsScored: 0,
+        missionsEnqueued: 0,
       };
       await persistState(dataDir, state);
     }
@@ -391,10 +512,66 @@ export async function runIngestOnce(
       };
       const inserted = store.append(event);
       session.closed = true;
+      if (inserted > 0) {
+        closedThisPass.add(sessionId);
+      }
       const stats = statsByVendor.get(session.vendor);
       if (stats !== undefined) {
         stats.eventsAppended += inserted;
-        stats.sessionsClosed += 1;
+        stats.sessionsClosed += inserted > 0 ? 1 : 0;
+      }
+    }
+
+    let sessionsScored = 0;
+    if (options.scoring !== false) {
+      const sessionsToScore = new Set<string>(closedThisPass);
+      for (const sessionId of grownScoredSessions(store)) {
+        sessionsToScore.add(sessionId);
+      }
+      for (const sessionId of sessionsToScore) {
+        try {
+          if (!scoreIsCurrent(store, sessionId)) {
+            scoreSession(store, sessionId);
+            sessionsScored += 1;
+          }
+        } catch (error: unknown) {
+          console.error(
+            `Failed to score ingested session "${sessionId}": ${errorMessage(error)}`,
+          );
+        }
+      }
+    }
+
+    let missionsEnqueued = 0;
+    if (options.missions === true && closedThisPass.size > 0) {
+      let missionQueue = options.missionQueue;
+      try {
+        if (missionQueue === undefined) {
+          missionQueue = createMissionQueue({
+            deps: { runModel: spawnAgentRunner({ dataDir }) },
+            dataDir,
+            store,
+            onError: (sessionId: string, error: unknown): void => {
+              console.error(
+                `Failed to generate mission for ingested session "${sessionId}": ${
+                  errorMessage(error)
+                }`,
+              );
+            },
+          });
+          internallyCreatedMissionQueue = missionQueue;
+        }
+        for (const sessionId of closedThisPass) {
+          // A newly inserted session_end is a new close boundary, so refresh the
+          // mission even when a prior mission record already exists.
+          if (missionQueue.enqueue(sessionId)) {
+            missionsEnqueued += 1;
+          }
+        }
+      } catch (error: unknown) {
+        console.error(
+          `Failed to enqueue missions after ingest: ${errorMessage(error)}`,
+        );
       }
     }
 
@@ -402,11 +579,19 @@ export async function runIngestOnce(
       startedAt,
       finishedAt: new Date(now()).toISOString(),
       adapters: adapterStats,
+      sessionsScored,
+      missionsEnqueued,
     };
     state.lastRun = result;
     await persistState(dataDir, state);
     return result;
   } finally {
-    store.close();
+    if (internallyCreatedMissionQueue === undefined) {
+      store.close();
+    } else {
+      void internallyCreatedMissionQueue.drain().finally((): void => {
+        store.close();
+      });
+    }
   }
 }

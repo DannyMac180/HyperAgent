@@ -1,10 +1,28 @@
 import { existsSync, watch } from "node:fs";
 import type { FSWatcher } from "node:fs";
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, readdir, stat, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import {
+  buildMissionInput,
+  generateMission,
+  writeMissionRecord,
+} from "../missions/generate.ts";
+import { spawnAgentRunner } from "../missions/runner.ts";
+import {
+  SCORER_VERSION,
+  getTrends,
+  rebuildScores,
+  scoreSession,
+} from "../scoring/score.ts";
+import type {
+  AgentTrend,
+  RepoTrend,
+  SessionScore,
+} from "../scoring/score.ts";
+import { openStore } from "../store/store.ts";
 import {
   readIngestState,
   runIngestOnce,
@@ -14,7 +32,6 @@ import type {
   IngestRunResult,
 } from "./ingest.ts";
 import { builtinAdaptersForProjectsRoot } from "./registry.ts";
-import { openStore } from "../store/store.ts";
 
 interface CommonOptions {
   dataDir?: string;
@@ -25,6 +42,9 @@ const usage = `Usage:
   bun src/daemon/cli.ts ingest --once [--data-dir D] [--projects-root P]
   bun src/daemon/cli.ts watch [--data-dir D] [--projects-root P]
   bun src/daemon/cli.ts status [--data-dir D]
+  bun src/daemon/cli.ts score [--session <id> | --all] [--data-dir D]
+  bun src/daemon/cli.ts report [--days N] [--data-dir D]
+  bun src/daemon/cli.ts missions [--session <id>] [--data-dir D]
   bun src/daemon/cli.ts install-plist [--write]
 `;
 
@@ -43,7 +63,7 @@ function parseOptions(
     if (!allowedFlags.has(flag)) {
       throw new ArgumentError(`Unknown flag: ${flag}`);
     }
-    if (flag === "--once" || flag === "--write") {
+    if (flag === "--once" || flag === "--write" || flag === "--all") {
       parsed.set(flag, true);
       continue;
     }
@@ -310,6 +330,275 @@ function formatStatus(
   );
 }
 
+function formatPercentage(value: number | null): string {
+  return value === null ? "n/a" : `${(value * 100).toFixed(1)}%`;
+}
+
+function formatEvidenceBacked(value: number | null): string {
+  return value === null ? "n/a" : value === 1 ? "yes" : "no";
+}
+
+function printSessionScore(score: SessionScore): void {
+  console.log(`Session: ${score.session_id}`);
+  console.log(`Status: ${score.provisional === 1 ? "provisional" : "final"}`);
+  console.log(`Scorer: ${score.scorer_version}`);
+  console.log(`Turns: ${score.turn_count}`);
+  console.log(`Tool calls: ${score.tool_call_count}`);
+  console.log(`Errors: ${score.error_count}`);
+  console.log(`Retries: ${score.retry_count}`);
+  console.log(
+    `Verifications: ${score.verification_passed}/${score.verification_total} passed (${formatPercentage(score.verification_pass_rate)})`,
+  );
+  console.log(`Completion claims: ${score.completion_claim_count}`);
+  console.log(
+    `Evidence-backed completion: ${formatEvidenceBacked(score.evidence_backed_completion)}`,
+  );
+}
+
+function scoreCommand(args: string[]): number {
+  const options = parseOptions(
+    args,
+    new Set(["--session", "--all", "--data-dir"]),
+  );
+  const sessionId = stringOption(options, "--session");
+  const all = options.get("--all") === true;
+  if (sessionId !== undefined && all) {
+    throw new ArgumentError("Pass either --session <id> or --all, not both.");
+  }
+  if (sessionId === undefined && !all) {
+    throw new ArgumentError("Pass either --session <id> or --all.");
+  }
+
+  const dataDir =
+    stringOption(options, "--data-dir") ?? join(homedir(), ".hyperagent");
+  const store = openStore(join(dataDir, "hyperagent.db"));
+  try {
+    if (sessionId !== undefined) {
+      printSessionScore(scoreSession(store, sessionId));
+      return 0;
+    }
+
+    const count = rebuildScores(store);
+    const provisionalSessions = store.getSessions({ open: true });
+    console.log(`Scored ${count} sessions with scorer ${SCORER_VERSION}.`);
+    if (provisionalSessions.length === 0) {
+      console.log("Provisional sessions: 0.");
+    } else {
+      console.log(`Provisional sessions: ${provisionalSessions.length}.`);
+      for (const session of provisionalSessions) {
+        console.log(`  provisional  ${session.session_id}`);
+      }
+    }
+    return 0;
+  } finally {
+    store.close();
+  }
+}
+
+interface ReportRow {
+  label: string;
+  sessions: string;
+  verificationPassRate: string;
+  errors: string;
+  claims: string;
+  evidenceBackedRatio: string;
+}
+
+function formatReportSection(
+  title: string,
+  labelHeader: string,
+  rows: ReportRow[],
+): void {
+  const headers = [
+    labelHeader,
+    "Sessions",
+    "Verification pass rate",
+    "Errors",
+    "Claims",
+    "Evidence-backed ratio",
+  ];
+  const cells = rows.map((row): string[] => [
+    row.label,
+    row.sessions,
+    row.verificationPassRate,
+    row.errors,
+    row.claims,
+    row.evidenceBackedRatio,
+  ]);
+  const widths = headers.map((header, index): number =>
+    Math.max(
+      header.length,
+      ...cells.map((row): number => row[index]?.length ?? 0),
+    )
+  );
+  const render = (row: string[]): string =>
+    row.map((cell, index): string => {
+      const width = widths[index] ?? cell.length;
+      return index === 0 ? cell.padEnd(width) : cell.padStart(width);
+    }).join("  ");
+
+  console.log(title);
+  console.log(render(headers));
+  console.log(render(widths.map((width): string => "-".repeat(width))));
+  for (const row of cells) {
+    console.log(render(row));
+  }
+}
+
+function agentReportRow(trend: AgentTrend): ReportRow {
+  return {
+    label: trend.agent ?? "(unknown)",
+    sessions: String(trend.session_count),
+    verificationPassRate: formatPercentage(
+      trend.average_verification_pass_rate,
+    ),
+    errors: String(trend.total_errors),
+    claims: String(trend.total_claims),
+    evidenceBackedRatio: formatPercentage(trend.evidence_backed_ratio),
+  };
+}
+
+function repoReportRow(trend: RepoTrend): ReportRow {
+  return {
+    label: trend.repo ?? "(unknown)",
+    sessions: String(trend.session_count),
+    verificationPassRate: formatPercentage(
+      trend.average_verification_pass_rate,
+    ),
+    errors: String(trend.total_errors),
+    claims: String(trend.total_claims),
+    evidenceBackedRatio: formatPercentage(trend.evidence_backed_ratio),
+  };
+}
+
+function positiveDays(value: string | undefined): number {
+  if (value === undefined) {
+    return 7;
+  }
+  const days = Number(value);
+  if (!Number.isSafeInteger(days) || days <= 0) {
+    throw new ArgumentError(
+      `Invalid value for --days: ${value}; expected a positive integer.`,
+    );
+  }
+  return days;
+}
+
+function reportCommand(args: string[]): number {
+  const options = parseOptions(args, new Set(["--days", "--data-dir"]));
+  const days = positiveDays(stringOption(options, "--days"));
+  const dataDir =
+    stringOption(options, "--data-dir") ?? join(homedir(), ".hyperagent");
+  const store = openStore(join(dataDir, "hyperagent.db"));
+  try {
+    const trends = getTrends(store, { days });
+    if (trends.by_agent.length === 0 && trends.by_repo.length === 0) {
+      console.log(`No sessions in the last ${days} days.`);
+      return 0;
+    }
+    formatReportSection(
+      `Agents — last ${days} days`,
+      "Agent",
+      trends.by_agent.map(agentReportRow),
+    );
+    console.log("");
+    formatReportSection(
+      `Repositories — last ${days} days`,
+      "Repository",
+      trends.by_repo.map(repoReportRow),
+    );
+    return 0;
+  } finally {
+    store.close();
+  }
+}
+
+interface MissionFile {
+  name: string;
+  size: number;
+  mtime: Date;
+  mtimeMs: number;
+}
+
+function isMissingPath(error: unknown): boolean {
+  return (
+    typeof error === "object"
+    && error !== null
+    && "code" in error
+    && error.code === "ENOENT"
+  );
+}
+
+async function listMissionRecords(dataDir: string): Promise<number> {
+  const missionsDir = join(dataDir, "missions");
+  let names: string[];
+  try {
+    const entries = await readdir(missionsDir, { withFileTypes: true });
+    names = entries
+      .filter((entry): boolean => entry.isFile() && entry.name.endsWith(".md"))
+      .map((entry): string => entry.name);
+  } catch (error: unknown) {
+    if (isMissingPath(error)) {
+      console.log("No mission records yet.");
+      return 0;
+    }
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(`Failed to list mission records in ${missionsDir}: ${message}`);
+  }
+
+  const files: MissionFile[] = [];
+  for (const name of names) {
+    const path = join(missionsDir, name);
+    try {
+      const metadata = await stat(path);
+      files.push({
+        name,
+        size: metadata.size,
+        mtime: metadata.mtime,
+        mtimeMs: metadata.mtimeMs,
+      });
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      throw new Error(`Failed to read mission record metadata for ${path}: ${message}`);
+    }
+  }
+  if (files.length === 0) {
+    console.log("No mission records yet.");
+    return 0;
+  }
+  files.sort((left, right): number => right.mtimeMs - left.mtimeMs);
+  for (const file of files) {
+    console.log(`${file.name}  ${file.size} bytes  ${file.mtime.toISOString()}`);
+  }
+  return 0;
+}
+
+async function missionsCommand(args: string[]): Promise<number> {
+  const options = parseOptions(args, new Set(["--session", "--data-dir"]));
+  const sessionId = stringOption(options, "--session");
+  const dataDir =
+    stringOption(options, "--data-dir") ?? join(homedir(), ".hyperagent");
+  if (sessionId === undefined) {
+    return listMissionRecords(dataDir);
+  }
+
+  const store = openStore(join(dataDir, "hyperagent.db"));
+  try {
+    const input = buildMissionInput(store, sessionId);
+    const runModel = spawnAgentRunner({ dataDir });
+    const record = await generateMission({ runModel }, input);
+    const path = await writeMissionRecord(record, dataDir);
+    console.log(`Mission record written: ${path}`);
+    console.log(`Generated by: ${record.generatedBy}`);
+    if (record.reason !== undefined) {
+      console.log(`Reason: ${record.reason}`);
+    }
+    return 0;
+  } finally {
+    store.close();
+  }
+}
+
 function xmlEscape(value: string): string {
   return value
     .replaceAll("&", "&amp;")
@@ -390,6 +679,15 @@ async function main(args: string[]): Promise<number> {
   }
   if (command === "status") {
     return statusCommand(rest);
+  }
+  if (command === "score") {
+    return scoreCommand(rest);
+  }
+  if (command === "report") {
+    return reportCommand(rest);
+  }
+  if (command === "missions") {
+    return missionsCommand(rest);
   }
   if (command === "install-plist") {
     return installPlistCommand(rest);

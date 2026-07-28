@@ -17,13 +17,6 @@ export const UNVERIFIED_HARNESSES: readonly UnverifiedHarness[] = [
     tier: "1 — full suit",
   },
   {
-    vendor: "Codex",
-    observe: "Session rollouts",
-    inject: "AGENTS.md, skills",
-    gate: "Approval config only",
-    tier: "2 — observe + inject",
-  },
-  {
     vendor: "Amp",
     observe: "Thread storage",
     inject: "AGENTS.md",

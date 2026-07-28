@@ -150,7 +150,7 @@ const usage = `Usage:
   bun src/daemon/cli.ts workshop approve <id> [--yes] [--data-dir D]
   bun src/daemon/cli.ts workshop reject <id> [--data-dir D]
   bun src/daemon/cli.ts workshop measure [--data-dir D]
-  bun src/daemon/cli.ts conformance run [--adapter <vendor>]
+  bun src/daemon/cli.ts conformance run [<vendor>|--adapter <vendor>]
   bun src/daemon/cli.ts conformance matrix [--write]
   bun src/daemon/cli.ts install-plist [--write]
 `;
@@ -1475,8 +1475,24 @@ export function conformanceExitCode(
 }
 
 async function conformanceRunCommand(args: string[]): Promise<number> {
-  const options = parseOptions(args, new Set(["--adapter"]));
-  const adapter = stringOption(options, "--adapter");
+  const positionalAdapter: string | undefined = args[0] !== undefined
+      && !args[0].startsWith("--")
+    ? args[0]
+    : undefined;
+  const optionArgs: string[] = positionalAdapter === undefined
+    ? args
+    : args.slice(1);
+  const options = parseOptions(optionArgs, new Set(["--adapter"]));
+  const optionAdapter: string | undefined = stringOption(
+    options,
+    "--adapter",
+  );
+  if (positionalAdapter !== undefined && optionAdapter !== undefined) {
+    throw new ArgumentError(
+      "Specify the conformance adapter positionally or with --adapter, not both",
+    );
+  }
+  const adapter: string | undefined = positionalAdapter ?? optionAdapter;
   const descriptors = adapter === undefined
     ? conformanceDescriptors()
     : [descriptorForVendor(adapter)].filter(

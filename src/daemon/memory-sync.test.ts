@@ -13,7 +13,7 @@ import { computeTargetRepos } from "../memory/inject.ts";
 import { openMemoryStore } from "../memory/store.ts";
 import { syncMemoryTargets } from "./memory-sync.ts";
 
-describe("Claude memory target sync", (): void => {
+describe("builtin memory target sync", (): void => {
   test("continues fanout after one target is refused", async (): Promise<void> => {
     const directory = mkdtempSync(join(tmpdir(), "hyperagent-memory-sync-"));
     const validRepo = join(directory, "valid-repo");
@@ -41,14 +41,15 @@ describe("Claude memory target sync", (): void => {
 
       const results = await syncMemoryTargets({ memoryStore });
 
-      expect(results).toHaveLength(2);
-      expect(results.some((result) => result.changed)).toBe(true);
+      expect(results).toHaveLength(4);
+      expect(results.filter((result) => result.changed)).toHaveLength(2);
       expect(
-        results.some((result) =>
+        results.filter((result) =>
           result.reason?.includes("cannot be canonicalized")
         ),
-      ).toBe(true);
+      ).toHaveLength(2);
       expect(existsSync(join(validRepo, "CLAUDE.local.md"))).toBe(true);
+      expect(existsSync(join(validRepo, "AGENTS.md"))).toBe(true);
     } finally {
       memoryStore.close();
       rmSync(directory, { recursive: true, force: true });
@@ -82,11 +83,16 @@ describe("Claude memory target sync", (): void => {
       });
 
       await syncMemoryTargets({ memoryStore });
-      const blockPath = join(repo, "CLAUDE.local.md");
-      const rendered = readFileSync(blockPath, "utf8");
-      // Both bullets present while the repo-scoped memory sustains the target.
-      expect(rendered).toContain("Repo specific gotcha.");
-      expect(rendered).toContain("Global lesson that applies everywhere.");
+      const blockPaths = [
+        join(repo, "CLAUDE.local.md"),
+        join(repo, "AGENTS.md"),
+      ];
+      for (const blockPath of blockPaths) {
+        const rendered = readFileSync(blockPath, "utf8");
+        // Both bullets are present while repo-scoped memory sustains the target.
+        expect(rendered).toContain("Repo specific gotcha.");
+        expect(rendered).toContain("Global lesson that applies everywhere.");
+      }
 
       // The repro: retire the only repo-scoped memory, which drops the repo
       // out of the target set. Capture the target set BEFORE the mutation.
@@ -97,15 +103,18 @@ describe("Claude memory target sync", (): void => {
 
       await syncMemoryTargets({ memoryStore, previousTargets });
 
-      const afterRetire = readFileSync(blockPath, "utf8");
-      // The file survives, the markers survive, and NO bullet is left behind —
-      // the stranded global bullet was the bug.
-      expect(existsSync(blockPath)).toBe(true);
-      expect(afterRetire).toContain("<!-- hyperagent:memory:begin -->");
-      expect(afterRetire).toContain("<!-- hyperagent:memory:end -->");
-      expect(afterRetire).not.toContain("Repo specific gotcha.");
-      expect(afterRetire).not.toContain("Global lesson that applies everywhere.");
-      expect(afterRetire).not.toContain("\n- ");
+      for (const blockPath of blockPaths) {
+        const afterRetire = readFileSync(blockPath, "utf8");
+        // Each file survives with markers and no stranded memory bullets.
+        expect(existsSync(blockPath)).toBe(true);
+        expect(afterRetire).toContain("<!-- hyperagent:memory:begin -->");
+        expect(afterRetire).toContain("<!-- hyperagent:memory:end -->");
+        expect(afterRetire).not.toContain("Repo specific gotcha.");
+        expect(afterRetire).not.toContain(
+          "Global lesson that applies everywhere.",
+        );
+        expect(afterRetire).not.toContain("\n- ");
+      }
 
       // The global memory is untouched in the store; only its rendering went.
       expect(memoryStore.getMemory(globalMemory.id)?.status).toBe("approved");
@@ -149,9 +158,11 @@ describe("Claude memory target sync", (): void => {
       memoryStore.approve(candidate.id);
       await syncMemoryTargets({ memoryStore, previousTargets });
 
-      const rendered = readFileSync(join(repo, "CLAUDE.local.md"), "utf8");
-      expect(rendered).toContain("Newly approved repo rule.");
-      expect(rendered).toContain("Global lesson that applies everywhere.");
+      for (const filename of ["CLAUDE.local.md", "AGENTS.md"]) {
+        const rendered = readFileSync(join(repo, filename), "utf8");
+        expect(rendered).toContain("Newly approved repo rule.");
+        expect(rendered).toContain("Global lesson that applies everywhere.");
+      }
     } finally {
       memoryStore.close();
       rmSync(directory, { recursive: true, force: true });

@@ -20,7 +20,10 @@ import type { EventInput } from "../schema/events.ts";
 import { openStore } from "../store/store.ts";
 import { runIngestOnce } from "./ingest.ts";
 import type { AdapterRunStats } from "./ingest.ts";
-import { builtinAdapters } from "./registry.ts";
+import {
+  builtinAdapters,
+  builtinInjectAdapters,
+} from "./registry.ts";
 
 const fixtureRoot = resolve(
   "src/adapters/claude-code/fixtures/projects",
@@ -32,6 +35,8 @@ function temporaryDataDir(): string {
   temporaryDirectories.push(directory);
   return directory;
 }
+
+const cliHome: string = temporaryDataDir();
 
 afterAll(() => {
   for (const directory of temporaryDirectories) {
@@ -368,9 +373,13 @@ describe("daemon boundaries and CLI", () => {
     expect(ingestSource.toLowerCase()).not.toContain("claude");
     expect(cliSource.toLowerCase()).not.toContain("claude");
     expect(registrySource.toLowerCase()).toContain("claude-code");
+    expect(registrySource.toLowerCase()).toContain("codex");
 
     const adapters = builtinAdapters();
-    expect(adapters.length).toBeGreaterThan(0);
+    expect(adapters.map((adapter): string => adapter.vendor)).toEqual([
+      "claude-code",
+      "codex",
+    ]);
     for (const adapter of adapters) {
       expect(typeof adapter.vendor).toBe("string");
       expect(typeof adapter.adapterVersion).toBe("string");
@@ -378,6 +387,9 @@ describe("daemon boundaries and CLI", () => {
       expect(typeof adapter.discoverSessions).toBe("function");
       expect(typeof adapter.parseSession).toBe("function");
     }
+    expect(
+      builtinInjectAdapters().map((adapter): string => adapter.vendor),
+    ).toEqual(["claude-code", "codex"]);
   });
 
   test("status CLI works before and after one-shot ingest", async () => {
@@ -403,6 +415,7 @@ describe("daemon boundaries and CLI", () => {
     const status = await runCli(["status", "--data-dir", dataDir]);
     expect(status.exitCode).toBe(0);
     expect(status.stdout).toContain("claude-code");
+    expect(status.stdout).toContain("codex");
     expect(status.stdout).toMatch(/sessions \d+/);
   });
 
@@ -450,6 +463,10 @@ async function runCli(
     ["bun", "src/daemon/cli.ts", ...args],
     {
       cwd: process.cwd(),
+      env: {
+        ...process.env,
+        HOME: cliHome,
+      },
       stdout: "pipe",
       stderr: "pipe",
     },

@@ -1,0 +1,2 @@
+{"timestamp":"2026-07-27T12:20:00.000Z","type":"session_meta","payload":{"session_id":"33333333-3333-4333-8333-333333333333","id":"33333333-3333-4333-8333-333333333333","timestamp":"2026-07-27T12:20:00.000Z","cwd":"/synthetic/project","originator":"Codex Conformance Fixture","cli_version":"0.144.2","source":"exec","thread_source":"user","model_provider":"openai","base_instructions":{"text":"Synthetic conformance instructions."}}}
+{"timestamp":"2026-07-27T12:20:01.000Z","type":"event_msg","payload":{"type":"user_message","message_missing":true}}

@@ -493,3 +493,71 @@ test("planRebuild does not mutate the store", (): void => {
   expect(allRows(join(dir, "hyperagent.db"), "memories")).toEqual(before);
   expect(allRows(join(dir, "hyperagent.db"), "events")).toEqual(eventsBefore);
 });
+
+test("a drifted target schema fails loudly rather than merging", async (): Promise<void> => {
+  seed();
+  seedDurableTable(2);
+
+  const plan = planRebuild(dir);
+  const paths = await archiveForRebuild(plan, "STAMP", dir);
+  openStore(join(dir, "hyperagent.db")).close();
+
+  // An engine opened the fresh store and created the table under a NEWER
+  // schema. The archived rows were written for the old one; inserting them
+  // silently changes what they mean.
+  const db = new Database(join(dir, "hyperagent.db"));
+  db.exec(
+    "CREATE TABLE memories (id TEXT PRIMARY KEY, claim TEXT NOT NULL, status TEXT NOT NULL, tier TEXT) STRICT",
+  );
+  db.close();
+
+  expect((): void => {
+    carryDurableTables(paths.archivedDb, join(dir, "hyperagent.db"));
+  }).toThrow(/different schema/);
+});
+
+test("an identical empty target table is filled, not rejected", async (): Promise<void> => {
+  seed();
+  seedDurableTable(2);
+
+  const plan = planRebuild(dir);
+  const paths = await archiveForRebuild(plan, "STAMP", dir);
+  openStore(join(dir, "hyperagent.db")).close();
+
+  // Same DDL the fixture used — the ordinary case of an engine opening the
+  // fresh store before carry-through runs.
+  const db = new Database(join(dir, "hyperagent.db"));
+  db.exec(`
+      CREATE TABLE IF NOT EXISTS memories (
+        id     TEXT PRIMARY KEY,
+        claim  TEXT NOT NULL,
+        status TEXT NOT NULL
+      ) STRICT;
+      CREATE INDEX IF NOT EXISTS idx_memories_status ON memories(status);
+    `);
+  db.close();
+
+  const result = carryDurableTables(paths.archivedDb, join(dir, "hyperagent.db"));
+  expect(result.carried).toEqual([{ name: "memories", rows: 2 }]);
+});
+
+/**
+ * No engine uses a virtual table today. The guard exists so that if one ever
+ * does, carry-through says so instead of producing a corrupt half-copy from
+ * replayed shadow-table DDL.
+ */
+test("a virtual table is refused, not half-copied", async (): Promise<void> => {
+  seed();
+  const db = new Database(join(dir, "hyperagent.db"));
+  db.exec("CREATE VIRTUAL TABLE claims_fts USING fts5(claim)");
+  db.query("INSERT INTO claims_fts (claim) VALUES ('hello')").run();
+  db.close();
+
+  const plan = planRebuild(dir);
+  const paths = await archiveForRebuild(plan, "STAMP", dir);
+  openStore(join(dir, "hyperagent.db")).close();
+
+  expect((): void => {
+    carryDurableTables(paths.archivedDb, join(dir, "hyperagent.db"));
+  }).toThrow(/virtual table/);
+});

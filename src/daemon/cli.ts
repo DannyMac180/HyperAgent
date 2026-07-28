@@ -337,6 +337,16 @@ function printTableBuckets(plan: RebuildPlan): void {
   console.log(
     `dropped, recomputable: ${derived.map(describe).join(", ") || "(none)"}`,
   );
+  if (derived.length > 0) {
+    // "Recomputable" is not "recomputed" — say which. Both of these are rebuilt
+    // by the ingest this command already runs (verified on the live store:
+    // policy_violations 219 -> 202, session_scores 1480 -> 1478), so the counts
+    // legitimately differ afterwards. The archive keeps the originals.
+    console.log(
+      "                    (rebuilt by the ingest below; counts may differ. " +
+        "The archived db keeps the pre-rebuild rows.)",
+    );
+  }
   console.log(
     `will be preserved:  ${durable.map(describe).join(", ") || "(none)"}`,
   );

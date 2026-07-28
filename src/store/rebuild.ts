@@ -403,15 +403,34 @@ function carryOneTable(
     throw new Error(`no CREATE TABLE statement recorded for ${entry.name}`);
   }
 
-  // A table of this name in the rebuilt store would only exist if some engine
-  // opened the fresh database and created an empty one before carry-through
-  // ran. Its own DDL made it, so the schema matches; the rows are what matter.
-  const existing = (target.query(
-    "SELECT count(*) AS n FROM sqlite_master WHERE type = 'table' AND name = ?1",
-  ).get(entry.name) as { n: number }).n;
-  if (existing === 0) {
+  // A virtual table's shadow tables appear in sqlite_master as ordinary tables,
+  // so replaying their CREATE statements collides with the ones the virtual
+  // table auto-creates — unfixable without writable_schema, which this module
+  // will not touch. No engine uses one today; if one ever does, this says so
+  // instead of producing a corrupt half-copy.
+  if (/^\s*create\s+virtual\s+table/i.test(tableSql)) {
+    throw new Error(
+      `${entry.name} is a virtual table; carry-through cannot reproduce its ` +
+        "shadow tables safely",
+    );
+  }
+
+  // A table of this name in the rebuilt store means some engine opened the
+  // fresh database and ran its own DDL before carry-through. Its schema must
+  // match the archive's byte for byte — a drifted schema silently changes what
+  // the carried rows mean, so it is a loud failure rather than a merge.
+  const existingSql = (target.query(
+    "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = ?1",
+  ).get(entry.name) as { sql: string | null } | null)?.sql ?? null;
+  if (existingSql === null) {
     target.exec(tableSql);
   } else {
+    if (existingSql !== tableSql) {
+      throw new Error(
+        `${entry.name} exists in the rebuilt store with a different schema than ` +
+          "the archive; refusing to insert rows under a schema they were not written for",
+      );
+    }
     const targetRows = (target.query(
       `SELECT count(*) AS n FROM ${quoted}`,
     ).get() as { n: number }).n;

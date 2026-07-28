@@ -197,7 +197,10 @@ describe("ingestGateSpool", (): void => {
         initiated_by: "suit",
       },
     });
-    expect(allowEvent.raw_ref).toStartWith(`${spoolPath(dataDir)}#`);
+    // DAN-217: deliberately NOT the spool's absolute path — that made the
+    // event id depend on $HOME. The content hash carries identity.
+    expect(allowEvent.raw_ref).toStartWith("gate-spool#");
+    expect(allowEvent.raw_ref).not.toContain(spoolPath(dataDir));
     expect(allowEvent.raw_ref?.split("#").at(-1)).toMatch(/^[a-f0-9]{64}$/);
 
     expect((): void => {

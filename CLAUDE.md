@@ -32,6 +32,7 @@ This repo is the **open data plane** ("the armor", MIT): schema, store, adapters
 
 **Binding rules for this repo:**
 - Never add judgment-plane code here — every push is irrevocably MIT. If a task needs scoring/missions/workshop/forge/memory-extraction changes, it belongs in `hyperagent-cockpit` (checkout: `~/Desktop/dev/hyperagent-cockpit`); stop and surface if unsure.
+- **This checkout is the side door.** The cockpit repo vendors this one as its `open/` submodule (tracking `main`), so cross-plane and judgment-plane sessions start there and edit this code through `open/`. Use this checkout for open-plane-only work. Either way the commit lands here and goes through a PR — after it merges, the cockpit's submodule pin gets bumped separately.
 - The daemon/CLI seam is `IngestOptions.scorer`/`missionQueue`/`memoryQueue` (`src/daemon/ingest.ts`), `WatchPlugins` + `runCli(args, extraCommands, watchPlugins)` (`src/daemon/cli.ts`). The Cockpit wraps these; keep them stable and vendor-blind — interface changes need a matching cockpit PR before merge.
 - Schema and store changes always land HERE first; the cockpit pins this repo and consumes the canonical schema only.
 - Judgment-plane git history predating the split (through `61499ab`) remains in this repo's public history — that's accepted and irrevocable; do not attempt history rewrites.

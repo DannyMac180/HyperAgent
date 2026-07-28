@@ -12,6 +12,10 @@ import type {
 import {
   loadContract,
 } from "../gate/contract.ts";
+import { runDecayAudit } from "../forge/decay.ts";
+import type { DecayVerdict } from "../forge/decay.ts";
+import { computeMetaReview } from "../forge/meta-review.ts";
+import { buildCapabilityRegistry } from "../forge/registry.ts";
 import {
   listViolations,
 } from "../gate/detect.ts";
@@ -153,6 +157,9 @@ const usage = `Usage:
   bun src/daemon/cli.ts workshop measure [--data-dir D]
   bun src/daemon/cli.ts conformance run [<vendor>|--adapter <vendor>]
   bun src/daemon/cli.ts conformance matrix [--write]
+  bun src/daemon/cli.ts forge registry [--json] [--data-dir D]
+  bun src/daemon/cli.ts forge audit [--json] [--min-sessions N] [--max-scan N] [--data-dir D]
+  bun src/daemon/cli.ts forge review [--json] [--data-dir D]
   bun src/daemon/cli.ts install-plist [--write]
 `;
 
@@ -179,6 +186,7 @@ function parseOptions(
       || flag === "--yes"
       || flag === "--workshop"
       || flag === "--apply"
+      || flag === "--json"
     ) {
       parsed.set(flag, true);
       continue;
@@ -1603,6 +1611,189 @@ async function conformanceCommand(args: string[]): Promise<number> {
   );
 }
 
+function forgeDataDir(options: Map<string, string | true>): string {
+  return stringOption(options, "--data-dir") ?? join(homedir(), ".hyperagent");
+}
+
+function forgeIntegerOption(
+  options: Map<string, string | true>,
+  flag: string,
+): number | undefined {
+  const value = stringOption(options, flag);
+  if (value === undefined) {
+    return undefined;
+  }
+  const parsed = Number(value);
+  if (!Number.isSafeInteger(parsed) || parsed <= 0) {
+    throw new ArgumentError(`${flag} must be a positive integer`);
+  }
+  return parsed;
+}
+
+function forgeRegistryCommand(args: string[]): number {
+  const options = parseOptions(args, new Set(["--data-dir", "--json"]));
+  const dataDir = forgeDataDir(options);
+  const store = openStore(join(dataDir, "hyperagent.db"));
+  let registry;
+  try {
+    registry = buildCapabilityRegistry({ dataDir }, { store });
+  } finally {
+    store.close();
+  }
+  if (options.get("--json") === true) {
+    console.log(JSON.stringify(registry, null, 2));
+    return 0;
+  }
+  if (registry.records.length === 0) {
+    console.log("No installed capabilities found.");
+  } else {
+    console.log("ID  TYPE  SCOPE  INSTALLED  ORIGIN");
+    for (const record of registry.records) {
+      const scope = record.scope.key === null
+        ? record.scope.level
+        : `${record.scope.level}:${record.scope.key}`;
+      console.log(
+        `${record.id}  ${record.type}  ${scope}  ` +
+          `${record.installedAt ?? "unknown"}  ` +
+          `${record.originSignature ?? "(no signature)"}`,
+      );
+    }
+  }
+  for (const line of registry.diagnostics) {
+    console.error(`note: ${line}`);
+  }
+  return 0;
+}
+
+function renderDecayVerdict(verdictRow: DecayVerdict): string {
+  const lines = [
+    `${verdictRow.capabilityId} [${verdictRow.vendor}]: ${verdictRow.status}`,
+    `  ${verdictRow.reason}`,
+  ];
+  if (verdictRow.retirementAction !== null) {
+    lines.push(`  action: ${verdictRow.retirementAction}`);
+  }
+  return lines.join("\n");
+}
+
+function forgeAuditCommand(args: string[]): number {
+  const options = parseOptions(
+    args,
+    new Set(["--data-dir", "--json", "--min-sessions", "--max-scan"]),
+  );
+  const dataDir = forgeDataDir(options);
+  const minSessions = forgeIntegerOption(options, "--min-sessions");
+  const maxScan = forgeIntegerOption(options, "--max-scan");
+  const store = openStore(join(dataDir, "hyperagent.db"));
+  try {
+    const registry = buildCapabilityRegistry({ dataDir }, { store });
+    const report = runDecayAudit(store, registry, {
+      ...(minSessions === undefined
+        ? {}
+        : { minPostInstallSessions: minSessions }),
+      ...(maxScan === undefined ? {} : { maxSessionsScanned: maxScan }),
+    });
+    if (options.get("--json") === true) {
+      console.log(JSON.stringify(report, null, 2));
+      return 0;
+    }
+    console.log(
+      `Decay audit v${report.auditVersion} — ${report.recordCount} capability record(s), vendors: ${report.vendors.join(", ") || "(none)"}`,
+    );
+    console.log(`limitation: ${report.limitation}`);
+    if (report.verdicts.length === 0) {
+      console.log("Nothing to audit: no installed capabilities.");
+    }
+    for (const verdictRow of report.verdicts) {
+      console.log(renderDecayVerdict(verdictRow));
+    }
+    const candidates = report.verdicts.filter(
+      (row): boolean => row.status === "retirement_candidate",
+    );
+    console.log(
+      `retirement candidates: ${candidates.length} (human review required; the audit never retires)`,
+    );
+    for (const line of report.diagnostics) {
+      console.error(`note: ${line}`);
+    }
+    return 0;
+  } finally {
+    store.close();
+  }
+}
+
+function forgeReviewCommand(args: string[]): number {
+  const options = parseOptions(args, new Set(["--data-dir", "--json"]));
+  const dataDir = forgeDataDir(options);
+  const queue = openWorkshopQueue({ dataDir });
+  const store = openStore(join(dataDir, "hyperagent.db"));
+  try {
+    const review = computeMetaReview(queue, store);
+    if (options.get("--json") === true) {
+      console.log(JSON.stringify(review, null, 2));
+      return 0;
+    }
+    console.log(`Workshop meta-review v${review.metaReviewVersion}`);
+    console.log(
+      `proposals: ${review.proposals.total} total — ` +
+        Object.entries(review.proposals.byStatus)
+          .map(([status, count]): string => `${status} ${count}`)
+          .join(", "),
+    );
+    const acceptance = review.acceptance.acceptanceRate;
+    const install = review.acceptance.installRate;
+    console.log(
+      `acceptance: ${acceptance === null ? "n/a" : acceptance.toFixed(2)} ` +
+        `(${review.acceptance.approved} approved / ${review.acceptance.decided} decided); ` +
+        `install rate: ${install === null ? "n/a" : install.toFixed(2)}`,
+    );
+    const meanCaught = review.evalQuality.meanPositivesCaughtRatio;
+    console.log(
+      `eval quality: ${review.evalQuality.proposalsWithEval} with evals, ` +
+        `mean positives-caught ${meanCaught === null ? "n/a" : meanCaught.toFixed(2)}, ` +
+        `false flags ${review.evalQuality.totalFalseFlags}, ` +
+        `${review.evalQuality.withNegativeControls} with negative controls, ` +
+        `${review.evalQuality.withHoldout} with holdout`,
+    );
+    console.log(
+      `specificity: scopes global ${review.specificity.scopeDistribution.global} / ` +
+        `repo ${review.specificity.scopeDistribution.repo} / ` +
+        `agent ${review.specificity.scopeDistribution.agent}; ` +
+        `${review.specificity.distinctClusters} distinct cluster(s)`,
+    );
+    console.log(
+      `measurement: ${review.measurement.measured} measured — ` +
+        (Object.entries(review.measurement.byStatus)
+          .map(([status, count]): string => `${status} ${count}`)
+          .join(", ") || "none"),
+    );
+    for (const line of review.diagnostics) {
+      console.error(`note: ${line}`);
+    }
+    return 0;
+  } finally {
+    store.close();
+    queue.close();
+  }
+}
+
+function forgeCommand(args: string[]): number {
+  const subcommand = args[0];
+  const rest = args.slice(1);
+  if (subcommand === "registry") {
+    return forgeRegistryCommand(rest);
+  }
+  if (subcommand === "audit") {
+    return forgeAuditCommand(rest);
+  }
+  if (subcommand === "review") {
+    return forgeReviewCommand(rest);
+  }
+  throw new ArgumentError(
+    `Unknown forge subcommand: ${subcommand ?? "(missing)"}`,
+  );
+}
+
 function gateDataDir(
   options: Map<string, string | true>,
 ): string {
@@ -2018,6 +2209,9 @@ async function main(args: string[]): Promise<number> {
   }
   if (command === "conformance") {
     return conformanceCommand(rest);
+  }
+  if (command === "forge") {
+    return forgeCommand(rest);
   }
   if (command === "install-plist") {
     return installPlistCommand(rest);

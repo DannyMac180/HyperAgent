@@ -84,7 +84,12 @@ import type {
   RepoTrend,
   SessionScore,
 } from "../scoring/score.ts";
-import { archiveForRebuild, planRebuild } from "../store/rebuild.ts";
+import {
+  archiveForRebuild,
+  carryDurableTables,
+  planRebuild,
+} from "../store/rebuild.ts";
+import type { RebuildPlan } from "../store/rebuild.ts";
 import { openStore } from "../store/store.ts";
 import { installProposal } from "../workshop/install.ts";
 import { measureInstalled } from "../workshop/measure.ts";
@@ -268,6 +273,7 @@ async function rebuildCommand(args: string[]): Promise<number> {
   console.log(`source artifacts:   ${plan.sourceArtifacts}`);
   console.log(`missing artifacts:  ${plan.missingArtifacts.length}`);
   console.log(`orphaned events:    ${plan.orphans.length}`);
+  printTableBuckets(plan);
 
   if (!apply) {
     console.log("");
@@ -290,6 +296,17 @@ async function rebuildCommand(args: string[]): Promise<number> {
   console.log("");
   printRun(result);
 
+  // Carry-through runs last, against a finished database (DAN-218).
+  const carry = carryDurableTables(paths.archivedDb, plan.dbPath);
+  console.log("");
+  if (carry.carried.length === 0) {
+    console.log("preserved tables:   (none — no durable sibling tables present)");
+  } else {
+    for (const table of carry.carried) {
+      console.log(`preserved:          ${table.name} (${table.rows} row(s))`);
+    }
+  }
+
   const after = planRebuild(dataDir);
   const afterCounts = Object.entries(after.eventsByVendor)
     .map(([vendor, n]: [string, number]): string => `${vendor}=${n}`)
@@ -297,6 +314,32 @@ async function rebuildCommand(args: string[]): Promise<number> {
   console.log("");
   console.log(`events after:       ${afterCounts || "(none)"}`);
   return 0;
+}
+
+/**
+ * State the rebuild's full blast radius before anything irreversible happens
+ * (DAN-218). Silence about a table that is about to be destroyed is the defect.
+ */
+function printTableBuckets(plan: RebuildPlan): void {
+  const describe = (entry: { name: string; rows: number }): string =>
+    `${entry.name} (${entry.rows} row(s))`;
+  const bucket = (name: string): { name: string; rows: number }[] =>
+    plan.tables.filter((entry): boolean => entry.bucket === name);
+
+  const eventStore = bucket("event_store");
+  const derived = bucket("derived");
+  const durable = bucket("durable");
+
+  console.log("");
+  console.log(
+    `rebuilt from source: ${eventStore.map(describe).join(", ") || "(none)"}`,
+  );
+  console.log(
+    `dropped, recomputable: ${derived.map(describe).join(", ") || "(none)"}`,
+  );
+  console.log(
+    `will be preserved:  ${durable.map(describe).join(", ") || "(none)"}`,
+  );
 }
 
 function watchedRoots(

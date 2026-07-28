@@ -7,25 +7,8 @@ import type {
   AdapterHealthStatus,
   ObserveAdapter,
 } from "../adapters/types.ts";
-import {
-  createMissionQueue,
-  type MissionQueue,
-} from "../missions/queue.ts";
-import {
-  createMemoryQueue,
-  type MemoryQueue,
-} from "../memory/queue.ts";
-import {
-  openMemoryStore,
-  type MemoryStore,
-} from "../memory/store.ts";
-import { spawnAgentRunner } from "../missions/runner.ts";
 import { deterministicEventId } from "../schema/ids.ts";
 import type { EventInput } from "../schema/events.ts";
-import {
-  SCORER_VERSION,
-  scoreSession,
-} from "../scoring/score.ts";
 import {
   detectViolations,
 } from "../gate/detect.ts";
@@ -40,17 +23,35 @@ import {
   ingestGateSpool,
 } from "./gate-ingest.ts";
 
+/**
+ * Judgment-plane seam (DAN-213). The open daemon is a pure flight recorder:
+ * it observes, stores, and runs gate detection. Scoring, mission generation,
+ * and memory extraction are injected by the Cockpit build through these
+ * structural interfaces — the open tree never imports judgment code.
+ */
+export interface IngestQueue {
+  enqueue(sessionId: string): boolean;
+  drain(): Promise<void>;
+}
+
+export interface SessionScorer {
+  /** Must match the scorer_version written to session_scores rows. */
+  scorerVersion: string;
+  scoreSession(store: ReturnType<typeof openStore>, sessionId: string): void;
+}
+
 export interface IngestOptions {
   dataDir?: string;
   adapters: ObserveAdapter[];
   quiesceMs?: number;
   now?: () => number;
-  scoring?: boolean;
+  /** Absent → sessions are not scored (open flight-recorder default). */
+  scorer?: SessionScorer;
   gate?: boolean;
-  missions?: boolean;
-  missionQueue?: MissionQueue;
-  memory?: boolean;
-  memoryQueue?: MemoryQueue;
+  /** Absent → no missions enqueued. Caller owns the queue lifecycle (drain/close). */
+  missionQueue?: IngestQueue;
+  /** Absent → no memory extraction enqueued. Caller owns the queue lifecycle. */
+  memoryQueue?: IngestQueue;
 }
 
 export interface AdapterRunStats {
@@ -254,6 +255,7 @@ function grownScoredSessions(store: ReturnType<typeof openStore>): string[] {
 function scoreIsCurrent(
   store: ReturnType<typeof openStore>,
   sessionId: string,
+  scorerVersion: string,
 ): boolean {
   try {
     const row = store.db.query<CurrentScoreRow, [string]>(`
@@ -269,7 +271,7 @@ function scoreIsCurrent(
     return (
       row !== null &&
       typeof row.current_watermark === "number" &&
-      row.scorer_version === SCORER_VERSION &&
+      row.scorer_version === scorerVersion &&
       row.event_watermark === row.current_watermark
     );
   } catch (error: unknown) {
@@ -349,9 +351,6 @@ export async function runIngestOnce(
   const adapterByVendor = new Map<string, ObserveAdapter>();
   const adapterStats: AdapterRunStats[] = [];
   const closedThisPass = new Set<string>();
-  let internallyCreatedMissionQueue: MissionQueue | undefined;
-  let internallyCreatedMemoryQueue: MemoryQueue | undefined;
-  let internallyCreatedMemoryStore: MemoryStore | undefined;
 
   try {
     for (const adapter of options.adapters) {
@@ -563,15 +562,16 @@ export async function runIngestOnce(
     }
 
     let sessionsScored = 0;
-    if (options.scoring !== false) {
+    const scorer = options.scorer;
+    if (scorer !== undefined) {
       const sessionsToScore = new Set<string>(closedThisPass);
       for (const sessionId of grownScoredSessions(store)) {
         sessionsToScore.add(sessionId);
       }
       for (const sessionId of sessionsToScore) {
         try {
-          if (!scoreIsCurrent(store, sessionId)) {
-            scoreSession(store, sessionId);
+          if (!scoreIsCurrent(store, sessionId, scorer.scorerVersion)) {
+            scorer.scoreSession(store, sessionId);
             sessionsScored += 1;
           }
         } catch (error: unknown) {
@@ -609,24 +609,9 @@ export async function runIngestOnce(
     }
 
     let missionsEnqueued = 0;
-    if (options.missions === true && closedThisPass.size > 0) {
-      let missionQueue = options.missionQueue;
+    if (options.missionQueue !== undefined && closedThisPass.size > 0) {
+      const missionQueue = options.missionQueue;
       try {
-        if (missionQueue === undefined) {
-          missionQueue = createMissionQueue({
-            deps: { runModel: spawnAgentRunner({ dataDir }) },
-            dataDir,
-            store,
-            onError: (sessionId: string, error: unknown): void => {
-              console.error(
-                `Failed to generate mission for ingested session "${sessionId}": ${
-                  errorMessage(error)
-                }`,
-              );
-            },
-          });
-          internallyCreatedMissionQueue = missionQueue;
-        }
         for (const sessionId of closedThisPass) {
           // A newly inserted session_end is a new close boundary, so refresh the
           // mission even when a prior mission record already exists.
@@ -642,34 +627,9 @@ export async function runIngestOnce(
     }
 
     let memoryExtractionsEnqueued = 0;
-    if (options.memory === true && closedThisPass.size > 0) {
-      let memoryQueue = options.memoryQueue;
+    if (options.memoryQueue !== undefined && closedThisPass.size > 0) {
+      const memoryQueue = options.memoryQueue;
       try {
-        if (memoryQueue === undefined) {
-          const memoryStore = openMemoryStore({
-            dbPath: join(dataDir, "hyperagent.db"),
-            memoryDir: join(dataDir, "memory"),
-          });
-          try {
-            memoryQueue = createMemoryQueue({
-              dataDir,
-              store,
-              memoryStore,
-              onError: (sessionId: string, error: unknown): void => {
-                console.error(
-                  `Failed to extract memory for ingested session "${sessionId}": ${
-                    errorMessage(error)
-                  }`,
-                );
-              },
-            });
-          } catch (error: unknown) {
-            memoryStore.close();
-            throw error;
-          }
-          internallyCreatedMemoryStore = memoryStore;
-          internallyCreatedMemoryQueue = memoryQueue;
-        }
         for (const sessionId of closedThisPass) {
           // Injection is deliberately not automatic here. Context changes only
           // after an explicit status transition or `memory sync`.
@@ -700,18 +660,8 @@ export async function runIngestOnce(
     await persistState(dataDir, state);
     return result;
   } finally {
-    const drains: Promise<void>[] = [];
-    if (internallyCreatedMissionQueue !== undefined) {
-      drains.push(internallyCreatedMissionQueue.drain());
-    }
-    if (internallyCreatedMemoryQueue !== undefined) {
-      drains.push(internallyCreatedMemoryQueue.drain());
-    }
-    try {
-      await Promise.all(drains);
-    } finally {
-      internallyCreatedMemoryStore?.close();
-      store.close();
-    }
+    // Injected queues are caller-owned: the Cockpit build drains and closes
+    // them. The open flight recorder has nothing to drain.
+    store.close();
   }
 }

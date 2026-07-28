@@ -5,6 +5,7 @@ import {
   mkdtempSync,
   rmSync,
   statSync,
+  writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -19,6 +20,7 @@ const BASIC_UUID = "11111111-1111-4111-8111-111111111111";
 const SIDECHAIN_UUID = "22222222-2222-4222-8222-222222222222";
 const MALFORMED_UUID = "33333333-3333-4333-8333-333333333333";
 const TRUNCATED_UUID = "44444444-4444-4444-8444-444444444444";
+const FALLBACK_UUID = "55555555-5555-4555-8555-555555555555";
 const FIXTURE_UUIDS = [
   BASIC_UUID,
   SIDECHAIN_UUID,
@@ -259,6 +261,145 @@ describe("ClaudeCodeAdapter", (): void => {
     expect(first.events.map((event): string => event.id)).toEqual(
       second.events.map((event): string => event.id),
     );
+  });
+
+  test("prefers content session ids for raw refs without changing session_id", async (): Promise<void> => {
+    // All local fixture I/O is bounded by Bun's per-test timeout.
+    const source: DiscoveredSession = await fixtureSession(BASIC_UUID);
+    const directory: string = mkdtempSync(join(tmpdir(), "claude-adapter-id-"));
+    tempDirectories.push(directory);
+    const path: string = join(directory, `${FALLBACK_UUID}.jsonl`);
+    copyFileSync(source.path, path);
+    const metadata = statSync(path);
+    const session: DiscoveredSession = {
+      sessionId: `claude-code:${FALLBACK_UUID}`,
+      path,
+      mtimeMs: metadata.mtimeMs,
+      sizeBytes: metadata.size,
+    };
+
+    const { events } = await adapter.parseSession(session, "");
+    expect(events.length).toBeGreaterThan(0);
+    expect(
+      events.every(
+        (event): boolean =>
+          typeof event.raw_ref === "string"
+          && event.raw_ref.startsWith(`claude-code:${BASIC_UUID}#L`),
+      ),
+    ).toBe(true);
+    expect(
+      events.every(
+        (event): boolean =>
+          event.session_id === `claude-code:${FALLBACK_UUID}`,
+      ),
+    ).toBe(true);
+  });
+
+  test("prefers content sessionId over content leafUuid for raw refs", async (): Promise<void> => {
+    const directory: string = mkdtempSync(
+      join(tmpdir(), "claude-adapter-leaf-"),
+    );
+    tempDirectories.push(directory);
+    const path: string = join(directory, `${FALLBACK_UUID}.jsonl`);
+    writeFileSync(
+      path,
+      `${JSON.stringify({
+        type: "user",
+        leafUuid: BASIC_UUID,
+        sessionId: SIDECHAIN_UUID,
+        timestamp: "2026-07-26T12:00:00.000Z",
+        message: {
+          role: "user",
+          content: "fixture request",
+        },
+      })}\n`,
+      "utf8",
+    );
+    const metadata = statSync(path);
+    const session: DiscoveredSession = {
+      sessionId: `claude-code:${FALLBACK_UUID}`,
+      path,
+      mtimeMs: metadata.mtimeMs,
+      sizeBytes: metadata.size,
+    };
+
+    // Local fixture parsing is bounded by Bun's per-test timeout.
+    const { events } = await adapter.parseSession(session, "");
+    expect(events.length).toBeGreaterThan(0);
+    expect(
+      events.every(
+        (event): boolean =>
+          event.raw_ref === `claude-code:${SIDECHAIN_UUID}#L1`,
+      ),
+    ).toBe(true);
+  });
+
+  test("uses content leafUuid when content sessionId is absent", async (): Promise<void> => {
+    const directory: string = mkdtempSync(
+      join(tmpdir(), "claude-adapter-leaf-only-"),
+    );
+    tempDirectories.push(directory);
+    const path: string = join(directory, `${FALLBACK_UUID}.jsonl`);
+    writeFileSync(
+      path,
+      `${JSON.stringify({
+        type: "user",
+        leafUuid: BASIC_UUID,
+        timestamp: "2026-07-26T12:00:00.000Z",
+        message: {
+          role: "user",
+          content: "fixture request",
+        },
+      })}\n`,
+      "utf8",
+    );
+    const metadata = statSync(path);
+    const session: DiscoveredSession = {
+      sessionId: `claude-code:${FALLBACK_UUID}`,
+      path,
+      mtimeMs: metadata.mtimeMs,
+      sizeBytes: metadata.size,
+    };
+
+    // Local fixture parsing is bounded by Bun's per-test timeout.
+    const { events } = await adapter.parseSession(session, "");
+    expect(events.length).toBeGreaterThan(0);
+    expect(
+      events.every(
+        (event): boolean =>
+          event.raw_ref === `claude-code:${BASIC_UUID}#L1`,
+      ),
+    ).toBe(true);
+  });
+
+  test("falls back to the filename session id when content has no uuid", async (): Promise<void> => {
+    const directory: string = mkdtempSync(
+      join(tmpdir(), "claude-adapter-fallback-"),
+    );
+    tempDirectories.push(directory);
+    const path: string = join(directory, `${FALLBACK_UUID}.jsonl`);
+    writeFileSync(
+      path,
+      `${JSON.stringify({
+        type: "system",
+        subtype: "error",
+        timestamp: "2026-07-26T12:00:00.000Z",
+        message: "fixture error",
+      })}\n`,
+      "utf8",
+    );
+    const metadata = statSync(path);
+    const session: DiscoveredSession = {
+      sessionId: `claude-code:${FALLBACK_UUID}`,
+      path,
+      mtimeMs: metadata.mtimeMs,
+      sizeBytes: metadata.size,
+    };
+
+    // Local fixture parsing is bounded by Bun's per-test timeout.
+    const { events } = await adapter.parseSession(session, "");
+    expect(events).toHaveLength(1);
+    expect(events[0]?.raw_ref).toBe(`claude-code:${FALLBACK_UUID}#L1`);
   });
 
   test("round-trips adapter events through the idempotent store", async (): Promise<void> => {

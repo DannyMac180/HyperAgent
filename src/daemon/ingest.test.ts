@@ -1,15 +1,19 @@
 import { afterAll, describe, expect, test } from "bun:test";
 import {
+  copyFileSync,
+  mkdirSync,
   mkdtempSync,
   readFileSync,
   rmSync,
   unlinkSync,
+  utimesSync,
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
 
 import { ClaudeCodeAdapter } from "../adapters/claude-code/adapter.ts";
+import { CodexAdapter } from "../adapters/codex/adapter.ts";
 import type {
   DiscoveredSession,
   ObserveAdapter,
@@ -27,6 +31,13 @@ import {
 
 const fixtureRoot = resolve(
   "src/adapters/claude-code/fixtures/projects",
+);
+const PATH_INVARIANCE_UUID = "11111111-1111-4111-8111-111111111111";
+const CLAUDE_PATH_INVARIANCE_FIXTURE = resolve(
+  "src/adapters/claude-code/conformance-fixtures/clean.jsonl",
+);
+const CODEX_PATH_INVARIANCE_FIXTURE = resolve(
+  "src/adapters/codex/conformance-fixtures/clean.jsonl",
 );
 const temporaryDirectories: string[] = [];
 
@@ -71,6 +82,89 @@ function event(
     raw_ref: rawRef,
     payload,
   } as EventInput;
+}
+
+interface PathInvariantFixtureRoots {
+  claudeProjectsRoot: string;
+  codexSessionsRoot: string;
+}
+
+interface StoredEventIdentity {
+  id: string;
+  rawRef: string;
+  type: string;
+}
+
+function copyPathInvariantFixtures(
+  label: string,
+): PathInvariantFixtureRoots {
+  const root: string = temporaryDataDir();
+  const claudeProjectsRoot: string = join(root, `${label}-claude-projects`);
+  const claudePath: string = join(
+    claudeProjectsRoot,
+    "-fixture-project",
+    `${PATH_INVARIANCE_UUID}.jsonl`,
+  );
+  const codexSessionsRoot: string = join(root, `${label}-codex-sessions`);
+  const codexPath: string = join(
+    codexSessionsRoot,
+    "2026",
+    "07",
+    "27",
+    `rollout-2026-07-27T12-00-00-${PATH_INVARIANCE_UUID}.jsonl`,
+  );
+
+  mkdirSync(dirname(claudePath), { recursive: true });
+  mkdirSync(dirname(codexPath), { recursive: true });
+  copyFileSync(CLAUDE_PATH_INVARIANCE_FIXTURE, claudePath);
+  copyFileSync(CODEX_PATH_INVARIANCE_FIXTURE, codexPath);
+  const quiescentTime: Date = new Date("2026-07-27T12:05:00.000Z");
+  utimesSync(claudePath, quiescentTime, quiescentTime);
+  utimesSync(codexPath, quiescentTime, quiescentTime);
+
+  return { claudeProjectsRoot, codexSessionsRoot };
+}
+
+function storedEventIdentities(
+  dataDir: string,
+  vendor: string,
+): StoredEventIdentity[] {
+  const store = openStore(join(dataDir, "hyperagent.db"));
+  try {
+    const rows: Array<{
+      id: unknown;
+      raw_ref: unknown;
+      type: unknown;
+    }> = store.db
+      .query<
+        { id: unknown; raw_ref: unknown; type: unknown },
+        [string]
+      >(
+        "SELECT id, raw_ref, type FROM events "
+        + "WHERE vendor = ? ORDER BY id",
+      )
+      .all(vendor);
+    return rows.map(
+      (row, index): StoredEventIdentity => {
+        if (
+          typeof row.id !== "string"
+          || typeof row.raw_ref !== "string"
+          || typeof row.type !== "string"
+        ) {
+          throw new Error(
+            `Invalid stored ${vendor} event identity at index ${index}`,
+          );
+        }
+        return {
+          id: row.id,
+          rawRef: row.raw_ref,
+          type: row.type,
+        };
+      },
+    );
+  } finally {
+    store.close();
+  }
 }
 
 function healthyAdapter(options?: {
@@ -159,6 +253,62 @@ describe("runIngestOnce", () => {
     expect(stats.sessionsParsed).toBe(stats.sessionsDiscovered);
     expect(stats.sessionsParsed).toBeGreaterThan(0);
     expect(stats.sessionsSkippedUnchanged).toBe(0);
+  });
+
+  test("keeps adapter and daemon event ids invariant across absolute roots", async () => {
+    const firstRoots: PathInvariantFixtureRoots =
+      copyPathInvariantFixtures("first");
+    const secondRoots: PathInvariantFixtureRoots =
+      copyPathInvariantFixtures("second");
+    const firstDataDir: string = temporaryDataDir();
+    const secondDataDir: string = temporaryDataDir();
+    const fixedNow: number = Date.parse("2026-07-27T13:00:00.000Z");
+
+    const adaptersFor = (
+      roots: PathInvariantFixtureRoots,
+    ): ObserveAdapter[] => [
+      new ClaudeCodeAdapter({
+        projectsRoot: roots.claudeProjectsRoot,
+      }),
+      new CodexAdapter({
+        sessionsRoot: roots.codexSessionsRoot,
+      }),
+    ];
+
+    // Local fixture ingestion is bounded by Bun's per-test timeout.
+    await runIngestOnce({
+      dataDir: firstDataDir,
+      adapters: adaptersFor(firstRoots),
+      quiesceMs: 1_000,
+      now: (): number => fixedNow,
+    });
+    await runIngestOnce({
+      dataDir: secondDataDir,
+      adapters: adaptersFor(secondRoots),
+      quiesceMs: 1_000,
+      now: (): number => fixedNow,
+    });
+
+    for (const vendor of ["claude-code", "codex"]) {
+      const first: StoredEventIdentity[] = storedEventIdentities(
+        firstDataDir,
+        vendor,
+      );
+      const second: StoredEventIdentity[] = storedEventIdentities(
+        secondDataDir,
+        vendor,
+      );
+      expect(first.length).toBeGreaterThan(1);
+      expect(first).toEqual(second);
+
+      const sessionEnds: StoredEventIdentity[] = first.filter(
+        (eventIdentity): boolean => eventIdentity.type === "session_end",
+      );
+      expect(sessionEnds).toHaveLength(1);
+      expect(sessionEnds[0]?.rawRef).toBe(
+        `${vendor}:${PATH_INVARIANCE_UUID}#quiesce`,
+      );
+    }
   });
 
   test("recovers from a corrupt state file", async () => {

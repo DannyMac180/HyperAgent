@@ -123,13 +123,50 @@ const stringifyResultContent = (content: unknown): string => {
   return canonicalJson(content);
 };
 
+function nativeSessionIdFromCanonical(sessionId: string): string {
+  return sessionId.startsWith("claude-code:")
+    ? sessionId.slice("claude-code:".length)
+    : sessionId;
+}
+
+function canonicalSessionId(nativeSessionId: string): string {
+  return `claude-code:${nativeSessionId}`;
+}
+
+function nativeSessionIdFromLines(
+  lines: CompleteLine[],
+  fallbackSessionId: string,
+): string {
+  /*
+   * Content identity wins over artifact location: prefer the transcript's
+   * sessionId, then leafUuid when that is the only content UUID, and fall back
+   * to the filename-derived canonical session id. This resolver is
+   * intentionally scoped to raw_ref derivation so existing emitted session_id
+   * values remain byte-identical.
+   */
+  for (const field of ["sessionId", "leafUuid"] as const) {
+    for (const completeLine of lines) {
+      const line: TranscriptLine | null = parseTranscriptLine(completeLine.raw);
+      const candidate: unknown = line?.[field];
+      if (typeof candidate !== "string" || candidate.length === 0) {
+        continue;
+      }
+      return nativeSessionIdFromCanonical(candidate);
+    }
+  }
+
+  return nativeSessionIdFromCanonical(fallbackSessionId);
+}
+
+function rawRefFor(nativeSessionId: string, lineNumber: number): string {
+  return `${canonicalSessionId(nativeSessionId)}#L${lineNumber}`;
+}
+
 const parentIdFromLines = (
   lines: CompleteLine[],
   sessionId: string,
 ): string | null => {
-  const nativeSessionId: string = sessionId.startsWith("claude-code:")
-    ? sessionId.slice("claude-code:".length)
-    : sessionId;
+  const nativeSessionId: string = nativeSessionIdFromCanonical(sessionId);
 
   for (const completeLine of lines) {
     const line: TranscriptLine | null = parseTranscriptLine(completeLine.raw);
@@ -376,6 +413,10 @@ export class ClaudeCodeAdapter implements ObserveAdapter {
       lines,
       session.sessionId,
     );
+    const nativeSessionId: string = nativeSessionIdFromLines(
+      lines,
+      session.sessionId,
+    );
     const sessionModelLine: TranscriptLine | undefined = lines
       .map((completeLine: CompleteLine): TranscriptLine | null =>
         parseTranscriptLine(completeLine.raw),
@@ -466,7 +507,10 @@ export class ClaudeCodeAdapter implements ObserveAdapter {
           continue;
         }
 
-        const rawRef: string = `${session.path}#L${completeLine.lineNumber}`;
+        const rawRef: string = rawRefFor(
+          nativeSessionId,
+          completeLine.lineNumber,
+        );
         const message: string = systemErrorMessage(line);
         const payload: Record<string, unknown> = {
           source: "harness",
@@ -495,7 +539,10 @@ export class ClaudeCodeAdapter implements ObserveAdapter {
         continue;
       }
 
-      const rawRef: string = `${session.path}#L${completeLine.lineNumber}`;
+      const rawRef: string = rawRefFor(
+        nativeSessionId,
+        completeLine.lineNumber,
+      );
       if (!sessionStartEmitted) {
         const payload: Record<string, unknown> = {
           agent: "claude-code",
@@ -534,8 +581,10 @@ export class ClaudeCodeAdapter implements ObserveAdapter {
             continue;
           }
 
-          const useRawRef: string =
-            `${session.path}#L${pending.lineNumber}`;
+          const useRawRef: string = rawRefFor(
+            nativeSessionId,
+            pending.lineNumber,
+          );
           const status: "ok" | "error" =
             result.is_error === true ? "error" : "ok";
           const toolPayload: Record<string, unknown> = {

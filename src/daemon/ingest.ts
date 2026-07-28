@@ -524,7 +524,7 @@ export async function runIngestOnce(
       const ts = new Date(
         session.lastTs ?? session.mtimeMs,
       ).toISOString();
-      const rawRef = `${session.path}#quiesce`;
+      const rawRef = `${sessionId}#quiesce`;
       const durationMs =
         session.firstTs !== undefined && session.lastTs !== undefined
           ? new Date(session.lastTs).getTime() -

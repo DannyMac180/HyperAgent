@@ -73,7 +73,12 @@ function verificationEvent(
   outcome: GateOutcome,
 ): VerificationEventInput {
   const stableKey: string = outcomeStableKey(outcome);
-  const rawRef: string = `${spoolPath(dataDir)}#${stableKey}`;
+  // DAN-217: the spool's absolute path used to prefix this ref, which made the
+  // id depend on $HOME — the same defect as the transcript adapters, found by
+  // the post-rebuild sweep for absolute paths. `gate-spool` is a stable
+  // logical source name; identity already lives in the content-derived
+  // stableKey, so dropping the path loses nothing.
+  const rawRef: string = `gate-spool#${stableKey}`;
   const payload: VerificationEventPayload = {
     kind: "gate",
     command_digest: sha256Hex(outcome.summary),

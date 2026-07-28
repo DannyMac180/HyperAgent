@@ -80,6 +80,7 @@ import type {
   RepoTrend,
   SessionScore,
 } from "../scoring/score.ts";
+import { archiveForRebuild, planRebuild } from "../store/rebuild.ts";
 import { openStore } from "../store/store.ts";
 import { installProposal } from "../workshop/install.ts";
 import { measureInstalled } from "../workshop/measure.ts";
@@ -177,6 +178,7 @@ function parseOptions(
       || flag === "--stale"
       || flag === "--yes"
       || flag === "--workshop"
+      || flag === "--apply"
     ) {
       parsed.set(flag, true);
       continue;
@@ -227,6 +229,65 @@ async function ingestCommand(args: string[]): Promise<number> {
     adapters: builtinAdaptersForProjectsRoot(common.projectsRoot),
   });
   printRun(result);
+  return 0;
+}
+
+/**
+ * Rebuild the store under the corrected (path-independent) id scheme, DAN-217.
+ *
+ * Defaults to a dry run: without `--apply` it only reports what would happen,
+ * because the destructive alternative — silently archiving someone's database
+ * when they typed the verb to see what it does — is the worse default.
+ *
+ * Stop the daemon before applying; it holds the database open and would keep
+ * writing into the archived file.
+ */
+async function rebuildCommand(args: string[]): Promise<number> {
+  const options = parseOptions(
+    args,
+    new Set(["--apply", "--data-dir", "--projects-root"]),
+  );
+  const dataDir = stringOption(options, "--data-dir");
+  const projectsRoot = stringOption(options, "--projects-root");
+  const apply = options.has("--apply");
+
+  const plan = planRebuild(dataDir);
+  const before = Object.entries(plan.eventsByVendor)
+    .map(([vendor, n]: [string, number]): string => `${vendor}=${n}`)
+    .join(", ");
+  console.log(`store:              ${plan.dbPath}`);
+  console.log(`events before:      ${before || "(none)"}`);
+  console.log(`source artifacts:   ${plan.sourceArtifacts}`);
+  console.log(`missing artifacts:  ${plan.missingArtifacts.length}`);
+  console.log(`orphaned events:    ${plan.orphans.length}`);
+
+  if (!apply) {
+    console.log("");
+    console.log("dry run — nothing changed. Re-run with --apply to rebuild.");
+    console.log("Stop the daemon first: launchctl bootout gui/$UID/com.hyperagent.hyperagentd");
+    return 0;
+  }
+
+  const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+  const paths = await archiveForRebuild(plan, stamp, dataDir);
+  console.log("");
+  console.log(`archived db:        ${paths.archivedDb}`);
+  console.log(`orphan archive:     ${paths.orphanArchive}`);
+  console.log(`archived state:     ${paths.archivedState ?? "(none)"}`);
+
+  const result = await runIngestOnce({
+    ...(dataDir === undefined ? {} : { dataDir }),
+    adapters: builtinAdaptersForProjectsRoot(projectsRoot),
+  });
+  console.log("");
+  printRun(result);
+
+  const after = planRebuild(dataDir);
+  const afterCounts = Object.entries(after.eventsByVendor)
+    .map(([vendor, n]: [string, number]): string => `${vendor}=${n}`)
+    .join(", ");
+  console.log("");
+  console.log(`events after:       ${afterCounts || "(none)"}`);
   return 0;
 }
 
@@ -1927,6 +1988,9 @@ async function main(args: string[]): Promise<number> {
   }
   if (command === "watch") {
     return watchCommand(rest);
+  }
+  if (command === "rebuild") {
+    return rebuildCommand(rest);
   }
   if (command === "status") {
     return statusWithGateHealthCommand(rest);

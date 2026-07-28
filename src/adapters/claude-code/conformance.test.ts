@@ -15,6 +15,28 @@ import {
 } from "./conformance.ts";
 
 describe("Claude Code observe conformance", (): void => {
+  test("pins real path-independent ids for the richer tool fixture", (): void => {
+    expect(goldenEvents).toHaveLength(10);
+    expect(
+      goldenEvents.every(
+        (event): boolean =>
+          event.id !== "<ID>"
+          && event.raw_ref.startsWith("claude-code:")
+          && !event.raw_ref.startsWith("/"),
+      ),
+    ).toBe(true);
+    expect(
+      goldenEvents.some((event): boolean => event.type === "tool_call"),
+    ).toBe(true);
+    expect(
+      goldenEvents.some(
+        (event): boolean =>
+          event.type === "error"
+          && typeof event.payload.tool_call_id === "string",
+      ),
+    ).toBe(true);
+  });
+
   test("passes every vendor-blind observe check", async (): Promise<void> => {
     expect(goldenEvents.length).toBeGreaterThan(0);
 

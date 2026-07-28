@@ -46,8 +46,6 @@ const PROJECT_DIRECTORY = "-conformance-project";
 const SESSION_FILE = "44444444-4444-4444-8444-444444444444.jsonl";
 const OPERATION_TIMEOUT_MS = 5_000;
 const NORMALIZED_OBSERVED_AT = "<OBSERVED_AT>";
-const NORMALIZED_ID = "<ID>";
-const NORMALIZED_TEMP_ROOT = "<TEMP>";
 
 interface VariantArtifact {
   adapter: ClaudeCodeAdapter;
@@ -186,25 +184,8 @@ async function appendFixture(
   );
 }
 
-function normalizedRawRef(rawRef: unknown, tempRoot: string): string {
-  if (typeof rawRef !== "string" || rawRef.length === 0) {
-    throw new Error("Claude Code event.raw_ref must be a non-empty string");
-  }
-  if (
-    rawRef !== tempRoot
-    && !rawRef.startsWith(`${tempRoot}${sep}`)
-  ) {
-    throw new Error(
-      `Claude Code event.raw_ref escaped context.tempRoot: `
-      + JSON.stringify(rawRef),
-    );
-  }
-  return `${NORMALIZED_TEMP_ROOT}${rawRef.slice(tempRoot.length)}`;
-}
-
 function createNormalizer(): ObserveFixtureSet["normalizeEvent"] {
-  return (event: EventInput, context: ConformanceContext): unknown => {
-    const tempRoot: string = requireTempRoot(context);
+  return (event: EventInput, _context: ConformanceContext): unknown => {
     if (!isPlainObject(event)) {
       throw new Error("Claude Code normalizeEvent expected a plain object");
     }
@@ -213,26 +194,6 @@ function createNormalizer(): ObserveFixtureSet["normalizeEvent"] {
     }
 
     const normalized: Record<string, unknown> = { ...event };
-
-    /*
-     * KNOWN LIMITATION (DAN-217): ClaudeCodeAdapter currently hashes the
-     * absolute artifact path into each event id. A shared placeholder removes
-     * that machine-dependent path entropy without coupling event content to
-     * the adapter's unsupported intra-timestamp order. Determinism separately
-     * pins id stability, and resume pins uniqueness/no-replay — but while this
-     * normalization stands, the golden cannot catch id-derivation regressions.
-     * When DAN-217 makes event ids path-independent: delete this
-     * normalization, regenerate the golden snapshot, and expand it to the
-     * richer fixture that path-derived tool_call_ids currently block.
-     */
-    normalized.id = NORMALIZED_ID;
-
-    /*
-     * raw_ref contains the runner-created absolute temp root, which changes
-     * between machines and runs. The #L<n> suffix and relative artifact path
-     * remain verbatim because they are substantive provenance evidence.
-     */
-    normalized.raw_ref = normalizedRawRef(event.raw_ref, tempRoot);
 
     /*
      * observed_at, when present, is wall-clock ingestion time rather than
@@ -299,8 +260,6 @@ async function createObserveFixtures(
       );
       resumeCompleted = true;
     },
-    // The check completes this artifact before using fullAdapter. Sharing the
-    // same path prevents path-derived ids from invalidating the baseline.
     fullAdapter: new BoundedClaudeCodeAdapter({
       projectsRoot: resumeArtifact.projectsRoot,
     }),

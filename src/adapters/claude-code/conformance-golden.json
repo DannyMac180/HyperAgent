@@ -1,12 +1,12 @@
 [
   {
-    "id": "<ID>",
-    "ts": "2026-07-26T15:00:00.000Z",
+    "id": "01KYF4QQG0NWJ779AA86RAMX1R",
+    "ts": "2026-07-26T12:00:00.000Z",
     "type": "session_start",
     "session_id": "claude-code:44444444-4444-4444-8444-444444444444",
     "vendor": "claude-code",
     "adapter_version": "0.1.0",
-    "raw_ref": "<TEMP>/claude-code-observe-clean/projects/-conformance-project/44444444-4444-4444-8444-444444444444.jsonl#L1",
+    "raw_ref": "claude-code:11111111-1111-4111-8111-111111111111#L1",
     "payload": {
       "agent": "claude-code",
       "parent_session_id": null,
@@ -18,19 +18,149 @@
     }
   },
   {
-    "id": "<ID>",
-    "ts": "2026-07-26T15:00:00.000Z",
+    "id": "01KYF4QQG0S7FC3MJ8SEZP66TD",
+    "ts": "2026-07-26T12:00:00.000Z",
     "type": "turn_start",
     "session_id": "claude-code:44444444-4444-4444-8444-444444444444",
     "vendor": "claude-code",
     "adapter_version": "0.1.0",
-    "raw_ref": "<TEMP>/claude-code-observe-clean/projects/-conformance-project/44444444-4444-4444-8444-444444444444.jsonl#L1",
+    "raw_ref": "claude-code:11111111-1111-4111-8111-111111111111#L1",
     "payload": {
       "turn_index": 0,
       "role": "user",
-      "text_digest": "54bfab71bde052851860a4e4f39c56eb6db331c01bced5a1ae0b681964116637",
-      "text_chars": 17,
+      "text_digest": "97a9be9cb607d77b63eefc05bfb9ffa5630b7e56851c808e0a6bf68017aa32ca",
+      "text_chars": 40,
       "is_correction": null
+    }
+  },
+  {
+    "id": "01KYF4QRF84JKCX5MPRPBK7Z33",
+    "ts": "2026-07-26T12:00:01.000Z",
+    "type": "verification_event",
+    "session_id": "claude-code:44444444-4444-4444-8444-444444444444",
+    "vendor": "claude-code",
+    "adapter_version": "0.1.0",
+    "raw_ref": "claude-code:11111111-1111-4111-8111-111111111111#L2",
+    "payload": {
+      "kind": "test",
+      "command_digest": "d8c272072687a75fab62bf32f66fc8948c86222dad85719db412b4d8bf0e50c7",
+      "command_summary": "bun test",
+      "result": "fail",
+      "turn_index": 0,
+      "initiated_by": "agent"
+    }
+  },
+  {
+    "id": "01KYF4QRF84YZP0YYMB21ZEEHQ",
+    "ts": "2026-07-26T12:00:01.000Z",
+    "type": "tool_call",
+    "session_id": "claude-code:44444444-4444-4444-8444-444444444444",
+    "vendor": "claude-code",
+    "adapter_version": "0.1.0",
+    "raw_ref": "claude-code:11111111-1111-4111-8111-111111111111#L2",
+    "payload": {
+      "name": "Read",
+      "input_digest": "47f1d1cc51b7a4570b9f31d957ccea978cbad98f24eb51f2af1574a8f47d300b",
+      "input_summary": "{\"file_path\":\"/home/user/project/src/index.ts\"}",
+      "status": "ok",
+      "turn_index": 0,
+      "duration_ms": 2500,
+      "files_touched": [
+        "src/index.ts"
+      ]
+    }
+  },
+  {
+    "id": "01KYF4QRF890TMDHX1SQ11TWVD",
+    "ts": "2026-07-26T12:00:01.000Z",
+    "type": "tool_call",
+    "session_id": "claude-code:44444444-4444-4444-8444-444444444444",
+    "vendor": "claude-code",
+    "adapter_version": "0.1.0",
+    "raw_ref": "claude-code:11111111-1111-4111-8111-111111111111#L2",
+    "payload": {
+      "name": "Bash",
+      "input_digest": "a1003bc499a4a040e32912bd72353c912e89218987d97904c0b2e5fede66dbab",
+      "input_summary": "{\"command\":\"bun test\"}",
+      "status": "error",
+      "turn_index": 0,
+      "duration_ms": 2500
+    }
+  },
+  {
+    "id": "01KYF4QTXCJX91KTJB0DSF3JQK",
+    "ts": "2026-07-26T12:00:03.500Z",
+    "type": "error",
+    "session_id": "claude-code:44444444-4444-4444-8444-444444444444",
+    "vendor": "claude-code",
+    "adapter_version": "0.1.0",
+    "raw_ref": "claude-code:11111111-1111-4111-8111-111111111111#L3",
+    "payload": {
+      "source": "tool",
+      "message_digest": "689370cca7dc320f68e2aed36f308d7b6800c51cd73483dc7471ee6472e6ce9d",
+      "message_summary": "1 test failed",
+      "turn_index": 0,
+      "tool_call_id": "01KYF4QRF890TMDHX1SQ11TWVD"
+    }
+  },
+  {
+    "id": "01KYF4QVSGNS3KNHQFXPSJSQVJ",
+    "ts": "2026-07-26T12:00:04.400Z",
+    "type": "error",
+    "session_id": "claude-code:44444444-4444-4444-8444-444444444444",
+    "vendor": "claude-code",
+    "adapter_version": "0.1.0",
+    "raw_ref": "claude-code:11111111-1111-4111-8111-111111111111#L8",
+    "payload": {
+      "source": "harness",
+      "message_digest": "efb57babd8dcf31f480aec5312fa1d587b0ed9ebfa27396cb85f588991b933de",
+      "message_summary": "Harness retry limit warning",
+      "turn_index": 0,
+      "tool_call_id": null
+    }
+  },
+  {
+    "id": "01KYF4QWC836B8025TSGFXAQPR",
+    "ts": "2026-07-26T12:00:05.000Z",
+    "type": "turn_end",
+    "session_id": "claude-code:44444444-4444-4444-8444-444444444444",
+    "vendor": "claude-code",
+    "adapter_version": "0.1.0",
+    "raw_ref": "claude-code:11111111-1111-4111-8111-111111111111#L9",
+    "payload": {
+      "turn_index": 0,
+      "role": "agent",
+      "text_digest": "bc1063e68a8e01d7f8832d8e18a8068062730eee7cb0c104fc072d57f908f77d",
+      "text_chars": 37,
+      "stop_reason": "end_turn"
+    }
+  },
+  {
+    "id": "01KYF4QWC8A4TBSD0KYW6ET6PN",
+    "ts": "2026-07-26T12:00:05.000Z",
+    "type": "completion_claim",
+    "session_id": "claude-code:44444444-4444-4444-8444-444444444444",
+    "vendor": "claude-code",
+    "adapter_version": "0.1.0",
+    "raw_ref": "claude-code:11111111-1111-4111-8111-111111111111#L9",
+    "payload": {
+      "claim_text": "All tests pass now.",
+      "claim_kind": "tests_pass",
+      "turn_index": 0
+    }
+  },
+  {
+    "id": "01KYF4QWC8P0F8R5JTQXPD2MZE",
+    "ts": "2026-07-26T12:00:05.000Z",
+    "type": "completion_claim",
+    "session_id": "claude-code:44444444-4444-4444-8444-444444444444",
+    "vendor": "claude-code",
+    "adapter_version": "0.1.0",
+    "raw_ref": "claude-code:11111111-1111-4111-8111-111111111111#L9",
+    "payload": {
+      "claim_text": "Fixed the parser.",
+      "claim_kind": "fixed",
+      "turn_index": 0
     }
   }
 ]

@@ -181,7 +181,10 @@ export function printRun(result: IngestRunResult): void {
   }
 }
 
-async function ingestCommand(args: string[]): Promise<number> {
+async function ingestCommand(
+  args: string[],
+  extraIngest?: WatchPlugins["ingest"],
+): Promise<number> {
   const options = parseOptions(
     args,
     new Set(["--once", "--data-dir", "--projects-root"]),
@@ -193,6 +196,7 @@ async function ingestCommand(args: string[]): Promise<number> {
   const result = await runIngestOnce({
     ...(common.dataDir === undefined ? {} : { dataDir: common.dataDir }),
     adapters: builtinAdaptersForProjectsRoot(common.projectsRoot),
+    ...extraIngest,
   });
   printRun(result);
   return 0;
@@ -1406,7 +1410,7 @@ export async function runCli(
   }
   const rest = args.slice(1);
   if (command === "ingest") {
-    return ingestCommand(rest);
+    return ingestCommand(rest, watchPlugins?.ingest);
   }
   if (command === "watch") {
     return watchCommand(rest, watchPlugins);

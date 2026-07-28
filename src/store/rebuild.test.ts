@@ -5,9 +5,18 @@ import { realpath } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
+import { Database } from "bun:sqlite";
+
 import { deterministicEventId } from "../schema/ids.ts";
 import { openStore } from "./store.ts";
-import { archiveForRebuild, planRebuild } from "./rebuild.ts";
+import {
+  archiveForRebuild,
+  carryDurableTables,
+  classifyTable,
+  DERIVED_TABLES,
+  EVENT_STORE_TABLES,
+  planRebuild,
+} from "./rebuild.ts";
 
 /** Store ids must be real ULIDs; derive stable ones for fixtures. */
 function idFor(seed: string): string {
@@ -231,4 +240,324 @@ test("the archived database still enforces append-only", async (): Promise<void>
   }).toThrow(/append-only/);
 
   archived.close();
+});
+
+// --- DAN-218: sibling tables sharing hyperagent.db ---------------------------
+
+/**
+ * Stand-in for another engine's durable table. Deliberately NOT the real
+ * memory-store DDL: the rebuild must preserve a table it has never heard of,
+ * and importing `memory/store.ts` here would test a name rather than the rule.
+ */
+function seedDurableTable(rows: number): void {
+  const db = new Database(join(dir, "hyperagent.db"));
+  try {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS memories (
+        id     TEXT PRIMARY KEY,
+        claim  TEXT NOT NULL,
+        status TEXT NOT NULL
+      ) STRICT;
+      CREATE INDEX IF NOT EXISTS idx_memories_status ON memories(status);
+    `);
+    const insert = db.query(
+      "INSERT INTO memories (id, claim, status) VALUES (?1, ?2, ?3)",
+    );
+    for (let index = 0; index < rows; index += 1) {
+      insert.run(`mem-${index}`, `claim number ${index}`, "approved");
+    }
+  } finally {
+    db.close();
+  }
+}
+
+function seedDerivedTable(): void {
+  const db = new Database(join(dir, "hyperagent.db"));
+  try {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS policy_violations (
+        session_id TEXT NOT NULL,
+        event_id   TEXT NOT NULL,
+        rule_id    TEXT NOT NULL,
+        PRIMARY KEY (session_id, event_id, rule_id)
+      ) STRICT;
+    `);
+    db.query(
+      "INSERT INTO policy_violations (session_id, event_id, rule_id) VALUES (?1, ?2, ?3)",
+    ).run("claude-code:alive", idFor("keep-1"), "no-secrets");
+  } finally {
+    db.close();
+  }
+}
+
+function tableNames(dbPath: string): string[] {
+  const db = new Database(dbPath, { readonly: true });
+  try {
+    return (db.query(
+      "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name",
+    ).all() as { name: string }[]).map((row): string => row.name);
+  } finally {
+    db.close();
+  }
+}
+
+function allRows(dbPath: string, table: string): Record<string, unknown>[] {
+  const db = new Database(dbPath, { readonly: true });
+  try {
+    return db.query(`SELECT * FROM ${table} ORDER BY rowid`).all() as Record<
+      string,
+      unknown
+    >[];
+  } finally {
+    db.close();
+  }
+}
+
+/**
+ * The reproduction, inverted (ISC-21). Before the fix, the rebuilt database had
+ * no `memories` table at all and this asserted zero rows against a missing one.
+ */
+test("carries a durable sibling table through a rebuild", async (): Promise<void> => {
+  seed();
+  seedDurableTable(3);
+  const before = allRows(join(dir, "hyperagent.db"), "memories");
+
+  const plan = planRebuild(dir);
+  const paths = await archiveForRebuild(plan, "STAMP", dir);
+  // Stands in for the fresh ingest: a new database with event-store DDL only.
+  openStore(join(dir, "hyperagent.db")).close();
+
+  expect(tableNames(join(dir, "hyperagent.db"))).not.toContain("memories");
+
+  const result = carryDurableTables(paths.archivedDb, join(dir, "hyperagent.db"));
+
+  expect(result.carried).toEqual([{ name: "memories", rows: 3 }]);
+  expect(tableNames(join(dir, "hyperagent.db"))).toContain("memories");
+  // Contents, not merely counts — a table of three empty rows would pass a
+  // count check and still be data loss.
+  expect(allRows(join(dir, "hyperagent.db"), "memories")).toEqual(before);
+});
+
+test("carried table keeps its exact schema text and indexes", async (): Promise<void> => {
+  seed();
+  seedDurableTable(1);
+
+  const schemaOf = (dbPath: string): { table: string | null; indexes: string[] } => {
+    const db = new Database(dbPath, { readonly: true });
+    try {
+      const table = (db.query(
+        "SELECT sql FROM sqlite_master WHERE type='table' AND name='memories'",
+      ).get() as { sql: string } | null)?.sql ?? null;
+      const indexes = (db.query(
+        "SELECT sql FROM sqlite_master WHERE type='index' AND tbl_name='memories' AND sql IS NOT NULL ORDER BY name",
+      ).all() as { sql: string }[]).map((row): string => row.sql);
+      return { table, indexes };
+    } finally {
+      db.close();
+    }
+  };
+
+  const before = schemaOf(join(dir, "hyperagent.db"));
+  const plan = planRebuild(dir);
+  const paths = await archiveForRebuild(plan, "STAMP", dir);
+  openStore(join(dir, "hyperagent.db")).close();
+  carryDurableTables(paths.archivedDb, join(dir, "hyperagent.db"));
+
+  expect(schemaOf(join(dir, "hyperagent.db"))).toEqual(before);
+  expect(before.indexes).toHaveLength(1);
+});
+
+test("derived tables are dropped, not carried", async (): Promise<void> => {
+  seed();
+  seedDerivedTable();
+
+  const plan = planRebuild(dir);
+  const paths = await archiveForRebuild(plan, "STAMP", dir);
+  openStore(join(dir, "hyperagent.db")).close();
+  const result = carryDurableTables(paths.archivedDb, join(dir, "hyperagent.db"));
+
+  expect(result.droppedDerived).toEqual(["policy_violations"]);
+  expect(result.carried).toEqual([]);
+  // The whole point: rows keyed to pre-rebuild event ids must not resurface.
+  expect(tableNames(join(dir, "hyperagent.db"))).not.toContain("policy_violations");
+});
+
+test("event-store tables are never carried", async (): Promise<void> => {
+  seed();
+  seedDurableTable(1);
+
+  const plan = planRebuild(dir);
+  const paths = await archiveForRebuild(plan, "STAMP", dir);
+  openStore(join(dir, "hyperagent.db")).close();
+  const result = carryDurableTables(paths.archivedDb, join(dir, "hyperagent.db"));
+
+  const carriedNames = result.carried.map((table): string => table.name);
+  for (const name of EVENT_STORE_TABLES) {
+    expect(carriedNames).not.toContain(name);
+  }
+  // Carry-through must not have smuggled the old events back in.
+  expect(allRows(join(dir, "hyperagent.db"), "events")).toHaveLength(0);
+});
+
+test("carry-through is a no-op when no durable tables exist", async (): Promise<void> => {
+  seed();
+
+  const plan = planRebuild(dir);
+  const paths = await archiveForRebuild(plan, "STAMP", dir);
+  openStore(join(dir, "hyperagent.db")).close();
+  const result = carryDurableTables(paths.archivedDb, join(dir, "hyperagent.db"));
+
+  expect(result).toEqual({ carried: [], droppedDerived: [] });
+});
+
+test("carry-through fails loudly and names the archive", async (): Promise<void> => {
+  seed();
+  seedDurableTable(2);
+
+  const plan = planRebuild(dir);
+  const paths = await archiveForRebuild(plan, "STAMP", dir);
+  openStore(join(dir, "hyperagent.db")).close();
+
+  // An engine reopened the fresh database and already wrote its own rows.
+  // Merging two versions of one table would silently pick a winner.
+  const db = new Database(join(dir, "hyperagent.db"));
+  db.exec(
+    "CREATE TABLE memories (id TEXT PRIMARY KEY, claim TEXT NOT NULL, status TEXT NOT NULL) STRICT",
+  );
+  db.query("INSERT INTO memories (id, claim, status) VALUES ('x','y','approved')").run();
+  db.close();
+
+  expect((): void => {
+    carryDurableTables(paths.archivedDb, join(dir, "hyperagent.db"));
+  }).toThrow(/no data was lost/);
+  expect((): void => {
+    carryDurableTables(paths.archivedDb, join(dir, "hyperagent.db"));
+  }).toThrow(paths.archivedDb);
+});
+
+test("a missing archive is an error, never a silent skip", (): void => {
+  expect((): void => {
+    carryDurableTables(join(dir, "does-not-exist.db"), join(dir, "hyperagent.db"));
+  }).toThrow(/archived database not found/);
+});
+
+test("plan inventories and classifies every table", (): void => {
+  seed();
+  seedDurableTable(4);
+  seedDerivedTable();
+
+  const plan = planRebuild(dir);
+  const byName = new Map(
+    plan.tables.map((entry): [string, typeof entry] => [entry.name, entry]),
+  );
+
+  expect(byName.get("events")?.bucket).toBe("event_store");
+  expect(byName.get("sessions")?.bucket).toBe("event_store");
+  expect(byName.get("meta")?.bucket).toBe("event_store");
+  expect(byName.get("policy_violations")?.bucket).toBe("derived");
+  expect(byName.get("memories")?.bucket).toBe("durable");
+  expect(byName.get("memories")?.rows).toBe(4);
+  expect(byName.get("events")?.rows).toBe(3);
+  // SQLite's own bookkeeping tables are nobody's data.
+  expect([...byName.keys()].some((name): boolean => name.startsWith("sqlite_")))
+    .toBe(false);
+});
+
+test("an unknown table defaults to durable", (): void => {
+  expect(classifyTable("some_future_engine_state")).toBe("durable");
+  expect(classifyTable("memories")).toBe("durable");
+});
+
+/**
+ * Membership of the derived list is asserted exactly. Adding a name here turns a
+ * preserved table into a destroyed one, so widening it must break the suite
+ * rather than pass quietly.
+ */
+test("the derived denylist has exactly the two known recomputable tables", (): void => {
+  expect([...DERIVED_TABLES].sort()).toEqual([
+    "policy_violations",
+    "session_scores",
+  ]);
+  expect([...EVENT_STORE_TABLES].sort()).toEqual(["events", "meta", "sessions"]);
+});
+
+test("planRebuild does not mutate the store", (): void => {
+  seed();
+  seedDurableTable(2);
+  const before = allRows(join(dir, "hyperagent.db"), "memories");
+  const eventsBefore = allRows(join(dir, "hyperagent.db"), "events");
+
+  planRebuild(dir);
+  planRebuild(dir);
+
+  expect(allRows(join(dir, "hyperagent.db"), "memories")).toEqual(before);
+  expect(allRows(join(dir, "hyperagent.db"), "events")).toEqual(eventsBefore);
+});
+
+test("a drifted target schema fails loudly rather than merging", async (): Promise<void> => {
+  seed();
+  seedDurableTable(2);
+
+  const plan = planRebuild(dir);
+  const paths = await archiveForRebuild(plan, "STAMP", dir);
+  openStore(join(dir, "hyperagent.db")).close();
+
+  // An engine opened the fresh store and created the table under a NEWER
+  // schema. The archived rows were written for the old one; inserting them
+  // silently changes what they mean.
+  const db = new Database(join(dir, "hyperagent.db"));
+  db.exec(
+    "CREATE TABLE memories (id TEXT PRIMARY KEY, claim TEXT NOT NULL, status TEXT NOT NULL, tier TEXT) STRICT",
+  );
+  db.close();
+
+  expect((): void => {
+    carryDurableTables(paths.archivedDb, join(dir, "hyperagent.db"));
+  }).toThrow(/different schema/);
+});
+
+test("an identical empty target table is filled, not rejected", async (): Promise<void> => {
+  seed();
+  seedDurableTable(2);
+
+  const plan = planRebuild(dir);
+  const paths = await archiveForRebuild(plan, "STAMP", dir);
+  openStore(join(dir, "hyperagent.db")).close();
+
+  // Same DDL the fixture used — the ordinary case of an engine opening the
+  // fresh store before carry-through runs.
+  const db = new Database(join(dir, "hyperagent.db"));
+  db.exec(`
+      CREATE TABLE IF NOT EXISTS memories (
+        id     TEXT PRIMARY KEY,
+        claim  TEXT NOT NULL,
+        status TEXT NOT NULL
+      ) STRICT;
+      CREATE INDEX IF NOT EXISTS idx_memories_status ON memories(status);
+    `);
+  db.close();
+
+  const result = carryDurableTables(paths.archivedDb, join(dir, "hyperagent.db"));
+  expect(result.carried).toEqual([{ name: "memories", rows: 2 }]);
+});
+
+/**
+ * No engine uses a virtual table today. The guard exists so that if one ever
+ * does, carry-through says so instead of producing a corrupt half-copy from
+ * replayed shadow-table DDL.
+ */
+test("a virtual table is refused, not half-copied", async (): Promise<void> => {
+  seed();
+  const db = new Database(join(dir, "hyperagent.db"));
+  db.exec("CREATE VIRTUAL TABLE claims_fts USING fts5(claim)");
+  db.query("INSERT INTO claims_fts (claim) VALUES ('hello')").run();
+  db.close();
+
+  const plan = planRebuild(dir);
+  const paths = await archiveForRebuild(plan, "STAMP", dir);
+  openStore(join(dir, "hyperagent.db")).close();
+
+  expect((): void => {
+    carryDurableTables(paths.archivedDb, join(dir, "hyperagent.db"));
+  }).toThrow(/virtual table/);
 });

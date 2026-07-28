@@ -21,6 +21,26 @@
  * Deliberately NOT carried into the new database: the orphaned rows. Inserting
  * them would reintroduce the very second id scheme the rebuild exists to
  * eliminate.
+ *
+ * Sibling tables (DAN-218). Other engines park their tables in this same file —
+ * the memory store's `memories`, scoring's `session_scores`, the gate's
+ * `policy_violations`. A fresh database gets the event-store DDL and nothing
+ * else, so before this every one of them was silently destroyed. Each table is
+ * now classified and handled explicitly:
+ *
+ *   event_store — rebuilt from the transcripts by ingest.
+ *   derived     — recomputable from events, and keyed to event ids or offsets
+ *                 that the rebuild deliberately changes. Dropped; carrying them
+ *                 would resurrect rows pointing at the old id scheme.
+ *   durable     — everything else. Carried through verbatim.
+ *
+ * The default is DURABLE, and the exception list is the derived one. For a
+ * data-loss defect that is the only safe direction: an engine that adds a table
+ * tomorrow gets preservation without touching this file, and the failure mode of
+ * a misclassification is a stale table a human can drop, not lost data.
+ *
+ * Classification reads the database's own schema. This module imports no engine
+ * module and knows no engine's DDL — that is what keeps it engine-blind.
  */
 
 import { existsSync } from "node:fs";
@@ -28,7 +48,51 @@ import { mkdir, rename, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
 
+import { Database } from "bun:sqlite";
+
 import { openStore } from "./store.ts";
+
+/**
+ * Tables the event store itself owns. Recreated by `openStore`'s DDL and
+ * repopulated by ingest, so carrying them would fight the rebuild.
+ */
+export const EVENT_STORE_TABLES: readonly string[] = [
+  "events",
+  "meta",
+  "sessions",
+];
+
+/**
+ * Tables that are pure functions of the event log AND are keyed to values the
+ * rebuild changes — `policy_violations.event_id` holds event ids, and
+ * `session_scores.event_watermark` is an offset into the old log. Recomputing
+ * them is correct; copying them is not.
+ *
+ * Membership is asserted by test. Adding a name here converts a table from
+ * preserved to destroyed, so it must be a deliberate, reviewed act.
+ */
+export const DERIVED_TABLES: readonly string[] = [
+  "policy_violations",
+  "session_scores",
+];
+
+export type TableBucket = "event_store" | "derived" | "durable";
+
+export interface TableInventoryEntry {
+  name: string;
+  bucket: TableBucket;
+  rows: number;
+}
+
+export function classifyTable(name: string): TableBucket {
+  if (EVENT_STORE_TABLES.includes(name)) {
+    return "event_store";
+  }
+  if (DERIVED_TABLES.includes(name)) {
+    return "derived";
+  }
+  return "durable";
+}
 
 /** An event whose source artifact is gone, so it cannot be re-derived. */
 export interface OrphanedEvent {
@@ -52,6 +116,11 @@ export interface RebuildPlan {
   orphans: OrphanedEvent[];
   /** Event counts per vendor, before the rebuild. */
   eventsByVendor: Record<string, number>;
+  /**
+   * Every table in the store, classified. This is the rebuild's blast radius,
+   * stated before anything irreversible happens (DAN-218).
+   */
+  tables: TableInventoryEntry[];
 }
 
 export interface RebuildPaths {
@@ -80,6 +149,30 @@ function artifactOf(rawRef: string): string | null {
   }
   const hash: number = rawRef.lastIndexOf("#");
   return hash === -1 ? rawRef : rawRef.slice(0, hash);
+}
+
+/**
+ * Read every user table out of a live database handle and classify it.
+ *
+ * `sqlite_%` is excluded because those are SQLite's own bookkeeping tables
+ * (`sqlite_sequence`, `sqlite_stat1`); SQLite recreates them as needed and they
+ * are not anybody's data.
+ */
+function inventoryTables(db: Database): TableInventoryEntry[] {
+  const rows = db.query(
+    "SELECT name FROM sqlite_master WHERE type = 'table' " +
+      "AND name NOT LIKE 'sqlite_%' ORDER BY name",
+  ).all() as { name: string }[];
+
+  return rows.map((row): TableInventoryEntry => ({
+    name: row.name,
+    bucket: classifyTable(row.name),
+    // The name comes from sqlite_master, never from caller input, so it cannot
+    // be an injection vector; quoting still guards against odd identifiers.
+    rows: (db.query(
+      `SELECT count(*) AS n FROM "${row.name.replaceAll('"', '""')}"`,
+    ).get() as { n: number }).n,
+  }));
 }
 
 /**
@@ -140,6 +233,7 @@ export function planRebuild(dataDir?: string): RebuildPlan {
       missingArtifacts,
       orphans,
       eventsByVendor,
+      tables: inventoryTables(db),
     };
   } finally {
     store.close();
@@ -209,4 +303,196 @@ export async function archiveForRebuild(
   }
 
   return { archivedDb, orphanArchive, archivedState };
+}
+
+export interface CarriedTable {
+  name: string;
+  rows: number;
+}
+
+export interface CarryThroughResult {
+  carried: CarriedTable[];
+  /** Derived tables that were present and are being left to be recomputed. */
+  droppedDerived: string[];
+}
+
+/**
+ * Copy durable sibling tables out of the archived database into the rebuilt one
+ * (DAN-218).
+ *
+ * Runs AFTER the fresh ingest, deliberately: if ingest fails the new database is
+ * incomplete and gets re-run, and a half-carried table would then be copied on
+ * top of itself. Running last means carry-through either completes against a
+ * finished database or does not run at all.
+ *
+ * Schema text is taken verbatim from the archive's `sqlite_master` rather than
+ * from any engine's DDL constant, so a table this module has never heard of is
+ * reproduced exactly — including its indexes and triggers.
+ *
+ * Failure is loud. A silent carry failure is indistinguishable from the defect
+ * this function exists to fix, so any error propagates with the archive path
+ * attached; the archive still holds every row and nothing has been deleted.
+ */
+export function carryDurableTables(
+  archivedDb: string,
+  rebuiltDb: string,
+): CarryThroughResult {
+  if (!existsSync(archivedDb)) {
+    throw new Error(`archived database not found for carry-through: ${archivedDb}`);
+  }
+
+  const source = new Database(archivedDb, { readonly: true });
+  try {
+    const inventory = inventoryTables(source);
+    const durable = inventory.filter(
+      (entry): boolean => entry.bucket === "durable",
+    );
+    const droppedDerived = inventory
+      .filter((entry): boolean => entry.bucket === "derived")
+      .map((entry): string => entry.name);
+
+    if (durable.length === 0) {
+      return { carried: [], droppedDerived };
+    }
+
+    const target = new Database(rebuiltDb);
+    try {
+      target.exec("PRAGMA busy_timeout = 5000;");
+      const carried: CarriedTable[] = [];
+
+      for (const entry of durable) {
+        try {
+          carried.push(carryOneTable(source, target, archivedDb, entry));
+        } catch (error: unknown) {
+          throw new Error(
+            `failed to carry table "${entry.name}" into the rebuilt store; ` +
+              `no data was lost — every row is still in ${archivedDb}: ` +
+              `${error instanceof Error ? error.message : String(error)}`,
+          );
+        }
+      }
+
+      return { carried, droppedDerived };
+    } finally {
+      target.close();
+    }
+  } finally {
+    source.close();
+  }
+}
+
+/**
+ * Recreate one table (schema, rows, then its indexes and triggers) in the
+ * rebuilt database.
+ *
+ * Order matters: indexes are created AFTER the rows are inserted, which is both
+ * faster and avoids a partially-built index if an insert fails.
+ */
+function carryOneTable(
+  source: Database,
+  target: Database,
+  archivedDb: string,
+  entry: TableInventoryEntry,
+): CarriedTable {
+  const quoted = `"${entry.name.replaceAll('"', '""')}"`;
+
+  const tableSql = (source.query(
+    "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = ?1",
+  ).get(entry.name) as { sql: string | null } | null)?.sql ?? null;
+  if (tableSql === null) {
+    throw new Error(`no CREATE TABLE statement recorded for ${entry.name}`);
+  }
+
+  // A virtual table's shadow tables appear in sqlite_master as ordinary tables,
+  // so replaying their CREATE statements collides with the ones the virtual
+  // table auto-creates — unfixable without writable_schema, which this module
+  // will not touch. No engine uses one today; if one ever does, this says so
+  // instead of producing a corrupt half-copy.
+  if (/^\s*create\s+virtual\s+table/i.test(tableSql)) {
+    throw new Error(
+      `${entry.name} is a virtual table; carry-through cannot reproduce its ` +
+        "shadow tables safely",
+    );
+  }
+
+  // A table of this name in the rebuilt store means some engine opened the
+  // fresh database and ran its own DDL before carry-through. Its schema must
+  // match the archive's byte for byte — a drifted schema silently changes what
+  // the carried rows mean, so it is a loud failure rather than a merge.
+  const existingSql = (target.query(
+    "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = ?1",
+  ).get(entry.name) as { sql: string | null } | null)?.sql ?? null;
+  if (existingSql === null) {
+    target.exec(tableSql);
+  } else {
+    if (existingSql !== tableSql) {
+      throw new Error(
+        `${entry.name} exists in the rebuilt store with a different schema than ` +
+          "the archive; refusing to insert rows under a schema they were not written for",
+      );
+    }
+    const targetRows = (target.query(
+      `SELECT count(*) AS n FROM ${quoted}`,
+    ).get() as { n: number }).n;
+    if (targetRows > 0) {
+      throw new Error(
+        `${entry.name} already holds ${targetRows} row(s) in the rebuilt store; ` +
+          "refusing to merge two versions of the same table",
+      );
+    }
+  }
+
+  const rows = source.query(`SELECT * FROM ${quoted}`).all() as Record<
+    string,
+    unknown
+  >[];
+
+  if (rows.length > 0) {
+    const columns = Object.keys(rows[0] as Record<string, unknown>);
+    const columnList = columns
+      .map((column): string => `"${column.replaceAll('"', '""')}"`)
+      .join(", ");
+    const placeholders = columns
+      .map((_column, index): string => `?${index + 1}`)
+      .join(", ");
+    const insert = target.query(
+      `INSERT INTO ${quoted} (${columnList}) VALUES (${placeholders})`,
+    );
+    target.transaction((): void => {
+      for (const row of rows) {
+        insert.run(
+          ...columns.map((column): unknown => row[column]) as never[],
+        );
+      }
+    })();
+  }
+
+  for (
+    const object of source.query(
+      "SELECT sql FROM sqlite_master WHERE tbl_name = ?1 " +
+        "AND type IN ('index', 'trigger') AND sql IS NOT NULL",
+    ).all(entry.name) as { sql: string }[]
+  ) {
+    try {
+      target.exec(object.sql);
+    } catch (error: unknown) {
+      // An index that already exists is not a failure — the engine's own DDL
+      // created it when it opened the fresh database. Anything else is.
+      const message = error instanceof Error ? error.message : String(error);
+      if (!message.includes("already exists")) {
+        throw new Error(`${message} (archive retained at ${archivedDb})`);
+      }
+    }
+  }
+
+  const carriedRows = (target.query(
+    `SELECT count(*) AS n FROM ${quoted}`,
+  ).get() as { n: number }).n;
+  if (carriedRows !== rows.length) {
+    throw new Error(
+      `expected ${rows.length} row(s) after carry, found ${carriedRows}`,
+    );
+  }
+
+  return { name: entry.name, rows: carriedRows };
 }

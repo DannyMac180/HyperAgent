@@ -1,4 +1,5 @@
 import { claudeCodeConformanceDescriptor } from "../adapters/claude-code/conformance.ts";
+import { codexConformanceDescriptor } from "../adapters/codex/conformance.ts";
 import {
   GATE_CHECKS,
 } from "./checks/gate.ts";
@@ -17,7 +18,10 @@ import type { ConformanceDescriptor } from "./types.ts";
  * vendor-blind.
  */
 export function conformanceDescriptors(): readonly ConformanceDescriptor[] {
-  return [claudeCodeConformanceDescriptor];
+  return [
+    claudeCodeConformanceDescriptor,
+    codexConformanceDescriptor,
+  ];
 }
 
 export function descriptorForVendor(

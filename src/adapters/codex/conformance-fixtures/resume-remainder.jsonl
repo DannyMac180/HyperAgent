@@ -1,0 +1,2 @@
+{"timestamp":"2026-07-27T12:30:03.000Z","type":"event_msg","payload":{"type":"user_message","message":"Second synthetic turn."}}
+{"timestamp":"2026-07-27T12:30:04.000Z","type":"event_msg","payload":{"type":"agent_message","message":"Second response.","phase":"final_answer"}}

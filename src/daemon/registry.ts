@@ -6,6 +6,8 @@ import type {
 import { ClaudeCodeAdapter } from "../adapters/claude-code/adapter.ts";
 import { ClaudeCodeGateAdapter } from "../adapters/claude-code/gate.ts";
 import { ClaudeCodeInjectAdapter } from "../adapters/claude-code/inject.ts";
+import { CodexAdapter } from "../adapters/codex/adapter.ts";
+import { CodexInjectAdapter } from "../adapters/codex/inject.ts";
 
 export interface BuiltinAdapterOptions {
   claudeProjectsRoot?: string;
@@ -18,6 +20,7 @@ export function builtinAdapters(
     new ClaudeCodeAdapter({
       projectsRoot: options?.claudeProjectsRoot,
     }),
+    new CodexAdapter(),
   ];
 }
 
@@ -28,7 +31,10 @@ export function builtinAdaptersForProjectsRoot(
 }
 
 export function builtinInjectAdapters(): InjectAdapter[] {
-  return [new ClaudeCodeInjectAdapter()];
+  return [
+    new ClaudeCodeInjectAdapter(),
+    new CodexInjectAdapter(),
+  ];
 }
 
 export interface BuiltinGateAdapterOptions {

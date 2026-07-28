@@ -385,7 +385,7 @@ function auditRecordForVendor(
       evidence.modelChanged === null
         ? record.installedAt === null
           ? `${quietPhrase}, but no install date is on record — before/after model comparison impossible, so outgrowth cannot be claimed`
-          : `${quietPhrase}, but model metadata is missing on one side of the install boundary — model change unverifiable, so outgrowth cannot be claimed`
+          : `${quietPhrase}, but model metadata is missing on one side of the install boundary — model change unverifiable, so outgrowth cannot be claimed until ${vendor} sessions record a model`
         : `${quietPhrase}, but the model has not changed since install — absence under the same model does not demonstrate outgrowth`,
       evidence,
     );

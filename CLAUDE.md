@@ -26,6 +26,16 @@ A meta-harness: a local observer daemon (`hyperagentd`) that watches agent harne
 - v1 verify scripts (`scripts/verify-core.sh` etc.) guard the v1 tree only; do not treat their string-presence checks as gates for v2 code.
 - New v2 code lives under a clean top-level layout (proposed: `src/` for daemon+engine, `src/adapters/`, `app/` for Cockpit) — establish it in DAN-198/199 and record the decision in `docs/architecture-v2.md`.
 
+## Open-core boundary (DAN-213, executed 2026-07-28)
+
+This repo is the **open data plane** ("the armor", MIT): schema, store, adapters, daemon, gates, `memory/store.ts` + `memory/inject.ts` + injection renderers, conformance, raw-inspection CLI. The **judgment plane** ("the cockpit", proprietary) lives in the private `hyperagent-cockpit` repo: scoring, missions, workshop, forge/decay audit, memory extraction/promotion/queue. See `docs/decisions/DAN-213-open-core-boundary.md`.
+
+**Binding rules for this repo:**
+- Never add judgment-plane code here — every push is irrevocably MIT. If a task needs scoring/missions/workshop/forge/memory-extraction changes, it belongs in `hyperagent-cockpit` (checkout: `~/Desktop/dev/hyperagent-cockpit`); stop and surface if unsure.
+- The daemon/CLI seam is `IngestOptions.scorer`/`missionQueue`/`memoryQueue` (`src/daemon/ingest.ts`), `WatchPlugins` + `runCli(args, extraCommands, watchPlugins)` (`src/daemon/cli.ts`). The Cockpit wraps these; keep them stable and vendor-blind — interface changes need a matching cockpit PR before merge.
+- Schema and store changes always land HERE first; the cockpit pins this repo and consumes the canonical schema only.
+- Judgment-plane git history predating the split (through `61499ab`) remains in this repo's public history — that's accepted and irrevocable; do not attempt history rewrites.
+
 ## Work tracking
 
 Workstreams are Linear tickets **DAN-198 … DAN-215** in the HyperAgent project (team Danmac). `Engineering`-labeled tickets are implementable by Claude Code; `Business`-labeled tickets are Dan's. Each ticket cites its architecture-v2 section. Build order (§9): schema (DAN-198) → daemon + Claude Code adapter (DAN-199/200) → mission generation + scoring (DAN-201) → memory (DAN-202) → gates (DAN-203) → Workshop (DAN-204) → more adapters (DAN-205/207) → Forge (DAN-208) → Cockpit (DAN-210 design → DAN-209 build). DAN-211 (repo transition/hygiene) can run first and in parallel.

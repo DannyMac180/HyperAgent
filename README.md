@@ -80,7 +80,7 @@ bun src/daemon/cli.ts --help
 
 This repo — observation, schema, store, adapters, daemon, gates, the memory store and injection layer, conformance — is **MIT and stays that way**.
 
-Judgment is a separate, proprietary layer: scoring sessions, proposing improvements, auditing which capabilities a smarter model has made unnecessary, and the Cockpit Mac app. The boundary is recorded in `docs/decisions/DAN-213-open-core-boundary.md`.
+Judgment is a separate, proprietary layer: scoring sessions, proposing improvements, auditing which capabilities a smarter model has made unnecessary, and the Cockpit Mac app. The boundary is recorded in `docs/open-core.md`.
 
 The split is deliberate rather than a licensing convenience. You should never have to trust a closed binary about what it records from your work — so the part that watches is the part that is open.
 
@@ -88,6 +88,7 @@ The split is deliberate rather than a licensing convenience. You should never ha
 
 - `docs/schema.md` — the canonical event schema; wins over prose elsewhere on schema questions.
 - `docs/architecture-v2.md` — the rearchitecture rationale.
+- `docs/open-core.md` — what is open, what is paid, and why observation is the open half.
 - `docs/gates.md` — gates, policy, and verification contracts.
 - `docs/memory.md` — the memory store and injection layer.
 - `docs/capability-matrix.md` — generated adapter coverage.

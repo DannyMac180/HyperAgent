@@ -1,6 +1,6 @@
 # HyperAgent Canonical Event Schema — v0.1.0
 
-> The vendor-neutral session/event model every adapter translates into, and the contract every downstream component (memory, scoring, Workshop, Forge, Cockpit) consumes. This is the precise spec promised by `docs/architecture-v2.md` §6.1 (DAN-198). Where this document and prose elsewhere disagree, this document wins for schema questions.
+> The vendor-neutral session/event model every adapter translates into, and the contract every downstream component (memory, scoring, Workshop, Forge, Cockpit) consumes. This is the precise spec promised by `docs/architecture-v2.md` §6.1. Where this document and prose elsewhere disagree, this document wins for schema questions.
 
 ## 1. Design rules
 
@@ -38,7 +38,7 @@ The enum is closed per schema version; adding a type is a minor bump. Adapters e
 
 `session_id` construction: `<vendor>:<native-session-id>` when the harness has one; else `<vendor>:<sha256(path+start_ts)[0..16]>`. Deterministic, so re-ingesting the same transcript yields the same id (idempotent ingestion dedupes on it, §6).
 
-`session_start` payload: `agent` (harness product name), `model` (as reported), `harness_version`, `repo` (git root path), `git_branch`, `cwd`, `parent_session_id` (nullable — session lineage: set when the harness resumes, forks, or compacts a prior session into this one, e.g. Claude Code `--resume`. Downstream consumers treat a lineage chain as one logical body of work; the DAN-200 adapter must populate it rather than inventing its own linkage).
+`session_start` payload: `agent` (harness product name), `model` (as reported), `harness_version`, `repo` (git root path), `git_branch`, `cwd`, `parent_session_id` (nullable — session lineage: set when the harness resumes, forks, or compacts a prior session into this one, e.g. Claude Code `--resume`. Downstream consumers treat a lineage chain as one logical body of work; the Claude Code adapter must populate it rather than inventing its own linkage).
 `session_end` payload: `outcome` (`completed` | `abandoned` | `crashed` | `unknown`), `duration_ms`, `turn_count`, `tool_call_count`. A session with no observed `session_end` is *open*; the daemon may close it with `outcome: unknown` after a timeout — as a new event, never an edit.
 
 **`session_end` is advisory, not terminal.** Harness sessions resume (Claude Code `--resume`, wake-after-sleep) and a quiescence-closed session may append further events afterward. Consumers (memory extraction, scoring) MUST be idempotent per session and MUST NOT treat `session_end` as a promise that no more events arrive; re-derive on new activity after a close.
@@ -136,12 +136,12 @@ CREATE TRIGGER IF NOT EXISTS events_no_delete BEFORE DELETE ON events
 - **Major**: re-shape. Requires a written migration in `src/store/migrations/` and a migration note appended to this file. The events table is never mutated in place; a major migration writes a new log and preserves the old file.
 - The schema is designed to stand alone as a potential open standard for agent telemetry; nothing in it references HyperAgent-internal concepts (missions, Workshop, capabilities) — those are consumers, not schema citizens.
 
-## 8. Known gaps (v0.1.x roadmap, decided before DAN-199/200 build on them)
+## 8. Known gaps (v0.1.x roadmap, decided before the daemon and first adapter built on them)
 
 - **Redaction tombstone.** Append-only currently has no remedy for a secret/PII that reaches an event. Planned (minor bump): a `redaction_tombstone` event type that supersedes a prior event by `id`; readers must treat a tombstoned event's payload as `{}`. Until then, the digest-not-raw-text design (§4.2) keeps the exposure surface to `input_summary`/`claim_text`/`message_summary`, which adapters redact before append.
-- **Multi-writer contention.** WAL is specified; the store should also set `PRAGMA busy_timeout` (e.g. 5000ms) before the daemon, CLI, and Cockpit share one file. Decide in DAN-199.
+- **Multi-writer contention.** WAL is specified; the store should also set `PRAGMA busy_timeout` (e.g. 5000ms) before the daemon, CLI, and Cockpit share one file. Decide before multi-process access becomes routine.
 - **Consumer cursor.** Downstream tailing ("events since my last position") uses SQLite `rowid`: monotonic here *because* deletes are impossible (append-only triggers) — that guarantee is load-bearing, revisit if the triggers ever change. Event `ts` is NOT a cursor: events arrive out of ingest order across sessions.
-- **Derived-event re-derivation — DECIDED 2026-07-27 (DAN-201): forward-only extraction + rebuildable derivation.** `completion_claim`/`verification_event` are heuristic extractions whose extractor version rides `adapter_version`. The resolution has four parts, binding on every consumer:
+- **Derived-event re-derivation — DECIDED 2026-07-27: forward-only extraction + rebuildable derivation.** `completion_claim`/`verification_event` are heuristic extractions whose extractor version rides `adapter_version`. The resolution has four parts, binding on every consumer:
   1. **Appended heuristic events are immutable.** No supersede event type, no extractor-versioned id scheme. An improved heuristic never rewrites history; the append-only guarantee is not weakened for the convenience of scoring.
   2. **All scoring intelligence lives in the derived, rebuildable `session_scores` table**, keyed by `scorer_version`. Improving a scoring heuristic is a `scorer_version` bump plus a rebuild — never an event mutation. The reader rule below is part of the scoring function, so changing *it* also bumps `scorer_version`.
   3. **Reader rule (dedupe):** among heuristic events sharing the same non-null `raw_ref`, a consumer keeps only those carrying the highest `adapter_version` present for that `raw_ref`, and discards the rest. This is required because ids are content-derived: when a resumed session's transcript is re-walked after an adapter upgrade, the old and new extractor's output legitimately coexist in the log for the same underlying transcript record. Deduping at read time makes double-counting impossible without touching the log.
@@ -152,5 +152,5 @@ CREATE TRIGGER IF NOT EXISTS events_no_delete BEFORE DELETE ON events
 
 ## Changelog
 
-- **v0.1.0** (2026-07-26, DAN-198) — initial spec: envelope, nine event types, six entities, SQLite physical schema, store contract.
-- **2026-07-27 (DAN-201)** — §8 derived-event re-derivation gap resolved (no schema shape change): forward-only extraction + rebuildable derivation. Heuristic events stay immutable; scoring intelligence moves to the derived `session_scores` table keyed by `scorer_version`; consumers dedupe same-`raw_ref` heuristic events to the highest `adapter_version`; historical re-extraction is a non-goal.
+- **v0.1.0** (2026-07-26) — initial spec: envelope, nine event types, six entities, SQLite physical schema, store contract.
+- **2026-07-27** — §8 derived-event re-derivation gap resolved (no schema shape change): forward-only extraction + rebuildable derivation. Heuristic events stay immutable; scoring intelligence moves to the derived `session_scores` table keyed by `scorer_version`; consumers dedupe same-`raw_ref` heuristic events to the highest `adapter_version`; historical re-extraction is a non-goal.

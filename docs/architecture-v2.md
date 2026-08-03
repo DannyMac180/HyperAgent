@@ -2,7 +2,7 @@
 
 > **Status:** Accepted direction, 2026-07-26. This document is the source of truth for the HyperAgent rearchitecture. Where it conflicts with the v1 PRD (archived 2026-08-03 at `docs/archive/hyperagent-prd-v1.md`) or the v1 implementation, this document wins. The PRD's vision, safety doctrine, and Suit/Workshop/Forge vocabulary carry forward; the v1 mechanism does not.
 >
-> **Provenance:** Distilled from a full-codebase review of v1 (2026-07-26) and the rearchitecture design session that followed. Linear tickets for each workstream live in the DAN project "HyperAgent".
+> **Provenance:** Distilled from a full-codebase review of v1 (2026-07-26) and the rearchitecture design session that followed.
 
 ## 1. Why v2
 
@@ -27,7 +27,7 @@ This is durable because it builds on the three interfaces every serious agent ha
 
 ## 3. The reframe: one suit, many bodies
 
-Agents are becoming interchangeable bodies; HyperAgent is the nervous system that persists across them. A user running Claude Code, Codex, OpenClaw, Amp, and Cursor today abandons everything each agent learned whenever they switch. The meta-harness inverts that: accumulated memory, policy, and telemetry become the durable user-owned asset, switching agents becomes cheap, and every additional agent feeds the shared layer more data. No single vendor can build this — cross-vendor neutrality is the moat.
+Agents are becoming interchangeable bodies; HyperAgent is the nervous system that persists across them. A user running Claude Code, Codex, OpenClaw, Amp, and Cursor today abandons everything each agent learned whenever they switch. The meta-harness inverts that: accumulated memory, policy, and telemetry become the durable user-owned asset, switching agents becomes cheap, and every additional agent feeds the shared layer more data. No single vendor has an incentive to build this: cross-vendor neutrality is the whole point, and it is the one property a model vendor cannot offer.
 
 ## 4. The durability test (admission rule)
 
@@ -51,25 +51,22 @@ flowchart TD
   end
   agents -->|transcripts + hook events| AD[Adapters]
   AD -->|canonical events| D[hyperagentd daemon]
-  D --> DB[(SQLite: sessions, events, memories, capabilities, scores)]
-  DB --> MR[Mission records - generated, not self-reported]
-  DB --> SC[Session scoring]
-  DB --> W[Workshop pipeline - idle/nightly analysis]
-  W -->|proposals + replay evals| Q[Cockpit review queue]
-  Q -->|human approve| REG[Capability registry]
-  REG -->|render per harness| AD
+  D --> DB[(SQLite: sessions, events, memories)]
+  DB --> MEM[Memory store - approved memories]
+  MEM -->|render per harness| AD
+  AD -->|managed blocks in agent memory files| agents
   D -->|Stop/PreToolUse gates| agents
-  F[Forge - meta-review + decay audit] --> W
-  F --> REG
-  UI[Cockpit Mac app] --> DB
-  UI --> Q
+  D --> PV[Post-hoc policy violations]
+  DB --> J([Judgment layer - separate, proprietary])
 ```
+
+The `Judgment layer` node is where this repository stops. Anything that reads the store and forms an opinion about it lives outside the MIT boundary; see `docs/open-core.md`.
 
 ## 6. Components
 
 ### 6.1 Canonical event schema (build first)
 
-One vendor-neutral session model that every adapter translates into, stored in local SQLite. This is the LSP move: N adapters × M features becomes N + M because everything downstream — memory extraction, scoring, Workshop, Cockpit, decay audits — is written once against the schema and is vendor-blind.
+One vendor-neutral session model that every adapter translates into, stored in local SQLite. This is the LSP move: N adapters × M features becomes N + M because everything downstream is written once against the schema and is vendor-blind.
 
 Core entities (to be specified precisely in `docs/schema.md` as the first engineering deliverable):
 
@@ -86,8 +83,7 @@ Design constraints: append-only event log; adapters may emit partial data (schem
 
 A local Bun/TypeScript background process (launchd on macOS). Watches transcript directories via file events, subscribes to hooks where available, normalizes into the canonical schema. Local-first: nothing leaves the machine.
 
-- Mission records still exist as human-readable markdown — but they are **generated from the transcript** after a session ends (by a cheap model dispatched through the user's own agent CLI), never written by the working agent.
-- Session scoring runs on the same trigger: evidence-backed completion, intervention count, retries, verification pass rate. Scores accumulate into per-agent, per-repo trend lines.
+- Anything that summarizes or grades a session is **derived from the transcript** after the session ends, never written by the working agent. The daemon exposes a session-end hook for that work; it does not perform it.
 - Adapter breakage is a normal event, not an exception: per-adapter version detection, and a visible "adapter needs update" state instead of silent data loss.
 
 ### 6.3 Adapters — the three-verb contract
@@ -115,7 +111,7 @@ An **adapter conformance suite** feeds a synthetic session through an adapter an
 Vendor-neutral store; per-adapter **renderers** compile relevant memories into each harness's native dialect (managed CLAUDE.md block, AGENTS.md section, Cursor rules, MCP recall tool).
 
 - Every memory carries: evidence links back to the transcript moments that taught it, scope (global / repo / agent — some lessons are about a specific harness's quirks), confidence, and a decay clock.
-- Promotion pipeline: observed pattern → candidate memory → (auto or human-approved per policy) → injected. Low-risk factual memories may auto-promote; behavior-shaping memories require review.
+- A memory becomes eligible for injection only through an explicit status transition — `approve`, `reject`, `retire` — and the store refuses to change status any other way. Where candidates come from is outside this repository; that the transition is an authority boundary is not.
 - The cross-agent transfer is the product's defining demo: a lesson learned in one agent's session is present in every other agent's next session.
 
 ### 6.5 Gates and verification contracts
@@ -126,59 +122,33 @@ The enforcement organ, running at harness hook points where available:
 - **Safety policy**: written once, compiled per harness — real PreToolUse blocks where hooks exist; permission-config settings where they don't; and **post-hoc detection** everywhere (the observer flags policy violations in transcripts even when it couldn't block, surfaced in the Cockpit).
 - v1's authority-boundary doctrine (propose freely; never silently broaden permissions, secrets handling, or access; human review for persistent changes) carries forward unchanged — as code instead of prose.
 
-### 6.6 Workshop — a pipeline, not a prompt
+### 6.6 Where the data plane ends
 
-Runs on idle or nightly, dispatched through the user's own installed agent CLI (headless `claude -p` / `codex exec`) so the suit's cognition rides the user's existing subscription at zero marginal cost.
+Everything above lives in this repository under MIT. Above the store sits a separate judgment layer — session scoring, improvement proposals, decay auditing, and a desktop app — which reads the canonical event schema and nothing else. It is a proprietary product and is not documented here. `docs/open-core.md` states what falls on each side of that line and why the observation half is the open half.
 
-1. Cluster friction across many sessions (single sessions rarely justify upgrades — v1's data proved it).
-2. Draft upgrades: new memory, new verification check, new skill, instruction edit — each admitted only if it passes the durability test (§4).
-3. Attach a **replay eval** to every proposal: re-run captured failing scenarios against the upgraded suit. Real fixtures from real history — no hand-authored circular evals.
-4. Land proposals in the Cockpit review queue for one-click approve/reject. Approved upgrades enter the capability registry and are rendered into harnesses by the adapters.
-5. Post-install measurement: session scores before vs. after, per capability. An upgrade that doesn't move the needle is flagged for retirement.
+The seam is typed and deliberately narrow: `IngestOptions.scorer` / `missionQueue` / `memoryQueue` in `src/daemon/ingest.ts`, plus `WatchPlugins` and `runCli(args, extraCommands, watchPlugins)` in `src/daemon/cli.ts`. With no plugins passed the daemon is a complete, standalone flight recorder — observe, store, gate, inspect. That is the intended free product, not a degraded mode of a larger one, and changes to the seam are treated as public interface changes.
 
-### 6.7 Forge — meta-review and the decay audit
-
-The Forge audits the Workshop (proposal acceptance rates, eval quality, specificity) as in v1 — but its signature v2 capability is the **decay audit**: every installed capability carries a falsifiable "still needed?" test. Periodically, the Forge replays scenarios *without* a given capability and checks whether the current model still fails. When a model has outgrown a crutch, the suit retires it — per agent, since Claude may outgrow a capability Codex still needs.
-
-This is the anti-scaffold property made mechanical: **a scaffold accumulates; this suit sheds weight as the pilot gets stronger.**
-
-### 6.8 Cockpit — the Mac app
-
-The paid product surface and the non-engineer's entire experience of HyperAgent:
-
-- Menu bar presence; detects installed agents and attaches with one click — no terminal required.
-- Dashboard: what your agents did, per-agent/per-repo score trends, policy violations, comparative agent performance ("in this repo, Codex wins on test-writing; Claude Code on debugging").
-- Review queue: approve/reject Workshop proposals; memory browser with evidence links; capability registry with decay-audit status.
-- Read-mostly over the local SQLite + markdown artifacts; markdown remains inspectable ground truth (v1's principle, kept).
-
-## 7. Cross-vendor measurement
-
-Because every agent's sessions score through one rubric, the meta-harness produces data no vendor can: comparative agent performance on the user's own workload. This powers routing recommendations, per-agent decay audits, and the Cockpit's comparative dashboard. It exists only at the meta level — a structural moat.
-
-## 8. What carries forward from v1, what dies
+## 7. What carries forward from v1, what dies
 
 **Carries forward:** the Suit/Workshop/Forge vocabulary and story; the mission-record, proposal, and decision formats (as generated outputs); the evidence policy; the safety/authority doctrine; the eval discipline (redirected at replay evals and adapter conformance); roadmap governance style.
 
 **Dies:** the 3,764-line bash CLI (surviving logic rewritten in TypeScript); the operating prompt's how-to-work instructions; all voluntary self-reporting (`mission closeout`, `check`, `record-check` as agent-facing ceremony); hand-authored eval fixtures as reliability proof; per-mission Workshop ceremony.
 
-## 9. Build order
+## 8. Build order
 
-Each stage is independently shippable; never more than one stage from something usable.
+Each stage is independently shippable; never more than one stage from something usable. These are the data-plane stages — judgment-plane work interleaves with them and is not tracked here.
 
 1. **Canonical schema + SQLite store** — everything else's interface.
 2. **`hyperagentd` + Claude Code adapter** — best observation surface (hooks + JSONL) and the primary dogfooding environment, so dogfooding becomes automatic rather than a discipline.
-3. **Transcript→mission generation + session scoring** — first visible value: "here's what your agents did this week."
-4. **Memory engine + injection renderers** — first felt improvement; the cross-agent demo.
-5. **Verification contracts + safety gates.**
-6. **Workshop pipeline + replay evals + review queue.**
-7. **Codex adapter** (parity for the v1 audience), then OpenClaw (Tier 1 candidate), Amp, Cursor.
-8. **Forge + decay audit.**
-9. **Cockpit Mac app** (UI design runs in parallel from stage 3; app ships once there's data worth looking at).
+3. **Memory store + injection renderers** — first felt improvement; the cross-agent demo.
+4. **Verification contracts + safety gates.**
+5. **Codex adapter** (parity for the v1 audience), then OpenClaw (Tier 1 candidate), Amp, Cursor.
 
-## 10. Open questions
+Stages 1 through 4 have shipped; the Codex adapter has shipped at Tier 2. `docs/capability-matrix.md` is the authority on what is actually verified.
+
+## 9. Open questions
 
 - Exact transcript formats/locations per harness and their stability (adapter spikes will answer; design for breakage regardless).
-- Auto-promotion policy boundaries for memory (which classes are safe without review).
-- Whether the canonical schema should be published as a standalone spec early (strategic upside vs. churn while young).
+- Whether the canonical schema should be published as a standalone spec, separately from this repository, and how early.
 - Hook depth on OpenClaw/Amp — verify Tier assignments before committing the matrix publicly.
 - v1 repo hygiene items (tracked mission records containing local paths; uncommitted dotdir migration) — resolved as part of the v2 transition rather than patched in place.

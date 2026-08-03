@@ -20,8 +20,8 @@ jobs:
         with:
           bun-version: latest
 
-      # v2 (Bun/TypeScript) checks — guarded so branches that predate the
-      # src/ layout (and main until DAN-198 merges) still pass.
+      # Bun/TypeScript checks — guarded so branches that predate the src/
+      # layout still pass rather than failing on a missing package.json.
       - name: Install dependencies
         if: ${{ hashFiles('package.json') != '' }}
         run: bun install --frozen-lockfile

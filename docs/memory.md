@@ -39,52 +39,34 @@ transition commands are also where injection re-rendering is triggered.
 `rejected` is a durable human refusal. `retired` removes a formerly useful claim
 while allowing the system to learn it again later.
 
-## Extraction
+## Where candidates come from
 
-When enabled by the daemon, a newly closed session is placed on a
-concurrency-one extraction queue alongside mission processing. HyperAgent's own
-spawned model-run sessions are rejected before extraction, preventing recursive
-self-ingestion.
+This repository stores, transitions, and injects memories. It does not produce
+them. Deriving candidate memories from a closed session — and deciding whether
+any candidate may reach `approved` without a human — is judgment-plane work and
+lives outside this repo (`docs/open-core.md`).
 
-Extraction uses the user's own agent CLI in
-`~/.hyperagent/modelruns/`. The model receives structured session facts and is
-asked for at most five candidates. Parsing is defensive: malformed JSON,
-unsupported fields, invalid kinds, invalid confidence, overlong output, and
-model failures yield no stored candidates. The pipeline stamps each evidence
-reference with the closed session's `session_id`; `session_id` is never accepted
-from model output.
+Two guarantees hold regardless of what produced a candidate, and both are
+enforced here rather than requested of the producer:
 
-Extraction does not inject context. Injection occurs after an explicit status
-transition or `memory sync`, so a session never receives a surprise mid-session
-context change.
+- A memory reaches `approved` only through the `approve` transition, and
+  `update` cannot move status. Injection eligibility is not something a
+  producer can grant itself.
+- Nothing is injected as a side effect of extraction. Injection happens on an
+  explicit status transition or an explicit `memory sync`, so a running session
+  never receives a surprise mid-session context change.
 
 ## Dedupe
 
 Claims are lowercased, punctuation is removed, whitespace is collapsed, and the
-normalized text is hashed. New extraction candidates are checked against every
-non-retired memory and against earlier candidates in the same extraction batch.
+normalized text is hashed (`normalizeClaim` / `claimHash` in
+`src/memory/store.ts`); the hash is stored on the row and indexed. That gives
+any producer a stable identity for a claim to check against.
 
-A match against a rejected memory is dropped. Rejection is a tombstone: a claim
-that a human rejected must not resurface as review spam. Retired claims are
-excluded from dedupe and may be learned again.
-
-## Promotion policy
-
-The promotion configuration lives at `~/.hyperagent/config.json`:
-
-```json
-{
-  "autoPromoteFactual": false
-}
-```
-
-Automatic promotion is off by default. `behavior` and `preference` memories
-never auto-promote, unconditionally. `factual` and `gotcha` candidates promote
-only when `autoPromoteFactual === true` and confidence is at least `0.8`.
-
-Setting `autoPromoteFactual` to `true` means trusting the model-assigned kind and
-confidence despite transcript-borne prompt injection. That risk is exactly why
-the default is off.
+Retired claims are excluded from dedupe and may be learned again — retirement
+removes a formerly useful claim without forbidding it. Rejection is the
+opposite: a durable human refusal, and a tombstone a producer is expected to
+respect.
 
 ## Managed-block contract
 
@@ -159,9 +141,10 @@ All commands also accept `--data-dir D`. `memory add` creates an approved manual
 memory with a synthetic evidence `session_id` of `manual`. For stale listing,
 `NULL` validation timestamps count as stale.
 
-## Deferred work
+## Not yet built
 
-- Workshop clustering: DAN-204
-- Decay audit: DAN-208
-- Other renderers: DAN-205 and DAN-207
-- Gates: DAN-203
+- Injection renderers beyond Claude Code and Codex. The store is
+  vendor-neutral; the renderer set is not yet complete.
+- A decay clock that does anything. Memories carry `last_validated_at`, and
+  `memory list --stale --days N` will show you what has gone quiet, but nothing
+  acts on it automatically.

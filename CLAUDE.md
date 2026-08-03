@@ -28,9 +28,9 @@ A meta-harness: a local observer daemon (`hyperagentd`) that watches agent harne
 - Layout: `src/schema`, `src/store`, `src/adapters`, `src/daemon`, `src/gate`, `src/memory`, `src/conformance`.
 - A capability-matrix row is earned by a passing conformance run, never by editing the table (`bun src/daemon/cli.ts conformance matrix --write`).
 
-## Open-core boundary (DAN-213, executed 2026-07-28)
+## Open-core boundary (executed 2026-07-28)
 
-This repo is the **open data plane** ("the armor", MIT): schema, store, adapters, daemon, gates, `memory/store.ts` + `memory/inject.ts` + injection renderers, conformance, raw-inspection CLI. The **judgment plane** ("the cockpit", proprietary) lives in the private `hyperagent-cockpit` repo: scoring, missions, workshop, forge/decay audit, memory extraction/promotion/queue. See `docs/decisions/DAN-213-open-core-boundary.md`.
+This repo is the **open data plane** ("the armor", MIT): schema, store, adapters, daemon, gates, `memory/store.ts` + `memory/inject.ts` + injection renderers, conformance, raw-inspection CLI. The **judgment plane** ("the cockpit", proprietary) lives in the private `hyperagent-cockpit` repo: scoring, missions, workshop, forge/decay audit, memory extraction/promotion/queue. See `docs/open-core.md`.
 
 **Binding rules for this repo:**
 - Never add judgment-plane code here — every push is irrevocably MIT. If a task needs scoring/missions/workshop/forge/memory-extraction changes, it belongs in `hyperagent-cockpit` (checkout: `~/Desktop/dev/hyperagent-cockpit`); stop and surface if unsure.
@@ -41,7 +41,7 @@ This repo is the **open data plane** ("the armor", MIT): schema, store, adapters
 
 ## Work tracking
 
-Workstreams are Linear tickets **DAN-198 … DAN-215** in the HyperAgent project (team Danmac). `Engineering`-labeled tickets are implementable by Claude Code; `Business`-labeled tickets are Dan's. Each ticket cites its architecture-v2 section. Build order (§9): schema (DAN-198) → daemon + Claude Code adapter (DAN-199/200) → mission generation + scoring (DAN-201) → memory (DAN-202) → gates (DAN-203) → Workshop (DAN-204) → more adapters (DAN-205/207) → Forge (DAN-208) → Cockpit (DAN-210 design → DAN-209 build). DAN-211 (repo transition/hygiene) can run first and in parallel.
+Planning happens in a private tracker, so it is not a reference you can follow from here. What matters in this repo is on disk: `docs/architecture-v2.md` §8 is the build order, `docs/capability-matrix.md` is the authority on what is actually verified, and each doc's own "not yet built" section is the honest list of gaps. If a task cannot be scoped from those, ask rather than inferring intent from a ticket ID in a commit message.
 
 ## Known repo state (2026-08-03, post-v1-retirement)
 

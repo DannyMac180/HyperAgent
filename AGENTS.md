@@ -34,7 +34,7 @@ Recording is open and MIT because trust requires that observation be inspectable
 
 ## Open-core boundary
 
-Everything pushed here is irrevocably MIT. **Never add judgment-plane code to this repo** — scoring, missions, workshop, forge/decay audit, and memory extraction/promotion/queue belong in the private cockpit repo. If a task appears to need them, stop and ask rather than guessing.
+Everything pushed here is irrevocably MIT. **Never add judgment-plane code to this repo** — scoring, missions, workshop, forge/decay audit, and memory extraction/promotion/queue belong in the private cockpit repo. If a task appears to need them, stop and ask rather than guessing. `docs/open-core.md` states where the line falls and why.
 
 The seam the private plane attaches to is `IngestOptions` (`src/daemon/ingest.ts`) plus `WatchPlugins` and `runCli(args, extraCommands, watchPlugins)` (`src/daemon/cli.ts`). Keep it stable and vendor-blind; an interface change needs the matching private-side change landing with it.
 

@@ -1,6 +1,6 @@
 # Gates and Verification Contracts
 
-> The enforcement organ (architecture-v2 §6.5, DAN-203). One policy, written once, compiled per harness at whatever fidelity that harness supports — with every outcome recorded as canonical evidence.
+> The enforcement organ (architecture-v2 §6.5). One policy, written once, compiled per harness at whatever fidelity that harness supports — with every outcome recorded as canonical evidence.
 
 The suit already observes and remembers. Gates are how it *acts*: a forbidden action is blocked at the hook point where the harness allows it, a completion claim without the promised checks bounces back to the agent in-flight, and everything that could not be blocked in real time is still detected afterwards.
 
@@ -126,8 +126,8 @@ A counter file, not a spool scan: rotation would break counting.
 | Harness | PreToolUse block | Stop bounce | Post-hoc detection | Status |
 |---|---|---|---|---|
 | Claude Code | yes | yes | yes | **full** |
-| Codex | no (approval config only) | no | yes | post-hoc only, DAN-205 |
-| OpenClaw | likely achievable | likely achievable | yes | post-hoc only, DAN-207 |
+| Codex | no (approval config only) | no | yes | post-hoc only |
+| OpenClaw | likely achievable | likely achievable | yes | post-hoc only |
 | Amp | no | no | yes | post-hoc only |
 | Cursor | no | no | yes | post-hoc only |
 
@@ -180,8 +180,7 @@ hyperagent violations [--session S] [--days N]
 
 ## Deferred
 
-- **DAN-204** — Workshop-proposed policy and contract edits (still human-reviewed).
-- **DAN-205 / DAN-207** — Codex approval-config emission and OpenClaw hooks; both are post-hoc-only today.
-- **DAN-209** — Cockpit surfacing of violations. DAN-203 ships the data and the CLI.
+- **Codex approval-config emission and OpenClaw hooks** — both harnesses are post-hoc-only today.
+- **A reviewing surface for violations** — this repo ships the data and the CLI (`violations`); presenting trends over it is judgment-plane work (`docs/open-core.md`).
 - **Eval latency** — each hook spawns a Bun process (tens of ms). Acceptable at v0; a compiled binary is the optimization if it ever bites.
 - **Semantic diff-vs-claim matching** — v0 contracts are deterministic checks only. Matching a diff against what the agent *said* it did needs a model, and the hook path deliberately has none.

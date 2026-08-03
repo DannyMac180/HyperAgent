@@ -17,7 +17,7 @@ The project is pre-release and moving. Opening an issue before a large change wi
 
 **In scope:** the event schema, the store, adapters, the daemon, gates and contracts, the memory store and injection renderers, conformance, and the inspection CLI.
 
-**Not in scope:** judging what the record means. Scoring, improvement proposals, decay auditing, and the Cockpit app are a separate proprietary layer (`docs/decisions/DAN-213-open-core-boundary.md`). If a change needs one of those, it does not belong in this repo — say so in an issue and we will work out where it goes.
+**Not in scope:** judging what the record means. Scoring, improvement proposals, decay auditing, and the Cockpit app are a separate proprietary layer (`docs/open-core.md`). If a change needs one of those, it does not belong in this repo — say so in an issue and we will work out where it goes.
 
 Everything merged here is irrevocably MIT.
 

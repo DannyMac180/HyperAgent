@@ -1,143 +1,76 @@
-# Contributing To HyperAgent
+# Contributing to HyperAgent
 
-HyperAgent is an early alpha, Codex-first, file-based project. Contributions should make the Mission -> Workshop -> Forge loop more reliable without adding unnecessary runtime complexity.
+This repository is HyperAgent's **open data plane** — the observation layer, MIT licensed. Contributions should make observation more faithful, more durable, and more inspectable, without adding runtime weight or reaching into territory the project deliberately keeps out.
 
-## Ground Rules
+The project is pre-release and moving. Opening an issue before a large change will save you work.
 
-- Keep the system local, inspectable, and dependency-light.
-- Preserve `human review required` for persistent behavior changes.
-- Do not add autonomous self-modification.
-- Do not broaden filesystem, shell, network, deployment, account, or secrets access without explicit review.
-- Prefer markdown templates, small shell scripts, and focused evals before adding heavier infrastructure.
-- Keep the PRD core small. Put optional UI, sensing, Workbench, reliability, or release-support work behind the extension/release boundary described in `docs/archive/roadmap.md`.
-- Use `docs/safety-policy.md` for authority-boundary checks and `docs/evidence-policy.md` before committing mission or trace evidence.
+## Ground rules
 
-## How To Propose A Suit Upgrade
+- **Never require the agent's cooperation.** Observation comes from harness telemetry — transcripts and lifecycle hooks. A change that asks the working agent to report on itself will be declined regardless of how well it is implemented; that mechanism was measured, found unreliable exactly where it mattered, and removed.
+- **Never install "how to work" instructions.** A capability is admissible only if it is ground truth, actuation/permission, measurement, or persistence (`docs/architecture-v2.md` §4). Advice to the model is the first thing a more capable model makes worthless.
+- **Local-first.** No hosted services, no network calls for core behavior. Data lives in local SQLite and markdown, and markdown stays inspectable.
+- **Vendor-blind downstream.** Only code under `src/adapters/` may know a vendor's format. Everything else consumes the canonical schema.
+- **Human review for persistent behavior changes.** Anything that alters how an agent behaves in future sessions is gated. See `docs/safety-policy.md` and `docs/gates.md`.
+- **Report honestly, including gaps.** Surfacing "this adapter can't observe X" or "this could only be detected after it ran" is correct behavior, not a defect to paper over.
 
-1. Start from mission evidence in `missions/`.
-2. Create a proposal in `workshop/proposals/` using `templates/upgrade-proposal.md`.
-3. Score the proposal with `workshop/rubric.md`.
-4. Add the proposal to `workshop/backlog.md` if it is worth tracking.
-5. Complete the Suit Not Scaffold review gate.
-6. Include an acceptance test and rollback plan.
-7. Keep the activation mode `human review required`.
+## Scope: what belongs here
 
-## Suit Not Scaffold Review Gate
+**In scope:** the event schema, the store, adapters, the daemon, gates and contracts, the memory store and injection renderers, conformance, and the inspection CLI.
 
-Before adding a feature, decide whether it strengthens durable agency infrastructure or only patches a narrow workflow. The allowed durable-agency pillars are: sensing, verification, memory, safety, capability discovery, upgrade flow, and adapter boundary.
+**Not in scope:** judging what the record means. Scoring, improvement proposals, decay auditing, and the Cockpit app are a separate proprietary layer (`docs/decisions/DAN-213-open-core-boundary.md`). If a change needs one of those, it does not belong in this repo — say so in an issue and we will work out where it goes.
 
-Answer these questions in the proposal and PR:
+Everything merged here is irrevocably MIT.
 
-- Which durable-agency pillar does this strengthen?
-- Is the feature core Suit infrastructure, an adapter-specific convenience, an example, or an experiment?
-- If it is task-specific, why does it belong outside core?
-- What evidence or local verification will show the feature prevents product creep instead of adding it?
+## Development
 
-Use these homes:
-
-- Core Suit infrastructure belongs in the local Mission -> Workshop -> Forge loop, shared templates, verification, safety boundaries, memory shape, or capability discovery surfaces.
-- Adapter-specific conveniences belong under adapter-owned docs, config, scripts, or examples until the adapter boundary is accepted.
-- Examples belong in docs, fixtures, eval fixtures, or sample artifacts that do not become required product behavior.
-- Experiments belong in Workshop proposals, backlog candidates, or clearly marked future work until a human decision accepts them.
-
-Accepted upgrades require:
-
-- a proposal in `workshop/proposals/`,
-- a decision record in `workshop/decisions/`,
-- a capability registry entry in `hyperagent/capability-registry.md`,
-- verification evidence.
-
-## How To Handle Mission Evidence
-
-Mission records can include local paths, issue metadata, trace references, and implementation details from real dogfooding. Before committing mission evidence, follow `docs/evidence-policy.md`.
-
-Use `docs/examples/missions/` for public-safe sample missions. Keep raw local evidence in ignored paths such as `.hyperagent-evidence/`.
-
-Before proposing a public mission commit, run:
+Requires [Bun](https://bun.sh).
 
 ```bash
-sh scripts/hyperagent.sh verify-mission --strict PATH
-sh scripts/hyperagent.sh mission redact-check PATH
+bun install
+bun test                # 339 tests
+bunx tsc --noEmit       # typecheck
 ```
 
-## How To Add Evals
+Both gate CI, along with a privacy guard that fails the build if `missions/` becomes tracked or an absolute personal path appears under `src/`.
 
-Put small, repeatable checks in `evals/`.
+## Adding or changing an adapter
 
-Good evals should:
+Adapters are the only vendor-aware code, and they break by design when a vendor changes its format — that is a normal event to detect and surface, never to fail silently.
 
-- run locally,
-- avoid hosted services,
-- be deterministic enough to catch regressions,
-- test behavior instead of only file presence when possible,
-- be documented in `evals/README.md`.
+A new adapter needs:
 
-Run:
+- a parser producing canonical events (`docs/schema.md`);
+- **path-independent event ids.** Ids must not derive from an absolute artifact path; moving a directory must not re-ingest history as duplicates. This one has bitten us, and there is a regression test.
+- a conformance descriptor plus fixtures recorded from real bytes, not hand-written;
+- a passing conformance run.
+
+Capability-matrix rows are **earned by a passing run, never by editing the table**:
 
 ```bash
-sh scripts/verify-mvp.sh
-sh evals/smoke-loop.sh
+bun src/daemon/cli.ts conformance run <vendor>
+bun src/daemon/cli.ts conformance matrix --write
 ```
 
-Use broader tiers when relevant:
+The matrix is generated and has a drift test. Hand-edits are rejected.
+
+## Testing expectations
+
+- Tests should exercise behavior, not file presence.
+- For a bug fix, add the failing test first and confirm it is red before the fix — a test that passes both before and after proves nothing.
+- When a fix removes a defect, check whether it is one instance of a class and sweep for siblings. Several of this project's worst bugs were one-line issues that survived because only the visible instance was fixed.
+
+## Privacy
+
+Session content is sensitive by construction. Never commit real transcripts, real session data, or absolute personal paths. `missions/` is never tracked. Fixtures must be redacted; see `docs/evidence-policy.md`.
+
+## Pull requests
+
+Before opening one:
 
 ```bash
-sh scripts/verify-extensions.sh
-sh scripts/verify-release.sh
+bun test && bunx tsc --noEmit
 ```
 
-## How To Change Templates
+A good PR explains the problem, what changed, how it was verified (with real output, not "should work"), anything that could not be verified and why, and the rollback path if behavior changes persist.
 
-Template changes affect the Suit's memory shape. When changing templates:
-
-- update the matching skill or operating prompt instructions,
-- update verifier expectations if the field is required,
-- update any smoke evals that depend on the template,
-- record the reason in a mission record or Workshop proposal.
-
-## How To Improve The Forge
-
-Forge changes should improve the Workshop process itself.
-
-Examples:
-
-- better proposal quality metrics,
-- stronger eval requirements,
-- clearer safety review fields,
-- better promotion rules from proposals to accepted capabilities.
-
-Use `forge/process/quality-rubric.md` and write Forge reviews in `forge/reviews/`.
-
-## Product State Reconciliation
-
-When a contribution changes user-visible product state, reconcile the inspectable truth files in the same PR.
-
-Checklist:
-
-- Update `docs/archive/roadmap.md` when a surface becomes shipped, accepted, in review, deferred, or stale.
-- Keep `README.md` high level and link to `docs/archive/roadmap.md` instead of duplicating detailed status tables.
-- Update `docs/archive/releases/v0.1.0-alpha.md` only for first-alpha truth; put unreleased next-alpha notes in `docs/archive/releases/next-alpha.md`.
-- Add accepted capabilities to `hyperagent/capability-registry.md` only after a human decision record exists in `workshop/decisions/`.
-- Put implemented-but-unaccepted surfaces in the registry and backlog as `in review`, not `accepted`.
-- Update `workshop/backlog.md` when a new proposal-backed item, review candidate, or deferred PRD area changes.
-- Review `docs/archive/hyperagent-v1.mmd` and `docs/archive/assets/hyperagent-architecture.svg` when user-visible modules are added, removed, renamed, or materially changed.
-- Run `sh scripts/verify-mvp.sh` after reconciliation.
-
-## Pull Requests
-
-Before opening a PR:
-
-```bash
-sh scripts/verify-mvp.sh
-sh evals/smoke-loop.sh
-```
-
-PRs should explain:
-
-- the mission or friction being addressed,
-- files changed,
-- verification run,
-- any safety or authority-boundary implications,
-- whether user-visible module changes required an architecture diagram update,
-- rollback path when behavior changes persist.
-- whether the change affects core, optional extensions, release support, or adapter boundaries.
+Public-facing docs that describe what HyperAgent observes are part of the product's trust surface. If your change alters what is collected or how it is stored, update `docs/schema.md` and `docs/evidence-policy.md` in the same PR.

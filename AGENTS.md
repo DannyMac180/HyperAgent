@@ -1,89 +1,41 @@
-# HyperAgent Project Instructions
+# HyperAgent — Project Instructions
 
-This repository is the testbed for HyperAgent. In this project, Codex should run HyperAgent triage on every task.
+This repository is the **open data plane** of HyperAgent (MIT). These instructions apply to any agent working in this repo, whatever harness it runs in. They mirror `CLAUDE.md`; where the two disagree, that is a bug — fix both.
 
-## Default Behavior
+## The one rule that shapes everything else
 
-At the start of each task, decide whether the full HyperAgent loop is relevant.
+**The pilot flies; the suit records.** HyperAgent observes agents through their harness's own telemetry — transcripts and lifecycle hooks — and never by asking an agent to report on itself. An agent working in this repo carries **zero HyperAgent ceremony**: no mission record to write, no proposal to file, no operating prompt to wear, no loop to run before or after the actual task. Just do the task.
 
-Use the full HyperAgent Mission -> Workshop -> Forge loop by default when the task:
+If you find an instruction anywhere in this repo telling an agent to record its own work, that instruction is v1 and it is wrong. The v1 self-reporting loop — Mission → Workshop → Forge as agent-authored markdown, the `codex-hyperagent` skill, `hyperagent/operating-prompt.md`, and the `scripts/hyperagent.sh` CLI — was **retired on 2026-08-03** and now exists only in git history.
 
-- changes files, docs, scripts, templates, skills, evals, or product behavior,
-- asks about the HyperAgent PRD, architecture, setup, install flow, skill behavior, or repo status,
-- requires investigation across multiple files or commands,
-- involves verification, debugging, failing checks, or repeated friction,
-- could reveal an improvement to the Suit, Workshop, Forge, installer, docs, or evals,
-- explicitly asks to use HyperAgent or to run a HyperAgent mission.
+Why it was abolished rather than improved: it was measured. 60 of 66 recorded missions closed with no usable handoff, and the auto-closeout template filled the agent's own judgment fields with boilerplate. Self-assessment written by the thing being assessed degrades toward whatever passes the check. Involuntary observation is not an implementation detail here; it is the product.
 
-For full-loop tasks:
+## What this repo is
 
-1. Use the `codex-hyperagent` skill instructions.
-2. Read `hyperagent/operating-prompt.md`.
-3. Complete the user task with focused changes and explicit verification.
-4. Write a mission record in `missions/`.
-5. Create a Workshop proposal in `workshop/proposals/` only when there is concrete Suit friction or a worthwhile improvement.
-6. Create a Forge review in `forge/reviews/` only when the Workshop process itself needs review.
-7. Keep persistent behavior changes `human review required`.
+A local observer daemon (`hyperagentd`) watches agent harnesses' own telemetry, normalizes it into one vendor-neutral event schema in append-only SQLite, and exposes durable capabilities on top of that record: memory shared across agents and injected into each one, and verification/safety gates at harness hook points.
 
-Skip the full loop only when the task is clearly isolated and low-signal, such as:
+Recording is open and MIT because trust requires that observation be inspectable. The judgment plane — scoring, the Workshop that proposes upgrades, the Forge decay audit, and the Cockpit Mac app — is proprietary and lives in a separate private repo.
 
-- answering a simple factual question that does not depend on repo state,
-- running a trivial one-line command,
-- restating prior status without new investigation,
-- small conversational clarification,
-- simple formatting or wording that does not affect project behavior.
+## Core design rules (binding for all code here)
 
-When skipping the full loop, mention briefly that HyperAgent triage classified the task as an isolated one-off and no mission record was written.
+1. **No self-reporting.** Observation comes from transcripts and hooks only. Nothing may require the working agent's cooperation.
+2. **Durability test.** A capability is admissible only if it is ground truth, actuation/permission, measurement, or persistence (`docs/architecture-v2.md` §4). Never install "how to think" or "how to work" instructions — a more capable model makes those worthless, and they are the fastest thing for a harness vendor to absorb.
+3. **Local-first.** Data lives in local SQLite and markdown, and markdown stays inspectable ground truth.
+4. **Vendor-blind downstream.** Only adapters know vendor formats; everything else consumes the canonical schema (`docs/schema.md`).
+5. **Adapter breakage is a normal event.** Version-detect and surface "adapter needs update" — never fail silently, and never claim coverage you do not have.
+6. **Human review for persistent behavior changes**, enforced in code rather than requested in prose. See `docs/gates.md`.
 
-## Testing Posture (testbed-only)
+## Conventions
 
-Because this repo is the HyperAgent testbed, prefer recording mission telemetry for borderline cases. The goal is to learn which tasks deserve the loop and where the loop feels too heavy.
+- TypeScript on Bun (`bun`/`bunx`, never npm/npx).
+- Tests: `bun test`. Typecheck: `bunx tsc --noEmit`. Both gate CI.
+- Source layout: `src/schema`, `src/store`, `src/adapters`, `src/daemon`, `src/gate`, `src/memory`, `src/conformance`.
+- A capability-matrix row is earned by a passing conformance run, never by editing the table. Regenerate with `bun src/daemon/cli.ts conformance matrix --write`.
 
-## Core And Extensions (testbed-only verification tiers)
+## Open-core boundary
 
-Use `docs/archive/roadmap.md` as the current source for what belongs to the PRD core versus optional extensions or release support.
+Everything pushed here is irrevocably MIT. **Never add judgment-plane code to this repo** — scoring, missions, workshop, forge/decay audit, and memory extraction/promotion/queue belong in the private cockpit repo. If a task appears to need them, stop and ask rather than guessing.
 
-- Core changes should preserve the Codex-first Suit, local mission evidence, Workshop, Forge, human review, and markdown-first memory.
-- Optional extension changes include the local UI, sensing extras, Workbench traces, and reliability scoring.
-- Release-support changes include GitHub templates, clean-install UAT, release notes, and rendered README assets.
+The seam the private plane attaches to is `IngestOptions` (`src/daemon/ingest.ts`) plus `WatchPlugins` and `runCli(args, extraCommands, watchPlugins)` (`src/daemon/cli.ts`). Keep it stable and vendor-blind; an interface change needs the matching private-side change landing with it.
 
-Run the narrowest relevant verification tier first:
-
-```bash
-sh scripts/verify-core.sh
-sh scripts/verify-extensions.sh
-sh scripts/verify-release.sh
-```
-
-## Symphony Linear Handoff (testbed-only)
-
-Before a Symphony-managed issue is moved to `Human Review`, complete a documentation checkpoint:
-
-1. Check whether the completed changes need documentation updates.
-2. Make any required documentation changes before the handoff.
-3. Add a Linear issue comment summarizing the documentation changes made.
-
-If no documentation changes were needed, add a Linear issue comment saying that the documentation checkpoint was completed and no docs changes were required.
-
-Only move the Linear issue to `Human Review` after that documentation checkpoint comment has been posted.
-
-## README Architecture Diagram (testbed-only)
-
-The GitHub README is the initial user-facing landing page. Keep its high-level architecture diagram current when user-visible HyperAgent modules are added, removed, renamed, or materially changed.
-
-When a task changes user-visible modules, review and update these files as needed:
-
-- `docs/archive/hyperagent-v1.mmd`: editable diagram source.
-- `docs/archive/assets/hyperagent-architecture.svg`: rendered README asset.
-- `README.md`: surrounding architecture copy if the public story changes.
-
-For PRs that change user-visible modules, confirm that the architecture diagram was reviewed or updated.
-
-Run the strongest relevant local verification before final response:
-
-```bash
-sh scripts/verify-mvp.sh
-sh evals/smoke-loop.sh
-```
-
-Use narrower checks when the change is documentation-only or when the full smoke loop is not relevant.
+Schema and store changes always land here first.

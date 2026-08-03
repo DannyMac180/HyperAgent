@@ -1,5 +1,4 @@
 .DS_Store
-evals/out/
 # Local dogfooding evidence and trace summaries stay private unless converted
 # into a reviewed, redacted public example under docs/examples/missions/.
 .hyperagent-evidence/

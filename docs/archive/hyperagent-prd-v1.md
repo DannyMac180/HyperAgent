@@ -1,4 +1,13 @@
-# HyperAgent PRD
+# HyperAgent PRD (v1 — SUPERSEDED)
+
+> [!WARNING]
+> **This document is superseded and is retained for history only. Do not implement from it.**
+>
+> Superseded 2026-07-26 by `docs/architecture-v2.md`, and again 2026-08-02 by the current product direction. Archived 2026-08-03.
+>
+> **Specifically wrong here:** the mission layer below is *agent self-reporting* — the mechanism v2 measured failing (60 of 66 recorded missions closed with no usable handoff) and abolished. The "operating doctrine" and task-execution conventions the Suit was to install are `how to work` instructions, which the current architecture rejects by name: they are the first thing a more capable model makes worthless. `auto-install low risk` appears below as an activation mode; unattended installation is no longer an available mode at all (`docs/safety-policy.md`). The first-implementation target and milestones describe a Codex-Mac-app product that no longer exists.
+>
+> **Still useful:** the Suit / Workshop / Forge vocabulary, and the safety doctrine that persistent behavior changes require human approval — which carried forward and is now enforced in code (`docs/gates.md`).
 
 ## Product Summary
 

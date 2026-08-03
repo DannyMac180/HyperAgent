@@ -1,6 +1,6 @@
 # HyperAgent v2 Architecture — The Meta-Harness
 
-> **Status:** Accepted direction, 2026-07-26. This document is the source of truth for the HyperAgent rearchitecture. Where it conflicts with `docs/hyperagent-prd.md` or the v1 implementation, this document wins. The PRD's vision, safety doctrine, and Suit/Workshop/Forge vocabulary carry forward; the v1 mechanism does not.
+> **Status:** Accepted direction, 2026-07-26. This document is the source of truth for the HyperAgent rearchitecture. Where it conflicts with the v1 PRD (archived 2026-08-03 at `docs/archive/hyperagent-prd-v1.md`) or the v1 implementation, this document wins. The PRD's vision, safety doctrine, and Suit/Workshop/Forge vocabulary carry forward; the v1 mechanism does not.
 >
 > **Provenance:** Distilled from a full-codebase review of v1 (2026-07-26) and the rearchitecture design session that followed. Linear tickets for each workstream live in the DAN project "HyperAgent".
 

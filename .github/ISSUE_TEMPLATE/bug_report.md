@@ -32,8 +32,8 @@ What should have happened?
 Commands run:
 
 ```bash
-sh scripts/verify-mvp.sh
-sh evals/smoke-loop.sh
+bun test
+bunx tsc --noEmit
 ```
 
 ## Safety Notes

@@ -1,5 +1,0 @@
-interface:
-  display_name: "HyperAgent"
-  short_description: "Run Codex with the HyperAgent Suit, mission records, Workshop proposals, and Forge reviews"
-  default_prompt: "Use $codex-hyperagent to run this as a HyperAgent mission, verify the result, write a mission record, and propose upgrades only if there is concrete friction."
-  version: "v0.1.0-alpha"

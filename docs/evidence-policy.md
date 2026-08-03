@@ -38,13 +38,7 @@ Before committing a mission record, review for:
 - network, deployment, filesystem, or account-authority details that would change the safety interpretation of the mission,
 - long raw command output that can be summarized as verification evidence instead.
 
-Run the quick preflight before committing public mission examples:
-
-```bash
-sh scripts/hyperagent.sh mission redact-check docs/examples/missions/public-safe-mission.md
-```
-
-This helper flags obvious local paths, private Linear URLs, local evidence payload references, and secret-like strings. It does not treat a bare public planning ID as a finding by itself. Core verification runs it on the public-safe example and on changed mission files visible to git, so new public evidence gets a forward safety gate. Passing the helper is not a guarantee that a mission is public-safe; human review is still required.
+> **Note (2026-08-03):** the `redact-check` / `verify-mission` helpers referenced by earlier revisions of this document belonged to the v1 bash CLI, which has been retired. Redaction is currently a **manual review step** with no automated preflight. Restoring a check scoped to the event store — and closing the redaction-tombstone gap described in `docs/schema.md` §8 — is tracked as open work; until then, human review is the only gate.
 
 ## Dogfooding Records
 
@@ -59,6 +53,5 @@ Private dogfooding records can be more specific than public examples, but they s
 
 1. Decide whether the record belongs in `docs/examples/missions/` (public, redacted) or stays in an ignored local path (`missions/`, `.hyperagent-evidence/`). `missions/` is never committed.
 2. Remove local paths, private issue metadata, secrets, raw traces, and unrelated side context; keep bare issue IDs only when they are intentional public labels.
-3. Run `sh scripts/hyperagent.sh verify-mission --strict PATH` when the file is a mission record.
-4. Run `sh scripts/hyperagent.sh mission redact-check PATH` before proposing a public commit.
-5. In the PR, say whether mission evidence was committed, redacted, converted to a public example, or kept local.
+3. Review by hand for the categories listed above; there is no automated preflight at present.
+4. In the PR, say whether mission evidence was committed, redacted, converted to a public example, or kept local.

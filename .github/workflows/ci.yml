@@ -34,22 +34,10 @@ jobs:
         if: ${{ hashFiles('package.json') != '' }}
         run: bun test
 
-      # v1 legacy surface: syntax-only safety net. Deliberately NOT
-      # scripts/verify-core.sh — its string-presence checks are v1 gates
-      # and must not gate v2 work (see CLAUDE.md).
-      - name: Shell syntax check (v1 legacy scripts)
-        run: |
-          rc=0
-          for f in scripts/*.sh evals/*.sh; do
-            [ -f "$f" ] || continue
-            bash -n "$f" || { echo "syntax error: $f"; rc=1; }
-          done
-          exit "$rc"
-
       # Repo privacy policy (docs/evidence-policy.md): missions/ is never
-      # committed, and v2 code never embeds absolute personal paths.
-      # Scoped to src/ because four v1 files legitimately reference the
-      # /Users/ pattern (redaction checklists and redaction code).
+      # committed, and code never embeds absolute personal paths.
+      # (The v1 shell-syntax step was removed on 2026-08-03 with the v1
+      # surface it guarded — scripts/ and evals/ no longer exist.)
       - name: Privacy guard
         run: |
           if git ls-files missions/ | grep -q .; then

@@ -4,6 +4,7 @@ import { expect, test } from "bun:test";
 
 import {
   renderCapabilityMatrix,
+  UNVERIFIED_HARNESSES,
 } from "./matrix.ts";
 import {
   ALL_CONFORMANCE_CHECKS,
@@ -66,6 +67,28 @@ test("only a passing report can render a verified row", () => {
   expect(renderCapabilityMatrix([])).not.toMatch(
     /\| absent-harness \|.*verified as of/,
   );
+});
+
+test("an unmeasured harness asserts no tier and no capability verdicts", () => {
+  const rendered = renderCapabilityMatrix([]);
+  const lines = rendered.split("\n");
+  const measuredStart = lines.indexOf("## Measured");
+  const unmeasuredStart = lines.indexOf("## Not yet measured");
+
+  expect(measuredStart).toBeGreaterThanOrEqual(0);
+  expect(unmeasuredStart).toBeGreaterThan(measuredStart);
+
+  for (const harness of UNVERIFIED_HARNESSES) {
+    const rowIndex = lines.findIndex((line) =>
+      line.startsWith(`| ${harness.vendor} |`)
+    );
+    expect(rowIndex).toBeGreaterThan(unmeasuredStart);
+
+    // Two columns only: a tier or a per-capability verdict cannot be expressed.
+    const cells = lines[rowIndex]!.split("|").slice(1, -1);
+    expect(cells).toHaveLength(2);
+    expect(lines[rowIndex]).not.toMatch(/\bTier\b|\bverified\b|\| [123] \|/);
+  }
 });
 
 test("capability matrix rendering is deterministic", async () => {

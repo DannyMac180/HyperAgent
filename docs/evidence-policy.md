@@ -1,57 +1,64 @@
-# Mission Evidence Policy
+# Data and Privacy Policy
 
-Mission records are product evidence for the Mission -> Workshop -> Forge loop. They are also logs from real work. Treat them as reviewable source artifacts, not raw transcripts.
+What HyperAgent records about your work, where it goes, what never reaches it, and what can be taken back out. This document covers the **data plane** — the parts that observe. It is a statement about the software's behavior, not a set of instructions for a working agent.
 
-## Default Boundary
+`docs/safety-policy.md` covers what HyperAgent may do to your machine; this covers what it keeps. `docs/schema.md` is the authority on the exact shape of every record.
 
-- Commit public-safe examples in `docs/examples/missions/`.
-- `missions/` is private, full stop. As of 2026-07-26 the directory is untracked (`git rm --cached`) and ignored; nothing under it may be committed. Records that were tracked before this date remain in git history — treat everything already pushed as public, and never rely on history for privacy. If a mission teaches a reusable lesson, convert it into a redacted public example under `docs/examples/missions/`.
-- Keep local dogfooding evidence in `.hyperagent-evidence/` or another ignored local path.
-- Do not commit raw Workbench traces, local trace payloads, shell history, environment dumps, credentials, or private account data.
-- When evidence is useful but too local, convert it into a public example that preserves the learning and removes the private details.
+## Where data lands
 
-## Public Examples
+Everything is local. Nothing is transmitted anywhere by the daemon, the CLI, or the adapters.
 
-Public examples should show the shape of the loop without depending on one maintainer's machine, issue tracker, or private workspace history.
+| Surface | What it holds | Where |
+|---|---|---|
+| Event store | Canonical events: envelope, digests, summaries, pointers | `~/.hyperagent/hyperagent.db` (append-only SQLite) |
+| Gate spool | Hook firings awaiting ingest: command summaries, matched paths, verdicts | `~/.hyperagent/gate/outcomes.jsonl`, drained into the store |
+| Memory markdown | Installed memories and their evidence links | `~/.hyperagent/memory/<scope>/<id>.md` |
 
-Good public examples:
+**Nothing in this repo invokes a model or spawns a subprocess.** There is no inference step in the data plane — no code path sends your text to an API or to a locally-installed agent CLI. Components that reason about the record live in the separate judgment plane and are not covered by this document; if you are running one, its own data behavior is its own to state.
 
-- use relative or fictional repo paths,
-- avoid private issue URLs, account names, and non-public tracker context,
-- use bare planning IDs such as `DAN-NNN` only when they are intentional public roadmap or provenance labels,
-- summarize checks instead of pasting raw tool output,
-- explain unresolved risks without exposing unrelated side context,
-- keep enough detail for contributors to understand what the mission proved.
+## Digests, not transcripts
 
-The sample mission in `docs/examples/missions/public-safe-mission.md` is the reference shape for committed public examples.
+The store is an **index into your harness's own transcripts**, not a copy of them. Events carry sha256 digests, counts, durations, and a `raw_ref` pointer; the prose stays in the vendor's file, which was already on your disk before HyperAgent existed.
 
-## Redaction Checklist
+The residual text surface is small and deliberate: `input_summary`, `claim_text`, and `message_summary`. Every one of them passes through the same redaction filter described below before it is appended, and each is length-capped. Two consequences worth stating plainly:
 
-Before committing a mission record, review for:
+- Deleting the HyperAgent store does not delete your transcripts, and deleting your transcripts does not delete the store — it strips the store's ability to resolve evidence (`docs/schema.md` §8).
+- A secret that was never in a transcript cannot reach the store. A secret that *was* is subject to the gap below.
 
-- absolute local paths such as `/Users/name/...`, `/private/tmp/...`, `/var/folders/...`, or `/tmp/...`,
-- private project names, internal workspace names, side-workspace history, or unrelated customer/user context,
-- issue metadata that is not meant for the public sample, including private Linear URLs, account names, comments, and full tracker payloads,
-- bare issue IDs only when they are not intentional public roadmap or provenance labels,
-- secrets, tokens, passwords, API keys, bearer tokens, private keys, or credential-like command fragments,
-- raw local trace payloads, `.hyperagent-evidence/` contents, Workbench payloads, screenshots, or command logs,
-- network, deployment, filesystem, or account-authority details that would change the safety interpretation of the mission,
-- long raw command output that can be summarized as verification evidence instead.
+## What is never ingested
 
-> **Note (2026-08-03):** the `redact-check` / `verify-mission` helpers referenced by earlier revisions of this document belonged to the v1 bash CLI, which has been retired. Redaction is currently a **manual review step** with no automated preflight. Restoring a check scoped to the event store — and closing the redaction-tombstone gap described in `docs/schema.md` §8 — is tracked as open work; until then, human review is the only gate.
+- Your source files. Adapters read harness transcripts and hook payloads. Inside a repo, HyperAgent reads exactly one file — `.hyperagent/contract.json`, the verification contract you installed there. Gate policy is read from `~/.hyperagent/policy.json`, outside your repo entirely. Nothing reads, digests, or stores the contents of your code.
+- Environment variables, shell history, keychains, credential files.
+- Anything outside the configured harness transcript locations and the gate spool.
+- Network traffic. Nothing in `src/` opens a socket or makes an HTTP request.
 
-## Dogfooding Records
+**It does write into your repo, and you should know where.** Injection maintains a managed block in one file per harness — `CLAUDE.local.md` for Claude Code and `AGENTS.md` for Codex. That difference matters to you: `CLAUDE.local.md` is local-only *by convention* — HyperAgent does not gitignore it for you, so verify yours is ignored if memories should not reach collaborators — while `AGENTS.md` is typically tracked, meaning anything injected there is visible to everyone who clones the repo. Installing gate hooks also edits `.claude/settings.local.json`. All of it is byte-idempotent, confined to the managed block, and reversible with an explicit uninstall.
 
-Private dogfooding records can be more specific than public examples, but they should still be inspectable and safe by default.
+## What redaction actually does
 
-- Keep raw local evidence in ignored paths.
-- Prefer concise summaries over pasted payloads.
-- Keep persistent behavior changes `human review required`.
-- If a private dogfooding record teaches a reusable lesson, extract the lesson into a redacted public example or a Workshop proposal.
+Every text summary — from adapters and from gate events alike — passes through one shared filter before it is appended: recognized key shapes (`sk-…`, `ghp_…`, `AKIA…`), `Bearer` headers, and `password=` / `api_key=` / `token=` assignments are replaced with `[redacted]`, and summaries are length-capped. This is a **known-shape filter, not a secret detector** — a credential in an unrecognized format passes through, which is why the gap below matters.
 
-## Contributor Workflow
+## The redaction gap — named, owned, not yet closed
 
-1. Decide whether the record belongs in `docs/examples/missions/` (public, redacted) or stays in an ignored local path (`missions/`, `.hyperagent-evidence/`). `missions/` is never committed.
-2. Remove local paths, private issue metadata, secrets, raw traces, and unrelated side context; keep bare issue IDs only when they are intentional public labels.
-3. Review by hand for the categories listed above; there is no automated preflight at present.
-4. In the PR, say whether mission evidence was committed, redacted, converted to a public example, or kept local.
+**The event store is append-only, and there is currently no supported way to remove a secret that reaches it.** Append-only is what makes the record trustworthy; it is also what makes this hard. The store's triggers reject `UPDATE` and `DELETE`, by design and under test.
+
+The planned remedy is a `redaction_tombstone` event type that supersedes a prior event by id, with readers required to treat a tombstoned payload as `{}` (`docs/schema.md` §8, minor version bump). It is **not built**. Until it is:
+
+- the blunt remedy is deleting `~/.hyperagent/hyperagent.db`, which costs the whole history;
+- the mitigations that do exist are structural — digests instead of raw text, and the shared redaction filter above on every summary that is stored;
+- there is **no automated preflight**. The v1 `redact-check` and `verify-mission` helpers belonged to the retired bash CLI and are gone; nothing replaced them.
+
+Treat this as the honest state of the art here, not as a solved problem. Closing it is a prerequisite for any feature that widens what gets recorded.
+
+## Your own copy is yours
+
+The store is a SQLite file and the memories are markdown. Both are readable with ordinary tools, both are yours to inspect, copy, or delete. Markdown stays inspectable ground truth on purpose: a record you cannot read is a record you cannot trust.
+
+## For contributors
+
+- Never commit a real store, spool file, memory file, or transcript. Test fixtures are recorded and redacted by hand.
+- **`missions/` is never git-tracked.** It is untracked and gitignored, and CI fails the build if any file under it is staged. The directory is a v1 artifact — mission records are now generated, private, and live in the judgment plane — but the guard stays because records committed before 2026-07-26 are already in this repo's public history, and re-tracking would compound that. Never rely on history for privacy: treat everything already pushed as public.
+- CI's privacy guard also fails on an absolute personal path (`/Users/…`) anywhere in `src/`.
+- Use relative or fictional repo paths in examples and fixtures.
+- Summarize verification output rather than pasting raw tool logs.
+- If a change widens what is recorded — a new event type, a new payload field, a new surface — say so in the PR explicitly, and check it against the redaction gap above.

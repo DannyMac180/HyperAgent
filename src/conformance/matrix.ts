@@ -1,34 +1,28 @@
 import type { ConformanceReport } from "./types.ts";
 
+/**
+ * A harness nobody has run the conformance suite against yet.
+ *
+ * These rows carry no tier and no capability verdicts, only a note on where
+ * the surface is expected to be. Tier is a claim about verified capability
+ * (§6.3 derivation: at least one real passing check per capability), so
+ * asserting one here would be asserting evidence that does not exist — which
+ * is the exact thing this file's footer says cannot happen.
+ */
 export interface UnverifiedHarness {
   vendor: string;
-  observe: string;
-  inject: string;
-  gate: string;
-  tier: string;
+  expectedSurface: string;
 }
 
 export const UNVERIFIED_HARNESSES: readonly UnverifiedHarness[] = [
   {
     vendor: "OpenClaw",
-    observe: "Open-source, hackable",
-    inject: "AGENTS.md-style, MCP",
-    gate: "Likely achievable",
-    tier: "1 — full suit",
+    expectedSurface: "open-source and hackable; AGENTS.md-style injection, MCP",
   },
-  {
-    vendor: "Amp",
-    observe: "Thread storage",
-    inject: "AGENTS.md",
-    gate: "No",
-    tier: "2",
-  },
+  { vendor: "Amp", expectedSurface: "thread storage; AGENTS.md injection" },
   {
     vendor: "Cursor",
-    observe: "Weak (app-internal)",
-    inject: "Rules files",
-    gate: "No",
-    tier: "3 — inject-only",
+    expectedSurface: "app-internal state; rules-file injection",
   },
 ];
 
@@ -45,11 +39,13 @@ function verifiedRow(report: ConformanceReport): string {
 }
 
 /**
- * Claimed rows are deliberately built on a separate path from report-backed
- * rows. Architecture claims can never be promoted to verified by this builder.
+ * Not-yet-measured rows are deliberately built on a separate path from
+ * report-backed rows, in a separate table with a different column set.
+ * Architecture claims can never be promoted to verified by this builder, and
+ * the two tables cannot be confused for one another by a skimming reader.
  */
-function claimedRow(harness: UnverifiedHarness): string {
-  return `| ${harness.vendor} | ${harness.observe} | ${harness.inject} | ${harness.gate} | ${harness.tier} | claimed, unverified — architecture-v2 §6.3 |`;
+function unmeasuredRow(harness: UnverifiedHarness): string {
+  return `| ${harness.vendor} | ${harness.expectedSurface} |`;
 }
 
 export function renderCapabilityMatrix(
@@ -63,7 +59,7 @@ export function renderCapabilityMatrix(
       return left.vendor > right.vendor ? 1 : 0;
     })
     .map(verifiedRow);
-  const claimedRows = UNVERIFIED_HARNESSES.map(claimedRow);
+  const unmeasuredRows = UNVERIFIED_HARNESSES.map(unmeasuredRow);
 
   return [
     "<!-- GENERATED FILE — DO NOT EDIT BY HAND. -->",
@@ -72,12 +68,23 @@ export function renderCapabilityMatrix(
     "",
     `Regenerate with \`${REGENERATION_COMMAND}\`. Generation runs the conformance suite LIVE against every registered descriptor; there is no cached-report path.`,
     "",
+    "## Measured",
+    "",
+    "Every row below is the output of a conformance run against a registered adapter. This is the authority on what HyperAgent can actually do.",
+    "",
     "| Harness | Observe | Inject | Gate | Tier | Evidence |",
     "|---|---|---|---|---|---|",
     ...reportRows,
-    ...claimedRows,
     "",
-    "To earn a row, add a `ConformanceDescriptor` beside the adapter, register it in `src/conformance/registry.ts`, and pass the suite. A row is earned by a passing run, never by editing this table.",
+    "## Not yet measured",
+    "",
+    "No adapter, no conformance run, no evidence. These rows carry **no tier and no capability verdicts** — only where the surface is expected to be, from the fleet assessment in `architecture-v2.md` §6.3. Nothing here is a claim about what HyperAgent supports today.",
+    "",
+    "| Harness | Expected surface (unverified) |",
+    "|---|---|",
+    ...unmeasuredRows,
+    "",
+    "To earn a row in **Measured**, add a `ConformanceDescriptor` beside the adapter, register it in `src/conformance/registry.ts`, and pass the suite. A row is earned by a passing run, never by editing this table.",
     "",
   ].join("\n");
 }

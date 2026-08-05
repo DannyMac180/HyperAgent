@@ -61,6 +61,19 @@ export interface IngestOptions {
    * only — already-ingested sessions are deletion's job, not exclusion's.
    */
   excludeProjects?: string[];
+  /**
+   * Cut-off in ms epoch: sessions whose artifact was last written before this
+   * are skipped before parse, exactly like `excludeProjects`.
+   *
+   * The filter is on artifact mtime — the only time signal available without
+   * reading the file, and the one every adapter supplies, which makes this
+   * genuinely vendor-blind where project exclusion cannot be. The honest
+   * reading is therefore "sessions last active since X", not "sessions started
+   * since X": a long-running session resumed after the cut-off is taken whole,
+   * including its older turns. Callers that surface this to a human must say
+   * so rather than implying a per-event window.
+   */
+  since?: number;
 }
 
 export interface AdapterRunStats {
@@ -74,6 +87,8 @@ export interface AdapterRunStats {
   sessionsSkippedUnchanged: number;
   /** Sessions dropped by `excludeProjects` before parse — never silent. */
   sessionsExcluded: number;
+  /** Sessions dropped by `since` before parse — never silent. */
+  sessionsSkippedOld: number;
   eventsAppended: number;
   skippedUnknown: number;
   parseFailures: number;
@@ -341,6 +356,7 @@ function zeroStats(
     sessionsParsed: 0,
     sessionsSkippedUnchanged: 0,
     sessionsExcluded: 0,
+    sessionsSkippedOld: 0,
     eventsAppended: 0,
     skippedUnknown: 0,
     parseFailures: 0,
@@ -404,6 +420,13 @@ export async function runIngestOnce(
           // ingests it fresh, because no resume token was ever recorded.
           if (session.projectDir !== undefined && excluded.has(session.projectDir)) {
             stats.sessionsExcluded += 1;
+            continue;
+          }
+          // Same contract as exclusion, on a different axis: before parse,
+          // before any state entry. Adapter-supplied mtime, so it reaches
+          // vendors that have no project identity to exclude on.
+          if (options.since !== undefined && session.mtimeMs < options.since) {
+            stats.sessionsSkippedOld += 1;
             continue;
           }
           const prior = state.sessions[session.sessionId];

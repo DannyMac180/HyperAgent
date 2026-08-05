@@ -51,6 +51,7 @@ import type {
   ConformanceReport,
 } from "../conformance/types.ts";
 import { computeTargetRepos } from "../memory/inject.ts";
+import { readScope, scopePath, writeScope } from "./scope.ts";
 import type { InjectionResult } from "../memory/inject.ts";
 import {
   openMemoryStore,
@@ -96,8 +97,10 @@ interface CommonOptions {
 }
 
 const usage = `Usage:
-  bun src/daemon/cli.ts ingest --once [--data-dir D] [--projects-root P] [--exclude-projects A,B]
+  bun src/daemon/cli.ts ingest --once [--data-dir D] [--projects-root P] [--exclude-projects A,B] [--since 30d|2026-01-01]
   bun src/daemon/cli.ts watch [--data-dir D] [--projects-root P] [--exclude-projects A,B]
+  bun src/daemon/cli.ts scope show [--data-dir D]
+  bun src/daemon/cli.ts scope set --exclude-projects A,B [--data-dir D]
   bun src/daemon/cli.ts status [--data-dir D]
   bun src/daemon/cli.ts memory list [--status S] [--scope S] [--stale --days N] [--data-dir D]
   bun src/daemon/cli.ts memory show <id> [--data-dir D]
@@ -185,6 +188,51 @@ function excludeProjectsOption(
   return projects.length > 0 ? projects : undefined;
 }
 
+/**
+ * `--since` accepts a relative window (`30d`, `12w`) or any date `Date.parse`
+ * understands (`2026-01-01`). An unparseable value EXITS rather than falling
+ * back to no cut-off: silently reading everything when the pilot asked for a
+ * window is the one failure mode a scope flag must never have.
+ */
+export class SinceParseError extends ArgumentError {}
+
+export function parseSince(raw: string, now: number = Date.now()): number {
+  const relative = /^(\d+)([dw])$/.exec(raw.trim());
+  if (relative !== null) {
+    const count = Number(relative[1]);
+    const days = relative[2] === "w" ? count * 7 : count;
+    return now - days * 86_400_000;
+  }
+  const absolute = Date.parse(raw);
+  if (Number.isNaN(absolute)) {
+    throw new SinceParseError(
+      `--since: can't read "${raw}". Use a window like 30d or 12w, or a date like 2026-01-01.`,
+    );
+  }
+  return absolute;
+}
+
+function sinceOption(options: Map<string, string | true>): number | undefined {
+  const raw = stringOption(options, "--since");
+  return raw === undefined ? undefined : parseSince(raw);
+}
+
+/**
+ * The exclusion actually applied to a run: an explicit flag overrides the
+ * standing choice for that run only, and its ABSENCE means "no override",
+ * never "clear the file". Forgetting a flag must not widen a privacy scope.
+ */
+export function resolveExcludeProjects(
+  dataDir: string,
+  flagValue: string[] | undefined,
+): string[] | undefined {
+  if (flagValue !== undefined) {
+    return flagValue;
+  }
+  const stored = readScope(dataDir).excludeProjects;
+  return stored.length > 0 ? stored : undefined;
+}
+
 export function printRun(result: IngestRunResult): void {
   for (const adapter of result.adapters) {
     console.log(
@@ -194,6 +242,9 @@ export function printRun(result: IngestRunResult): void {
         `${adapter.sessionsClosed} closed` +
         (adapter.sessionsExcluded > 0
           ? `, ${adapter.sessionsExcluded} excluded by project`
+          : "") +
+        (adapter.sessionsSkippedOld > 0
+          ? `, ${adapter.sessionsSkippedOld} older than the cut-off`
           : ""),
     );
     if (adapter.detail.length > 0) {
@@ -208,21 +259,90 @@ async function ingestCommand(
 ): Promise<number> {
   const options = parseOptions(
     args,
-    new Set(["--once", "--data-dir", "--projects-root", "--exclude-projects"]),
+    new Set([
+      "--once",
+      "--data-dir",
+      "--projects-root",
+      "--exclude-projects",
+      "--since",
+    ]),
   );
   const common: CommonOptions = {
     dataDir: stringOption(options, "--data-dir"),
     projectsRoot: stringOption(options, "--projects-root"),
   };
-  const excludeProjects = excludeProjectsOption(options);
+  const dataDir = common.dataDir ?? join(homedir(), ".hyperagent");
+  const excludeProjects = resolveExcludeProjects(
+    dataDir,
+    excludeProjectsOption(options),
+  );
+  const since = sinceOption(options);
   const result = await runIngestOnce({
     ...(common.dataDir === undefined ? {} : { dataDir: common.dataDir }),
     adapters: builtinAdaptersForProjectsRoot(common.projectsRoot),
     ...(excludeProjects === undefined ? {} : { excludeProjects }),
+    ...(since === undefined ? {} : { since }),
     ...extraIngest,
   });
   printRun(result);
   return 0;
+}
+
+/**
+ * Read/write the standing read scope. This is the single writer any UI should
+ * use — nothing outside the data plane should be hand-editing scope.json.
+ *
+ * `set --exclude-projects ""` is how a scope is CLEARED. There is deliberately
+ * no "clear" that can happen by omission: see `resolveExcludeProjects`.
+ */
+async function scopeCommand(args: string[]): Promise<number> {
+  const subcommand = args[0];
+  const options = parseOptions(
+    args.slice(1),
+    new Set(["--data-dir", "--exclude-projects"]),
+  );
+  const dataDir =
+    stringOption(options, "--data-dir") ?? join(homedir(), ".hyperagent");
+
+  if (subcommand === "show") {
+    const scope = readScope(dataDir);
+    console.log(`scope: ${scopePath(dataDir)}`);
+    if (scope.excludeProjects.length === 0) {
+      console.log("excluded projects: none — every project enters the record");
+    } else {
+      console.log(`excluded projects (${scope.excludeProjects.length}):`);
+      for (const project of scope.excludeProjects) {
+        console.log(`  ${project}`);
+      }
+    }
+    console.log(
+      "Scope applies to future reads. Sessions already in the record stay until they are deleted.",
+    );
+    return 0;
+  }
+
+  if (subcommand === "set") {
+    const raw = stringOption(options, "--exclude-projects");
+    if (raw === undefined) {
+      throw new ArgumentError(
+        "scope set: --exclude-projects is required (pass an empty value to clear).",
+      );
+    }
+    await mkdir(dataDir, { recursive: true });
+    const excludeProjects = raw
+      .split(",")
+      .map((name: string): string => name.trim())
+      .filter((name: string): boolean => name.length > 0);
+    writeScope(dataDir, { v: 1, excludeProjects });
+    console.log(
+      excludeProjects.length === 0
+        ? "scope cleared — every project enters the record"
+        : `scope set — ${excludeProjects.length} project(s) will not enter the record`,
+    );
+    return 0;
+  }
+
+  throw new ArgumentError("scope: expected `show` or `set`.");
 }
 
 /**
@@ -369,7 +489,10 @@ async function watchCommand(
   const dataDir =
     stringOption(options, "--data-dir") ?? join(homedir(), ".hyperagent");
   const projectsRoot = stringOption(options, "--projects-root");
-  const excludeProjects = excludeProjectsOption(options);
+  // Read fresh from the file on every pass rather than captured once here: the
+  // daemon outlives the choice, so a scope set while it is running has to take
+  // effect on the next pass, not on the next reboot.
+  const excludeProjectsFlag = excludeProjectsOption(options);
   const onIdleInterval = plugins?.onIdleInterval;
   const adapters = builtinAdaptersForProjectsRoot(projectsRoot);
   const watchers = new Map<string, FSWatcher>();
@@ -418,6 +541,10 @@ async function watchCommand(
       do {
         pending = false;
         try {
+          const excludeProjects = resolveExcludeProjects(
+            dataDir,
+            excludeProjectsFlag,
+          );
           printRun(
             await runIngestOnce({
               dataDir,
@@ -1446,6 +1573,9 @@ export async function runCli(
   }
   if (command === "rebuild") {
     return rebuildCommand(rest);
+  }
+  if (command === "scope") {
+    return scopeCommand(rest);
   }
   if (command === "status") {
     return statusWithGateHealthCommand(rest);

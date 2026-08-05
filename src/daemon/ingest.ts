@@ -52,6 +52,15 @@ export interface IngestOptions {
   missionQueue?: IngestQueue;
   /** Absent → no memory extraction enqueued. Caller owns the queue lifecycle. */
   memoryQueue?: IngestQueue;
+  /**
+   * Project directories whose sessions never enter the record — skipped before
+   * parse, so nothing from them lands in the store, the ingest state, or any
+   * derived table (not even digests). Matched against each discovered
+   * session's vendor-native `projectDir`; sessions without one (Codex) have no
+   * project identity and cannot be excluded this way. Applies to future reads
+   * only — already-ingested sessions are deletion's job, not exclusion's.
+   */
+  excludeProjects?: string[];
 }
 
 export interface AdapterRunStats {
@@ -63,6 +72,8 @@ export interface AdapterRunStats {
   sessionsDiscovered: number;
   sessionsParsed: number;
   sessionsSkippedUnchanged: number;
+  /** Sessions dropped by `excludeProjects` before parse — never silent. */
+  sessionsExcluded: number;
   eventsAppended: number;
   skippedUnknown: number;
   parseFailures: number;
@@ -329,6 +340,7 @@ function zeroStats(
     sessionsDiscovered: 0,
     sessionsParsed: 0,
     sessionsSkippedUnchanged: 0,
+    sessionsExcluded: 0,
     eventsAppended: 0,
     skippedUnknown: 0,
     parseFailures: 0,
@@ -384,8 +396,16 @@ export async function runIngestOnce(
         const sessions = await adapter.discoverSessions();
         stats.sessionsDiscovered = sessions.length;
         const failuresByPath = new Map<string, number>();
+        const excluded = new Set(options.excludeProjects ?? []);
 
         for (const session of sessions) {
+          // Exclusion happens before parse and before any state entry, so an
+          // excluded project leaves no trace at all — and un-excluding later
+          // ingests it fresh, because no resume token was ever recorded.
+          if (session.projectDir !== undefined && excluded.has(session.projectDir)) {
+            stats.sessionsExcluded += 1;
+            continue;
+          }
           const prior = state.sessions[session.sessionId];
           if (
             prior !== undefined &&

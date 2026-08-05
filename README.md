@@ -45,6 +45,10 @@ bun install
 # Read your existing agent history once, then see what was found.
 bun src/daemon/cli.ts ingest --once
 bun src/daemon/cli.ts status
+
+# Keep specific projects out of the record entirely — skipped before parse,
+# so nothing from them enters the store, not even digests.
+bun src/daemon/cli.ts ingest --once --exclude-projects -Users-you-dev-private-repo
 ```
 
 To keep watching in the background:

@@ -645,3 +645,149 @@ async function runCli(
     }
   }
 }
+
+describe("excludeProjects", () => {
+  test("claude-code discovery reports each session's project directory", async () => {
+    const adapter = new ClaudeCodeAdapter({ projectsRoot: fixtureRoot });
+    const sessions = await adapter.discoverSessions();
+    expect(sessions.length).toBeGreaterThan(0);
+    for (const session of sessions) {
+      expect(session.projectDir).toBe("-home-user-project");
+    }
+  });
+
+  test("an excluded project's sessions never enter the store, the state, or the parsed stats", async () => {
+    const dataDir = temporaryDataDir();
+    const result = await runIngestOnce({
+      dataDir,
+      adapters: [new ClaudeCodeAdapter({ projectsRoot: fixtureRoot })],
+      excludeProjects: ["-home-user-project"],
+    });
+    const stats = onlyStats(result.adapters);
+    expect(stats.sessionsDiscovered).toBeGreaterThan(0);
+    expect(stats.sessionsExcluded).toBe(stats.sessionsDiscovered);
+    expect(stats.sessionsParsed).toBe(0);
+    expect(stats.eventsAppended).toBe(0);
+
+    const store = openStore(join(dataDir, "hyperagent.db"));
+    try {
+      const row = store.db
+        .query<{ count: unknown }, []>("SELECT count(*) AS count FROM events")
+        .get();
+      expect(row?.count).toBe(0);
+    } finally {
+      store.close();
+    }
+    const state = JSON.parse(
+      readFileSync(join(dataDir, "ingest-state.json"), "utf8"),
+    ) as { sessions: Record<string, unknown> };
+    expect(Object.keys(state.sessions)).toHaveLength(0);
+  });
+
+  test("a non-matching exclusion changes nothing (negative control)", async () => {
+    const dataDir = temporaryDataDir();
+    const stats = onlyStats(
+      (
+        await runIngestOnce({
+          dataDir,
+          adapters: [new ClaudeCodeAdapter({ projectsRoot: fixtureRoot })],
+          excludeProjects: ["some-other-project"],
+        })
+      ).adapters,
+    );
+    expect(stats.sessionsExcluded).toBe(0);
+    expect(stats.sessionsParsed).toBe(stats.sessionsDiscovered);
+    expect(stats.eventsAppended).toBeGreaterThan(0);
+  });
+
+  test("dropping the exclusion later ingests the project fresh", async () => {
+    const dataDir = temporaryDataDir();
+    const adapter = new ClaudeCodeAdapter({ projectsRoot: fixtureRoot });
+    const excluded = onlyStats(
+      (
+        await runIngestOnce({
+          dataDir,
+          adapters: [adapter],
+          excludeProjects: ["-home-user-project"],
+        })
+      ).adapters,
+    );
+    expect(excluded.sessionsParsed).toBe(0);
+    const included = onlyStats(
+      (await runIngestOnce({ dataDir, adapters: [adapter] })).adapters,
+    );
+    expect(included.sessionsParsed).toBe(included.sessionsDiscovered);
+    expect(included.eventsAppended).toBeGreaterThan(0);
+  });
+
+  test("sessions with no project identity cannot be excluded by project", async () => {
+    const dataDir = temporaryDataDir();
+    const events = [
+      event(
+        "synthetic:no-project",
+        "synthetic",
+        "0.0.1",
+        "session_start",
+        "2026-08-05T12:00:00.000Z",
+        "synthetic:no-project#L1",
+        {},
+      ),
+    ];
+    const adapter: ObserveAdapter = {
+      vendor: "synthetic",
+      adapterVersion: "0.0.1",
+      detect: async () => ({
+        status: "ok" as const,
+        harnessVersion: null,
+        detail: "synthetic",
+      }),
+      discoverSessions: async (): Promise<DiscoveredSession[]> => [
+        {
+          sessionId: "synthetic:no-project",
+          path: "/dev/null/synthetic.jsonl",
+          mtimeMs: 1,
+          sizeBytes: 1,
+        },
+      ],
+      parseSession: async (): Promise<ParseResult> => ({
+        events,
+        resumeToken: "end",
+        skippedUnknown: 0,
+        parseFailures: 0,
+      }),
+    };
+    const stats = onlyStats(
+      (
+        await runIngestOnce({
+          dataDir,
+          adapters: [adapter],
+          excludeProjects: ["-home-user-project"],
+        })
+      ).adapters,
+    );
+    expect(stats.sessionsExcluded).toBe(0);
+    expect(stats.sessionsParsed).toBe(1);
+  });
+
+  test("CLI threads --exclude-projects through to a real ingest", async () => {
+    const dataDir = temporaryDataDir();
+    const ingest = await runCli([
+      "ingest",
+      "--once",
+      "--data-dir",
+      dataDir,
+      "--projects-root",
+      fixtureRoot,
+      "--exclude-projects",
+      "-home-user-project,unrelated",
+    ]);
+    expect(ingest.exitCode).toBe(0);
+    const state = JSON.parse(
+      readFileSync(join(dataDir, "ingest-state.json"), "utf8"),
+    ) as { sessions: Record<string, unknown> };
+    const claudeSessions = Object.keys(state.sessions).filter((id) =>
+      id.startsWith("claude-code:"),
+    );
+    expect(claudeSessions).toHaveLength(0);
+  });
+});

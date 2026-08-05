@@ -955,12 +955,6 @@ describe("persisted read scope", () => {
     ]);
   });
 
-  test("a corrupt scope file does not widen scope silently — it reads as empty", () => {
-    const dataDir = temporaryDataDir();
-    writeFileSync(join(dataDir, "scope.json"), "{not json", "utf8");
-    expect(readScope(dataDir)).toEqual({ v: 1, excludeProjects: [] });
-  });
-
   test("ingest honors the scope file with no flag present", async () => {
     const dataDir = temporaryDataDir();
     writeScope(dataDir, { v: 1, excludeProjects: ["-home-user-project"] });
@@ -1011,5 +1005,76 @@ describe("persisted read scope", () => {
     ]);
     expect(clear.exitCode).toBe(0);
     expect(readScope(dataDir).excludeProjects).toEqual([]);
+  });
+});
+
+describe("scope durability for the cut-off (advisor 2026-08-05)", () => {
+  /**
+   * The defect this exists to prevent: a session skipped for being older than
+   * the cut-off leaves NO ingest-state entry, so to a later flagless pass it
+   * looks unseen rather than declined — and the daemon, which runs `watch`
+   * with fixed arguments, backfills exactly what the window left out.
+   */
+  test("a stored cut-off survives a later run that passes no flags", async () => {
+    const dataDir = temporaryDataDir();
+    const first = await runCli([
+      "ingest", "--once", "--data-dir", dataDir, "--projects-root", fixtureRoot,
+      "--since", "2099-01-01",
+    ]);
+    expect(first.exitCode).toBe(0);
+    // Without persistence this is where the control silently expires.
+    await runCli([
+      "scope", "set", "--data-dir", dataDir, "--since", "2099-01-01",
+    ]);
+    const second = await runCli([
+      "ingest", "--once", "--data-dir", dataDir, "--projects-root", fixtureRoot,
+    ]);
+    expect(second.exitCode).toBe(0);
+    const state = JSON.parse(
+      readFileSync(join(dataDir, "ingest-state.json"), "utf8"),
+    ) as { sessions: Record<string, unknown> };
+    expect(Object.keys(state.sessions)).toHaveLength(0);
+  });
+
+  test("without a stored cut-off the next flagless run DOES backfill (negative control)", async () => {
+    const dataDir = temporaryDataDir();
+    await runCli([
+      "ingest", "--once", "--data-dir", dataDir, "--projects-root", fixtureRoot,
+      "--since", "2099-01-01",
+    ]);
+    const second = await runCli([
+      "ingest", "--once", "--data-dir", dataDir, "--projects-root", fixtureRoot,
+    ]);
+    expect(second.exitCode).toBe(0);
+    const state = JSON.parse(
+      readFileSync(join(dataDir, "ingest-state.json"), "utf8"),
+    ) as { sessions: Record<string, unknown> };
+    expect(Object.keys(state.sessions).length).toBeGreaterThan(0);
+  });
+
+  test("scope set leaves the half you did not pass alone", async () => {
+    const dataDir = temporaryDataDir();
+    await runCli([
+      "scope", "set", "--data-dir", dataDir, "--exclude-projects", "keep-me-out",
+    ]);
+    await runCli(["scope", "set", "--data-dir", dataDir, "--since", "2020-01-01"]);
+    const scope = readScope(dataDir);
+    expect(scope.excludeProjects).toEqual(["keep-me-out"]);
+    expect(scope.sinceMs).toBe(Date.parse("2020-01-01"));
+
+    // ...and an empty value clears that half, explicitly.
+    await runCli(["scope", "set", "--data-dir", dataDir, "--since", ""]);
+    expect(readScope(dataDir).sinceMs).toBeUndefined();
+    expect(readScope(dataDir).excludeProjects).toEqual(["keep-me-out"]);
+  });
+
+  test("a corrupt scope file refuses the read rather than widening it", () => {
+    const dataDir = temporaryDataDir();
+    writeFileSync(join(dataDir, "scope.json"), "{not json", "utf8");
+    expect(() => readScope(dataDir)).toThrow(/could not be read/);
+  });
+
+  test("an absent scope file is simply no scope", () => {
+    expect(readScope(temporaryDataDir())).toEqual({ v: 1, excludeProjects: [] });
   });
 });

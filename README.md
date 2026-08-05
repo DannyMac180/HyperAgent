@@ -59,10 +59,18 @@ bun src/daemon/cli.ts scope show
 # so it means "sessions active since then" — a session resumed after the
 # cut-off is read whole, older turns included.
 bun src/daemon/cli.ts ingest --once --since 30d      # or --since 2026-01-01
+
+# Record the cut-off too, so later reads keep honouring it. This one matters:
+# a session skipped for being too old leaves no state entry, so to a later
+# flagless read it looks unseen — without the stored cut-off, the background
+# daemon backfills exactly what the window left out.
+bun src/daemon/cli.ts scope set --since 30d
 ```
 
 Both are prospective: they decide what future reads take in, and leave whatever
-is already recorded alone.
+is already recorded alone. A flag overrides the stored scope for one run and
+never rewrites it; passing an empty value to `scope set` is how you clear a
+half, because omission must never widen what gets recorded.
 
 To keep watching in the background:
 

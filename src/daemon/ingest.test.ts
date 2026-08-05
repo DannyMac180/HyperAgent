@@ -23,6 +23,7 @@ import { deterministicEventId } from "../schema/ids.ts";
 import type { EventInput } from "../schema/events.ts";
 import { openStore } from "../store/store.ts";
 import { runIngestOnce } from "./ingest.ts";
+import { readScope, writeScope } from "./scope.ts";
 import type { AdapterRunStats } from "./ingest.ts";
 import {
   builtinAdapters,
@@ -789,5 +790,226 @@ describe("excludeProjects", () => {
       id.startsWith("claude-code:"),
     );
     expect(claudeSessions).toHaveLength(0);
+  });
+});
+
+describe("since (date cut-off)", () => {
+  /**
+   * A synthetic adapter is the only way to pin mtime deterministically — the
+   * committed fixtures carry whatever mtime the checkout gave them.
+   */
+  const datedAdapter = (
+    vendor: string,
+    sessions: { id: string; mtimeMs: number }[],
+  ): ObserveAdapter => ({
+    vendor,
+    adapterVersion: "0.0.1",
+    detect: async () => ({
+      status: "ok" as const,
+      harnessVersion: null,
+      detail: "synthetic",
+    }),
+    discoverSessions: async (): Promise<DiscoveredSession[]> =>
+      sessions.map((s) => ({
+        sessionId: `${vendor}:${s.id}`,
+        path: `/dev/null/${s.id}.jsonl`,
+        mtimeMs: s.mtimeMs,
+        sizeBytes: 1,
+      })),
+    parseSession: async (session): Promise<ParseResult> => ({
+      events: [
+        event(
+          session.sessionId,
+          vendor,
+          "0.0.1",
+          "session_start",
+          "2026-08-05T12:00:00.000Z",
+          `${session.sessionId}#L1`,
+          {},
+        ),
+      ],
+      resumeToken: "end",
+      skippedUnknown: 0,
+      parseFailures: 0,
+    }),
+  });
+
+  const OLD = 1_000_000;
+  const NEW = 2_000_000;
+
+  test("sessions older than the cut-off leave no events, no rows and no state", async () => {
+    const dataDir = temporaryDataDir();
+    const result = await runIngestOnce({
+      dataDir,
+      adapters: [
+        datedAdapter("synthetic", [
+          { id: "old", mtimeMs: OLD },
+          { id: "new", mtimeMs: NEW },
+        ]),
+      ],
+      since: 1_500_000,
+    });
+    const stats = onlyStats(result.adapters);
+    expect(stats.sessionsDiscovered).toBe(2);
+    expect(stats.sessionsSkippedOld).toBe(1);
+    expect(stats.sessionsParsed).toBe(1);
+
+    const store = openStore(join(dataDir, "hyperagent.db"));
+    try {
+      const row = store.db
+        .query<{ count: unknown }, []>(
+          "SELECT count(*) AS count FROM events WHERE session_id = 'synthetic:old'",
+        )
+        .get();
+      expect(row?.count).toBe(0);
+    } finally {
+      store.close();
+    }
+    const state = JSON.parse(
+      readFileSync(join(dataDir, "ingest-state.json"), "utf8"),
+    ) as { sessions: Record<string, unknown> };
+    expect(Object.keys(state.sessions)).toEqual(["synthetic:new"]);
+  });
+
+  test("no cut-off takes everything (negative control)", async () => {
+    const dataDir = temporaryDataDir();
+    const stats = onlyStats(
+      (
+        await runIngestOnce({
+          dataDir,
+          adapters: [
+            datedAdapter("synthetic", [
+              { id: "old", mtimeMs: OLD },
+              { id: "new", mtimeMs: NEW },
+            ]),
+          ],
+        })
+      ).adapters,
+    );
+    expect(stats.sessionsSkippedOld).toBe(0);
+    expect(stats.sessionsParsed).toBe(2);
+  });
+
+  test("the cut-off is vendor-blind — it applies to projectless sessions too", async () => {
+    const dataDir = temporaryDataDir();
+    // Codex sessions carry no projectDir, so `excludeProjects` can never reach
+    // them. `since` filters on mtime, which every adapter supplies, so it must.
+    const stats = onlyStats(
+      (
+        await runIngestOnce({
+          dataDir,
+          adapters: [datedAdapter("codexish", [{ id: "old", mtimeMs: OLD }])],
+          since: 1_500_000,
+        })
+      ).adapters,
+    );
+    expect(stats.sessionsSkippedOld).toBe(1);
+    expect(stats.sessionsParsed).toBe(0);
+  });
+
+  test("CLI --since accepts an Nd window and an ISO date, and rejects garbage", async () => {
+    const dataDir = temporaryDataDir();
+    const relative = await runCli([
+      "ingest", "--once", "--data-dir", dataDir,
+      "--projects-root", fixtureRoot, "--since", "30d",
+    ]);
+    expect(relative.exitCode).toBe(0);
+
+    const absolute = await runCli([
+      "ingest", "--once", "--data-dir", temporaryDataDir(),
+      "--projects-root", fixtureRoot, "--since", "1970-01-01",
+    ]);
+    expect(absolute.exitCode).toBe(0);
+
+    const garbage = await runCli([
+      "ingest", "--once", "--data-dir", temporaryDataDir(),
+      "--projects-root", fixtureRoot, "--since", "last tuesday",
+    ]);
+    expect(garbage.exitCode).not.toBe(0);
+  });
+
+  test("a cut-off in the future skips everything rather than silently ingesting", async () => {
+    const dataDir = temporaryDataDir();
+    const stats = onlyStats(
+      (
+        await runIngestOnce({
+          dataDir,
+          adapters: [new ClaudeCodeAdapter({ projectsRoot: fixtureRoot })],
+          since: Date.now() + 86_400_000,
+        })
+      ).adapters,
+    );
+    expect(stats.sessionsParsed).toBe(0);
+    expect(stats.sessionsSkippedOld).toBe(stats.sessionsDiscovered);
+  });
+});
+
+describe("persisted read scope", () => {
+  test("scope round-trips through write and read", () => {
+    const dataDir = temporaryDataDir();
+    expect(readScope(dataDir).excludeProjects).toEqual([]);
+    writeScope(dataDir, { v: 1, excludeProjects: ["-home-user-project", " b "] });
+    expect(readScope(dataDir).excludeProjects).toEqual([
+      "-home-user-project",
+      "b",
+    ]);
+  });
+
+  test("a corrupt scope file does not widen scope silently — it reads as empty", () => {
+    const dataDir = temporaryDataDir();
+    writeFileSync(join(dataDir, "scope.json"), "{not json", "utf8");
+    expect(readScope(dataDir)).toEqual({ v: 1, excludeProjects: [] });
+  });
+
+  test("ingest honors the scope file with no flag present", async () => {
+    const dataDir = temporaryDataDir();
+    writeScope(dataDir, { v: 1, excludeProjects: ["-home-user-project"] });
+    const ingest = await runCli([
+      "ingest", "--once", "--data-dir", dataDir, "--projects-root", fixtureRoot,
+    ]);
+    expect(ingest.exitCode).toBe(0);
+    const state = JSON.parse(
+      readFileSync(join(dataDir, "ingest-state.json"), "utf8"),
+    ) as { sessions: Record<string, unknown> };
+    expect(
+      Object.keys(state.sessions).filter((id) => id.startsWith("claude-code:")),
+    ).toHaveLength(0);
+  });
+
+  test("an explicit flag overrides the file for that run", async () => {
+    const dataDir = temporaryDataDir();
+    writeScope(dataDir, { v: 1, excludeProjects: ["-home-user-project"] });
+    const ingest = await runCli([
+      "ingest", "--once", "--data-dir", dataDir, "--projects-root", fixtureRoot,
+      "--exclude-projects", "something-else",
+    ]);
+    expect(ingest.exitCode).toBe(0);
+    const state = JSON.parse(
+      readFileSync(join(dataDir, "ingest-state.json"), "utf8"),
+    ) as { sessions: Record<string, unknown> };
+    expect(
+      Object.keys(state.sessions).filter((id) => id.startsWith("claude-code:")),
+    ).not.toHaveLength(0);
+    // Overriding for one run must not rewrite the standing choice.
+    expect(readScope(dataDir).excludeProjects).toEqual(["-home-user-project"]);
+  });
+
+  test("scope set writes the file and scope show reports it", async () => {
+    const dataDir = temporaryDataDir();
+    const set = await runCli([
+      "scope", "set", "--data-dir", dataDir, "--exclude-projects", "a,b",
+    ]);
+    expect(set.exitCode).toBe(0);
+    expect(readScope(dataDir).excludeProjects).toEqual(["a", "b"]);
+
+    const show = await runCli(["scope", "show", "--data-dir", dataDir]);
+    expect(show.exitCode).toBe(0);
+
+    // Clearing is an explicit act, never an implied one.
+    const clear = await runCli([
+      "scope", "set", "--data-dir", dataDir, "--exclude-projects", "",
+    ]);
+    expect(clear.exitCode).toBe(0);
+    expect(readScope(dataDir).excludeProjects).toEqual([]);
   });
 });

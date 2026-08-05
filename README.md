@@ -49,7 +49,20 @@ bun src/daemon/cli.ts status
 # Keep specific projects out of the record entirely — skipped before parse,
 # so nothing from them enters the store, not even digests.
 bun src/daemon/cli.ts ingest --once --exclude-projects -Users-you-dev-private-repo
+
+# Or record that choice once, so every later read honours it — including the
+# background daemon, which never sees your flags.
+bun src/daemon/cli.ts scope set --exclude-projects -Users-you-dev-private-repo
+bun src/daemon/cli.ts scope show
+
+# Only go back so far. The cut-off is on each transcript's last-modified time,
+# so it means "sessions active since then" — a session resumed after the
+# cut-off is read whole, older turns included.
+bun src/daemon/cli.ts ingest --once --since 30d      # or --since 2026-01-01
 ```
+
+Both are prospective: they decide what future reads take in, and leave whatever
+is already recorded alone.
 
 To keep watching in the background:
 

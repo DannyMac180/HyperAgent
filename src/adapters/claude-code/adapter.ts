@@ -366,6 +366,7 @@ export class ClaudeCodeAdapter implements ObserveAdapter {
             path,
             mtimeMs: metadata.mtimeMs,
             sizeBytes: metadata.size,
+            projectDir: projectDirectory.name,
           });
         } catch {
           continue;

@@ -33,6 +33,14 @@ export interface DiscoveredSession {
   mtimeMs: number;
   /** Artifact size in bytes — cheap change detection alongside mtime. */
   sizeBytes: number;
+  /**
+   * Vendor-native project identity, when the harness has one (Claude Code's
+   * per-project transcript directory name, e.g. `-Users-dan-dev-repo`).
+   * Absent when the vendor doesn't attribute sessions to projects (Codex's
+   * date-bucketed rollouts) — such sessions cannot be excluded by project,
+   * matching the honest "sessions with no project" framing upstream.
+   */
+  projectDir?: string;
 }
 
 /**

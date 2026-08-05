@@ -96,8 +96,8 @@ interface CommonOptions {
 }
 
 const usage = `Usage:
-  bun src/daemon/cli.ts ingest --once [--data-dir D] [--projects-root P]
-  bun src/daemon/cli.ts watch [--data-dir D] [--projects-root P]
+  bun src/daemon/cli.ts ingest --once [--data-dir D] [--projects-root P] [--exclude-projects A,B]
+  bun src/daemon/cli.ts watch [--data-dir D] [--projects-root P] [--exclude-projects A,B]
   bun src/daemon/cli.ts status [--data-dir D]
   bun src/daemon/cli.ts memory list [--status S] [--scope S] [--stale --days N] [--data-dir D]
   bun src/daemon/cli.ts memory show <id> [--data-dir D]
@@ -167,13 +167,34 @@ export function stringOption(
   return typeof value === "string" ? value : undefined;
 }
 
+/**
+ * `--exclude-projects` is comma-separated because `parseOptions` is a
+ * last-wins Map — a repeated flag would silently drop earlier values.
+ */
+function excludeProjectsOption(
+  options: Map<string, string | true>,
+): string[] | undefined {
+  const raw = stringOption(options, "--exclude-projects");
+  if (raw === undefined) {
+    return undefined;
+  }
+  const projects = raw
+    .split(",")
+    .map((name: string): string => name.trim())
+    .filter((name: string): boolean => name.length > 0);
+  return projects.length > 0 ? projects : undefined;
+}
+
 export function printRun(result: IngestRunResult): void {
   for (const adapter of result.adapters) {
     console.log(
         `${adapter.vendor} ${adapter.adapterVersion}: ${adapter.status}; ` +
         `${adapter.sessionsParsed}/${adapter.sessionsDiscovered} parsed, ` +
         `${adapter.eventsAppended} events appended, ` +
-        `${adapter.sessionsClosed} closed`,
+        `${adapter.sessionsClosed} closed` +
+        (adapter.sessionsExcluded > 0
+          ? `, ${adapter.sessionsExcluded} excluded by project`
+          : ""),
     );
     if (adapter.detail.length > 0) {
       console.log(`  ${adapter.detail}`);
@@ -187,15 +208,17 @@ async function ingestCommand(
 ): Promise<number> {
   const options = parseOptions(
     args,
-    new Set(["--once", "--data-dir", "--projects-root"]),
+    new Set(["--once", "--data-dir", "--projects-root", "--exclude-projects"]),
   );
   const common: CommonOptions = {
     dataDir: stringOption(options, "--data-dir"),
     projectsRoot: stringOption(options, "--projects-root"),
   };
+  const excludeProjects = excludeProjectsOption(options);
   const result = await runIngestOnce({
     ...(common.dataDir === undefined ? {} : { dataDir: common.dataDir }),
     adapters: builtinAdaptersForProjectsRoot(common.projectsRoot),
+    ...(excludeProjects === undefined ? {} : { excludeProjects }),
     ...extraIngest,
   });
   printRun(result);
@@ -341,11 +364,12 @@ async function watchCommand(
 ): Promise<number> {
   const options = parseOptions(
     args,
-    new Set(["--data-dir", "--projects-root"]),
+    new Set(["--data-dir", "--projects-root", "--exclude-projects"]),
   );
   const dataDir =
     stringOption(options, "--data-dir") ?? join(homedir(), ".hyperagent");
   const projectsRoot = stringOption(options, "--projects-root");
+  const excludeProjects = excludeProjectsOption(options);
   const onIdleInterval = plugins?.onIdleInterval;
   const adapters = builtinAdaptersForProjectsRoot(projectsRoot);
   const watchers = new Map<string, FSWatcher>();
@@ -395,7 +419,12 @@ async function watchCommand(
         pending = false;
         try {
           printRun(
-            await runIngestOnce({ dataDir, adapters, ...plugins?.ingest }),
+            await runIngestOnce({
+              dataDir,
+              adapters,
+              ...(excludeProjects === undefined ? {} : { excludeProjects }),
+              ...plugins?.ingest,
+            }),
           );
           syncWatchers();
         } catch (error: unknown) {

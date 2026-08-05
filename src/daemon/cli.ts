@@ -100,7 +100,7 @@ const usage = `Usage:
   bun src/daemon/cli.ts ingest --once [--data-dir D] [--projects-root P] [--exclude-projects A,B] [--since 30d|2026-01-01]
   bun src/daemon/cli.ts watch [--data-dir D] [--projects-root P] [--exclude-projects A,B]
   bun src/daemon/cli.ts scope show [--data-dir D]
-  bun src/daemon/cli.ts scope set --exclude-projects A,B [--data-dir D]
+  bun src/daemon/cli.ts scope set [--exclude-projects A,B] [--since 30d|2026-01-01] [--data-dir D]
   bun src/daemon/cli.ts status [--data-dir D]
   bun src/daemon/cli.ts memory list [--status S] [--scope S] [--stale --days N] [--data-dir D]
   bun src/daemon/cli.ts memory show <id> [--data-dir D]
@@ -233,6 +233,21 @@ export function resolveExcludeProjects(
   return stored.length > 0 ? stored : undefined;
 }
 
+/**
+ * Same override rule as exclusions, and persisted for a sharper reason: a
+ * session skipped for being older than the cut-off leaves NO ingest-state
+ * entry, so to any later flagless pass it looks unseen rather than declined.
+ * Without the stored cut-off the daemon's next scan backfills exactly what the
+ * window left out — verified: a second pass with no flags re-parsed all four
+ * previously-skipped fixture sessions.
+ */
+export function resolveSince(
+  dataDir: string,
+  flagValue: number | undefined,
+): number | undefined {
+  return flagValue ?? readScope(dataDir).sinceMs;
+}
+
 export function printRun(result: IngestRunResult): void {
   for (const adapter of result.adapters) {
     console.log(
@@ -276,7 +291,7 @@ async function ingestCommand(
     dataDir,
     excludeProjectsOption(options),
   );
-  const since = sinceOption(options);
+  const since = resolveSince(dataDir, sinceOption(options));
   const result = await runIngestOnce({
     ...(common.dataDir === undefined ? {} : { dataDir: common.dataDir }),
     adapters: builtinAdaptersForProjectsRoot(common.projectsRoot),
@@ -299,7 +314,7 @@ async function scopeCommand(args: string[]): Promise<number> {
   const subcommand = args[0];
   const options = parseOptions(
     args.slice(1),
-    new Set(["--data-dir", "--exclude-projects"]),
+    new Set(["--data-dir", "--exclude-projects", "--since"]),
   );
   const dataDir =
     stringOption(options, "--data-dir") ?? join(homedir(), ".hyperagent");
@@ -316,6 +331,11 @@ async function scopeCommand(args: string[]): Promise<number> {
       }
     }
     console.log(
+      scope.sinceMs === undefined
+        ? "cut-off: none — reads go back as far as the transcripts do"
+        : `cut-off: ${new Date(scope.sinceMs).toISOString()} — nothing written before this is read`,
+    );
+    console.log(
       "Scope applies to future reads. Sessions already in the record stay until they are deleted.",
     );
     return 0;
@@ -323,21 +343,43 @@ async function scopeCommand(args: string[]): Promise<number> {
 
   if (subcommand === "set") {
     const raw = stringOption(options, "--exclude-projects");
-    if (raw === undefined) {
+    const sinceRaw = stringOption(options, "--since");
+    if (raw === undefined && sinceRaw === undefined) {
       throw new ArgumentError(
-        "scope set: --exclude-projects is required (pass an empty value to clear).",
+        "scope set: pass --exclude-projects and/or --since (an empty value clears either).",
       );
     }
     await mkdir(dataDir, { recursive: true });
-    const excludeProjects = raw
-      .split(",")
-      .map((name: string): string => name.trim())
-      .filter((name: string): boolean => name.length > 0);
-    writeScope(dataDir, { v: 1, excludeProjects });
+    // Absent means "leave this half alone"; empty means "clear it". Same rule
+    // as the ingest flags, for the same reason: omission must never widen.
+    const current = readScope(dataDir);
+    const excludeProjects =
+      raw === undefined
+        ? current.excludeProjects
+        : raw
+            .split(",")
+            .map((name: string): string => name.trim())
+            .filter((name: string): boolean => name.length > 0);
+    const sinceMs =
+      sinceRaw === undefined
+        ? current.sinceMs
+        : sinceRaw.trim().length === 0
+          ? undefined
+          : parseSince(sinceRaw);
+    writeScope(dataDir, {
+      v: 1,
+      excludeProjects,
+      ...(sinceMs === undefined ? {} : { sinceMs }),
+    });
     console.log(
       excludeProjects.length === 0
-        ? "scope cleared — every project enters the record"
-        : `scope set — ${excludeProjects.length} project(s) will not enter the record`,
+        ? "scope: every project enters the record"
+        : `scope: ${excludeProjects.length} project(s) will not enter the record`,
+    );
+    console.log(
+      sinceMs === undefined
+        ? "scope: no cut-off"
+        : `scope: cut-off ${new Date(sinceMs).toISOString()}`,
     );
     return 0;
   }
@@ -545,11 +587,13 @@ async function watchCommand(
             dataDir,
             excludeProjectsFlag,
           );
+          const since = resolveSince(dataDir, undefined);
           printRun(
             await runIngestOnce({
               dataDir,
               adapters,
               ...(excludeProjects === undefined ? {} : { excludeProjects }),
+              ...(since === undefined ? {} : { since }),
               ...plugins?.ingest,
             }),
           );

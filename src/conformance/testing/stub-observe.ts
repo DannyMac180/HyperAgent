@@ -45,7 +45,8 @@ export type ObserveMutation =
   | "unknown-record"
   | "truncation"
   | "breakage-signal"
-  | "envelope";
+  | "envelope"
+  | "correction";
 
 type StubEventType = EventInput["type"];
 
@@ -88,6 +89,60 @@ const OBSERVE_MUTATIONS: readonly ObserveMutation[] = [
   "truncation",
   "breakage-signal",
   "envelope",
+  "correction",
+];
+
+const CORRECTION_POSITIVE_RECORDS: readonly StubKnownRecord[] = [
+  {
+    kind: "event",
+    payload: { phase: "start" },
+    ts: "2026-01-01T01:00:00.000Z",
+    type: "session_start",
+  },
+  {
+    kind: "event",
+    payload: { role: "user", turn_index: 0, is_correction: false },
+    ts: "2026-01-01T01:00:01.000Z",
+    type: "turn_start",
+  },
+  {
+    kind: "event",
+    payload: {
+      role: "user",
+      turn_index: 1,
+      is_correction: true,
+      correction_basis: ["explicit_phrase"],
+    },
+    ts: "2026-01-01T01:00:02.000Z",
+    type: "turn_start",
+  },
+  {
+    kind: "event",
+    payload: { phase: "complete" },
+    ts: "2026-01-01T01:00:03.000Z",
+    type: "session_end",
+  },
+];
+
+const CORRECTION_NEGATIVE_RECORDS: readonly StubKnownRecord[] = [
+  {
+    kind: "event",
+    payload: { phase: "start" },
+    ts: "2026-01-01T02:00:00.000Z",
+    type: "session_start",
+  },
+  {
+    kind: "event",
+    payload: { role: "user", turn_index: 0, is_correction: false },
+    ts: "2026-01-01T02:00:01.000Z",
+    type: "turn_start",
+  },
+  {
+    kind: "event",
+    payload: { phase: "complete" },
+    ts: "2026-01-01T02:00:02.000Z",
+    type: "session_end",
+  },
 ];
 
 const MAIN_RECORDS: readonly StubKnownRecord[] = [
@@ -427,6 +482,15 @@ class StubObserveAdapter implements ObserveAdapter {
     if (this.options.mutation === "golden" && recordIndex === 1) {
       payload.unexpected = true;
     }
+    if (
+      this.options.mutation === "correction"
+      && record.type === "turn_start"
+    ) {
+      // The negative control: an adapter that stopped computing the signal
+      // at ingest regresses to null, which only observe.correction rejects.
+      payload.is_correction = null;
+      delete payload.correction_basis;
+    }
 
     const event: Record<string, unknown> = {
       id: deterministicUlid(`${this.options.eventSessionId}:${idSeed}`),
@@ -584,6 +648,46 @@ async function createObserveFixtures(
     }),
   };
 
+  const correctionPositivePath: string = join(
+    fixtureRoot,
+    "correction-positive.jsonl",
+  );
+  await writeArtifact(
+    correctionPositivePath,
+    encodeRecords(CORRECTION_POSITIVE_RECORDS),
+    "correction positive fixture",
+  );
+  const correctionNegativePath: string = join(
+    fixtureRoot,
+    "correction-negative.jsonl",
+  );
+  await writeArtifact(
+    correctionNegativePath,
+    encodeRecords(CORRECTION_NEGATIVE_RECORDS),
+    "correction negative fixture",
+  );
+  const correctionMutation: ObserveMutation = mutation === "correction"
+    ? mutation
+    : "none";
+  const correction: ObserveFixtureSet["correction"] = {
+    positive: {
+      adapter: new StubObserveAdapter({
+        artifactPath: correctionPositivePath,
+        eventSessionId: "stub:correction-positive",
+        mutation: correctionMutation,
+      }),
+      label: "stub correction fixture",
+    },
+    negative: {
+      adapter: new StubObserveAdapter({
+        artifactPath: correctionNegativePath,
+        eventSessionId: "stub:correction-negative",
+        mutation: correctionMutation,
+      }),
+      label: "stub correction negative control",
+    },
+  };
+
   const base: ObserveFixtureSet = {
     adapter: mainAdapter,
     expectedSessionIdPrefix: "stub:",
@@ -592,6 +696,7 @@ async function createObserveFixtures(
     unknownRecord,
     corrupted,
     resume,
+    correction,
   };
   if (!appendOnlyLines) {
     // The fixture is intentionally absent because the descriptor explicitly

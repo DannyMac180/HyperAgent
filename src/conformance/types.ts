@@ -99,6 +99,18 @@ export interface ObserveFixtureSet {
   resume: ResumeFixture;
   /** Required when storageTraits.appendOnlyLines is true; omitted otherwise. */
   truncation?: TruncationFixture;
+  /**
+   * Correction/intervention detection fixtures (DAN-224). Omitted when the
+   * harness's transcripts cannot support adapter-time detection — the
+   * observe.correction check then reports not-applicable, which is the honest
+   * matrix entry, never a silent pass.
+   */
+  correction?: {
+    /** Contains ≥1 user turn the adapter must flag as a correction. */
+    positive: ObserveVariant;
+    /** Negative control: benign session that must produce zero flags. */
+    negative: ObserveVariant;
+  };
 }
 
 export interface InjectFixtureSet {

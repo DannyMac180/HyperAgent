@@ -1,6 +1,6 @@
 import { isUlid } from "./ulid.ts";
 
-export const SCHEMA_VERSION = "0.1.0" as const;
+export const SCHEMA_VERSION = "0.2.0" as const;
 
 export const EVENT_TYPES = [
   "session_start",
@@ -68,6 +68,12 @@ export interface TurnStartPayload {
   text_digest?: string;
   text_chars?: number;
   is_correction?: boolean | null;
+  /**
+   * Which deterministic signals flagged the correction (closed enum:
+   * "explicit_phrase" | "after_completion_claim" | "interrupt"). Present only
+   * when is_correction is true. Never contains prose.
+   */
+  correction_basis?: string[];
   [key: string]: unknown;
 }
 

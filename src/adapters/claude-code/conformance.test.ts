@@ -48,7 +48,7 @@ describe("Claude Code observe conformance", (): void => {
     expect(report.checks.map((check): string => check.id)).toEqual(
       OBSERVE_CHECKS.map((check): string => check.id),
     );
-    expect(report.checks).toHaveLength(9);
+    expect(report.checks).toHaveLength(10);
     const nonPassChecks: CheckResult[] = report.checks.filter(
       (check: CheckResult): boolean => check.status !== "pass",
     );

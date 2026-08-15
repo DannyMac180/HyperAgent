@@ -638,6 +638,125 @@ const envelopeCheck: ConformanceCheck = observeCheck(
   },
 );
 
+const CORRECTION_BASIS_VALUES: ReadonlySet<string> = new Set([
+  "explicit_phrase",
+  "after_completion_claim",
+  "interrupt",
+]);
+
+interface CorrectionTally {
+  userTurns: number;
+  flagged: number;
+  problems: string[];
+}
+
+/**
+ * Real user turn = the pilot's own prose. Sidechain "user" turns are
+ * agent-authored subagent traffic; detection must not apply there, so their
+ * honest is_correction stays null.
+ */
+function tallyCorrections(parsed: ParsedSessions, label: string): CorrectionTally {
+  const tally: CorrectionTally = { userTurns: 0, flagged: 0, problems: [] };
+  parsed.events.forEach((event: EventInput, index: number): void => {
+    if (!isPlainObject(event) || event.type !== "turn_start") {
+      return;
+    }
+    const payload: Record<string, unknown> = isPlainObject(event.payload)
+      ? event.payload
+      : {};
+    if (payload.role !== "user") {
+      return;
+    }
+    if (payload.is_sidechain === true) {
+      if (payload.is_correction !== null && payload.is_correction !== undefined) {
+        tally.problems.push(
+          `${label} event[${index}] is a sidechain turn but carries `
+          + `is_correction ${compact(payload.is_correction)} (must stay null)`,
+        );
+      }
+      return;
+    }
+    tally.userTurns += 1;
+    if (typeof payload.is_correction !== "boolean") {
+      tally.problems.push(
+        `${label} event[${index}].payload.is_correction must be a boolean on `
+        + `real user turns, got ${compact(payload.is_correction)}`,
+      );
+      return;
+    }
+    const basis: unknown = payload.correction_basis;
+    if (payload.is_correction === true) {
+      tally.flagged += 1;
+      if (
+        !Array.isArray(basis)
+        || basis.length === 0
+        || basis.some((value: unknown): boolean =>
+          typeof value !== "string" || !CORRECTION_BASIS_VALUES.has(value),
+        )
+      ) {
+        tally.problems.push(
+          `${label} event[${index}].payload.correction_basis must be a non-empty `
+          + `array drawn from the closed basis enum, got ${compact(basis)}`,
+        );
+      }
+    } else if (basis !== undefined) {
+      tally.problems.push(
+        `${label} event[${index}] carries correction_basis on an unflagged turn`,
+      );
+    }
+  });
+  return tally;
+}
+
+const correctionCheck: ConformanceCheck = observeCheck(
+  "observe.correction",
+  async ({ fixtures }): Promise<string> => {
+    const correction = fixtures.correction;
+    if (correction === undefined) {
+      throw new NotApplicableError(
+        "adapter does not claim adapter-time correction detection",
+      );
+    }
+    const positive: ParsedSessions = await parseAll(
+      correction.positive.adapter,
+      correction.positive.label,
+    );
+    const negative: ParsedSessions = await parseAll(
+      correction.negative.adapter,
+      correction.negative.label,
+    );
+    const positiveTally: CorrectionTally = tallyCorrections(
+      positive,
+      correction.positive.label,
+    );
+    const negativeTally: CorrectionTally = tallyCorrections(
+      negative,
+      correction.negative.label,
+    );
+    const problems: string[] = [
+      ...positiveTally.problems,
+      ...negativeTally.problems,
+    ];
+    if (positiveTally.flagged === 0) {
+      problems.push(
+        `${correction.positive.label} must flag at least one correction turn`,
+      );
+    }
+    if (negativeTally.flagged > 0) {
+      problems.push(
+        `${correction.negative.label} is a negative control but flagged `
+        + `${negativeTally.flagged} turn(s)`,
+      );
+    }
+    if (problems.length > 0) {
+      throw new Error(`correction detection mismatch: ${problems.join("; ")}`);
+    }
+    return `${positiveTally.flagged} correction(s) flagged across `
+      + `${positiveTally.userTurns} user turn(s); negative control clean `
+      + `(${negativeTally.userTurns} user turn(s), 0 flagged)`;
+  },
+);
+
 export const OBSERVE_CHECKS: readonly ConformanceCheck[] = [
   discoverCheck,
   schemaCheck,
@@ -648,4 +767,5 @@ export const OBSERVE_CHECKS: readonly ConformanceCheck[] = [
   truncationCheck,
   breakageSignalCheck,
   envelopeCheck,
+  correctionCheck,
 ];

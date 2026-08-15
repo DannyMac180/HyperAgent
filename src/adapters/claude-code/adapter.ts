@@ -4,6 +4,8 @@ import { open, readdir, stat } from "node:fs/promises";
 
 import { deterministicEventId } from "../../schema/ids.ts";
 import type { EventInput } from "../../schema/events.ts";
+import { detectCorrection } from "../correction.ts";
+import type { CorrectionResult } from "../correction.ts";
 import type {
   AdapterHealth,
   DiscoveredSession,
@@ -32,16 +34,32 @@ import {
   userToolResults,
 } from "./transcript.ts";
 import type {
+  ClaimMatch,
   ToolResultBlock,
   ToolUseBlock,
   TranscriptLine,
 } from "./transcript.ts";
 
 interface ResumeState {
-  v: 1;
+  /**
+   * v2 (adapter 0.2.0): adds `claim`. A v1 token cannot say whether a
+   * completion claim preceded the resume point, and defaulting it would make
+   * a resumed parse disagree with a full parse — so v1 tokens are rejected
+   * and the session re-parses from byte 0, which is safe because event ids
+   * are deterministic and the store is idempotent.
+   */
+  v: 2;
   lines: number;
   bytes: number;
   turns: number;
+  /**
+   * A completion claim was seen after the last real user turn. Carried in the
+   * resume token because parsing streams from a byte offset: without it, an
+   * incremental pass would lose the after-completion-claim context that
+   * correction detection (DAN-224) needs, and a resumed parse would diverge
+   * from a full parse.
+   */
+  claim: boolean;
 }
 
 interface PendingTool {
@@ -54,6 +72,7 @@ interface PendingTool {
   byteOffset: number;
   linesBefore: number;
   turnsBefore: number;
+  claimBefore: boolean;
 }
 
 interface EmittedEvent {
@@ -82,14 +101,15 @@ const resumeStateFrom = (
   fileSize: number,
 ): ResumeState => {
   if (token === "") {
-    return { v: 1, lines: 0, bytes: 0, turns: 0 };
+    return { v: 2, lines: 0, bytes: 0, turns: 0, claim: false };
   }
 
   try {
     const parsed: unknown = JSON.parse(token);
     if (
       !isPlainObject(parsed) ||
-      parsed.v !== 1 ||
+      parsed.v !== 2 ||
+      typeof parsed.claim !== "boolean" ||
       !Number.isInteger(parsed.lines) ||
       !Number.isInteger(parsed.bytes) ||
       !Number.isInteger(parsed.turns) ||
@@ -101,17 +121,18 @@ const resumeStateFrom = (
       parsed.turns < 0 ||
       parsed.bytes > fileSize
     ) {
-      return { v: 1, lines: 0, bytes: 0, turns: 0 };
+      return { v: 2, lines: 0, bytes: 0, turns: 0, claim: false };
     }
 
     return {
-      v: 1,
+      v: 2,
       lines: parsed.lines,
       bytes: parsed.bytes,
       turns: parsed.turns,
+      claim: parsed.claim,
     };
   } catch {
-    return { v: 1, lines: 0, bytes: 0, turns: 0 };
+    return { v: 2, lines: 0, bytes: 0, turns: 0, claim: false };
   }
 };
 
@@ -219,7 +240,7 @@ const parentIdFromLines = (
 
 export class ClaudeCodeAdapter implements ObserveAdapter {
   readonly vendor = "claude-code";
-  readonly adapterVersion = "0.1.0";
+  readonly adapterVersion = "0.2.0";
 
   private readonly projectsRoot: string;
 
@@ -438,6 +459,7 @@ export class ClaudeCodeAdapter implements ObserveAdapter {
     let skippedUnknown = 0;
     let parseFailures = 0;
     let turns: number = initial.turns;
+    let pendingClaim: boolean = initial.claim;
     let sessionStartEmitted: boolean = initial.bytes !== 0;
 
     const emit = (
@@ -481,6 +503,7 @@ export class ClaudeCodeAdapter implements ObserveAdapter {
     for (const completeLine of lines) {
       const linesBefore: number = completeLine.lineNumber - 1;
       const turnsBefore: number = turns;
+      const claimBefore: boolean = pendingClaim;
       if (completeLine.raw.trim() === "") {
         continue;
       }
@@ -680,10 +703,32 @@ export class ClaudeCodeAdapter implements ObserveAdapter {
             role: "user",
             text_digest: sha256Hex(text),
             text_chars: text.length,
+            // Sidechain "user" turns are agent-authored subagent prompts, not
+            // the pilot — detection does not apply, so the honest value stays
+            // null (overwritten below for real pilot turns).
             is_correction: null,
           };
           if (line.isSidechain === true) {
             payload.is_sidechain = true;
+          } else {
+            const interrupted: boolean = text
+              .trimStart()
+              .startsWith("[Request interrupted by user");
+            const correction: CorrectionResult = detectCorrection(text, {
+              afterCompletionClaim: pendingClaim,
+              interrupted,
+            });
+            payload.is_correction = correction.isCorrection;
+            if (correction.isCorrection) {
+              payload.correction_basis = correction.basis;
+            }
+            // The interrupt marker is a synthetic harness line, not the
+            // pilot's answer to the claim — clearing the claim context on it
+            // would strip after_completion_claim from the real follow-up turn
+            // (a vendor asymmetry vs codex, caught in cross-vendor review).
+            if (!interrupted) {
+              pendingClaim = false;
+            }
           }
           emit(
             ts,
@@ -713,6 +758,7 @@ export class ClaudeCodeAdapter implements ObserveAdapter {
           byteOffset: completeLine.byteOffset,
           linesBefore,
           turnsBefore,
+          claimBefore,
         });
       }
 
@@ -742,7 +788,11 @@ export class ClaudeCodeAdapter implements ObserveAdapter {
       }
 
       const assistantText: string = extractAssistantText(line.message);
-      for (const claim of findCompletionClaims(assistantText)) {
+      const assistantClaims: ClaimMatch[] = findCompletionClaims(assistantText);
+      if (assistantClaims.length > 0 && line.isSidechain !== true) {
+        pendingClaim = true;
+      }
+      for (const claim of assistantClaims) {
         const payload: Record<string, unknown> = {
           claim_text: redactSummary(claim.text, 400),
           claim_kind: claim.kind,
@@ -763,10 +813,11 @@ export class ClaudeCodeAdapter implements ObserveAdapter {
     }
 
     let finalState: ResumeState = {
-      v: 1,
+      v: 2,
       lines: physicalLine,
       bytes: cursor,
       turns,
+      claim: pendingClaim,
     };
     let finalEvents: EventInput[] = emitted.map(
       (item: EmittedEvent): EventInput => item.event,
@@ -780,10 +831,11 @@ export class ClaudeCodeAdapter implements ObserveAdapter {
     )[0];
     if (earliestPending !== undefined) {
       finalState = {
-        v: 1,
+        v: 2,
         lines: earliestPending.linesBefore,
         bytes: earliestPending.byteOffset,
         turns: earliestPending.turnsBefore,
+        claim: earliestPending.claimBefore,
       };
       finalEvents = emitted
         .filter(

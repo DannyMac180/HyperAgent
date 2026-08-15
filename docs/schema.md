@@ -1,4 +1,4 @@
-# HyperAgent Canonical Event Schema — v0.1.0
+# HyperAgent Canonical Event Schema — v0.2.0
 
 > The vendor-neutral session/event model every adapter translates into, and the contract every downstream component (memory, scoring, Workshop, Forge, Cockpit) consumes. This is the precise spec promised by `docs/architecture-v2.md` §6.1. Where this document and prose elsewhere disagree, this document wins for schema questions.
 
@@ -26,7 +26,7 @@
 | `raw_ref` | text, nullable | evidence pointer: `<session-id>#<locator>` into the vendor artifact (e.g. `claude-code:9f3e…#L42`). **Never a filesystem path** — see §4.1 |
 | `payload` | JSON | type-specific fields (§4); unknown keys are preserved, never dropped |
 
-## 3. Event types (closed enum, v0.1.0)
+## 3. Event types (closed enum; unchanged since v0.1.0)
 
 `session_start`, `session_end`, `turn_start`, `turn_end`, `tool_call`, `error`, `retry`, `completion_claim`, `verification_event`
 
@@ -47,7 +47,17 @@ The enum is closed per schema version; adding a type is a minor bump. Adapters e
 
 ### 4.2 `turn` (span: `turn_start` → `turn_end`)
 
-`turn_start` payload: `turn_index` (0-based within session), `role` (`user`), `text_digest` (sha256 of user text), `text_chars`, `is_correction` (boolean, nullable — flagged when the adapter can detect the user correcting/redirecting the agent; a core scoring signal).
+`turn_start` payload: `turn_index` (0-based within session), `role` (`user`), `text_digest` (sha256 of user text), `text_chars`, `is_correction`, `correction_basis`.
+
+**`is_correction` (boolean, nullable) is computed by the adapter at ingest, on prose, before digesting** — the store keeps digests only, so a prose-dependent signal not extracted at observation time is unrecoverable. On a real user turn from a vendor that supports detection, the value is `true`/`false`, never null. It stays `null` in exactly two honest cases: (a) sidechain "user" turns, which are agent-authored subagent prompts rather than the pilot; (b) **historical events ingested before adapter v0.2.0 — the prose is gone, so nulls are permanent unless the surviving vendor transcript is re-ingested. Consumers MUST NOT read null as "no correction" and MUST NOT imply retroactive coverage.**
+
+`correction_basis` (array, present only when `is_correction` is `true`) names which deterministic signals fired, drawn from an enum: `explicit_phrase` (correction/redirection wording leads the turn), `after_completion_claim` (contradiction wording on the user turn immediately after an agent completion claim), `interrupt` (harness-recorded user interrupt/abort evidence). Never prose. Detection is deliberately conservative — heuristics scan only the leading window of the turn (300 UTF-16 code units, JavaScript `slice` semantics — reimplementations MUST match this unit or determinism claims break on multi-byte text), tuned against a live corpus so machine-injected "user" turns and pasted content do not flag (see `src/adapters/correction.ts`). Per-vendor support is recorded in `docs/capability-matrix.md` ("Correction detection" column, earned by the `observe.correction` conformance check with a negative control).
+
+Three contract rules, binding on writers and readers:
+
+- **The classifier is heuristic, not normative.** The recorded *shape* is the contract (boolean on real user turns, basis present iff flagged, no prose); the exact phrase lists may improve in any adapter release, and consumers attribute classification-distribution shifts to `adapter_version`. Conformance verifies the structural contract plus obvious-case sensitivity and a negative control — it does not freeze the regexes.
+- **Basis values grow additively.** New basis strings may appear in a minor schema bump; readers MUST tolerate unknown values (count the turn, ignore the unfamiliar basis), mirroring the unknown-payload-field rule in §8.
+- **Absent means null.** A `turn_start` with no `is_correction` key is identical to an explicit `null` (pre-detection data); consumers must treat both as "signal never computed", never as `false`. Per-vendor basis coverage varies with what the transcript records (e.g. interrupt evidence differs by harness), so cross-vendor comparisons of correction counts are indicative, not calibrated.
 `turn_end` payload: `turn_index`, `role` (`agent`), `text_digest`, `text_chars`, `stop_reason` (nullable).
 
 Digests, not raw text: the canonical store carries pointers and measurements; raw text stays in the vendor transcript reachable via `raw_ref`. (Memory extraction reads transcripts directly; the event log is the index, not a copy — keeps the DB small and the privacy surface minimal.)
@@ -155,6 +165,7 @@ CREATE TRIGGER IF NOT EXISTS events_no_delete BEFORE DELETE ON events
 
 ## Changelog
 
+- **v0.2.0** (2026-08-15) — **§4.2 `turn_start.is_correction` goes live; additive minor bump.** Adapters now run deterministic correction/intervention heuristics at ingest, on prose, before digesting (DAN-224): real user turns carry boolean `is_correction` plus a new optional `correction_basis` payload field (closed enum `explicit_phrase` | `after_completion_claim` | `interrupt`; present only when flagged; never prose). Sidechain turns stay null by design. **Historical events keep `is_correction: null` forever — the prose was digested away; only re-ingesting a surviving vendor transcript can backfill, and nothing may present nulls as zero corrections.** Verified per vendor by the new `observe.correction` conformance check (positive fixture + negative control); the capability matrix gains a generated "Correction detection" column. Claude Code and Codex adapters bump to v0.2.0 (claude-code's resume token additionally carries the pending-completion-claim flag so incremental parses agree with full parses).
 - **v0.1.0** (2026-07-26) — initial spec: envelope, nine event types, six entities, SQLite physical schema, store contract.
 - **2026-08-03** — §8 gains the vendor-owned-artifact durability gap with its disposition (raw retention deliberately out of scope; `raw_ref` is best-effort). No schema shape change.
 - **2026-07-28** — **§4.1 identity rule corrected (no schema shape change).** Event ids and `raw_ref` are content-derived, never path-derived. The prior spec asserted path-bearing ids and judged the relocation hazard acceptable; that was falsified on the live store (a directory move re-ingested 73 events as 146). Five emitting sites were fixed and the live store rebuilt — 41,128 events, 41,128 distinct ids, zero absolute paths in `raw_ref`. §1's rule 3, §2's envelope row, and §8's closing note carried the same error and are corrected with it. §4.1's no-native-id fallback still specified a path-derived session id — unexercised by both shipped adapters, but it would have re-introduced the defect in the next adapter, so it is now content-derived too.

@@ -88,7 +88,7 @@ describe("schema constants", (): void => {
       "completion_claim",
       "verification_event",
     ]);
-    expect(SCHEMA_VERSION).toBe("0.1.0");
+    expect(SCHEMA_VERSION).toBe("0.2.0");
   });
 
   test("isEventType is closed over the canonical enum", (): void => {

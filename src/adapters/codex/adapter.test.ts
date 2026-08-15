@@ -201,7 +201,15 @@ async function basicFixture(): Promise<{
 }> {
   const root: string = makeTempDirectory();
   const path: string = writeRollout(root, SESSION_ID, basicRollout());
-  const adapter = new CodexAdapter({ sessionsRoot: root });
+  // The fixture cwd doesn't exist on the test machine; stub it as a git root
+  // so the attribution path runs deterministically (see adapters/attribution.ts).
+  const adapter = new CodexAdapter({
+    sessionsRoot: root,
+    gitRootResolver: (dir: string): string | null =>
+      dir === "/work/project" || dir.startsWith("/work/project/")
+        ? "/work/project"
+        : null,
+  });
   const sessions: DiscoveredSession[] = await adapter.discoverSessions();
   expect(sessions).toHaveLength(1);
   const session: DiscoveredSession | undefined = sessions[0];
@@ -336,6 +344,9 @@ describe("CodexAdapter canonical parsing", (): void => {
       model_provider: "openai",
       dialect: CODEX_DIALECT_VERSION,
     });
+    // Attribution (DAN-225): the stubbed resolver marks /work/project as a
+    // git root, so the derived session repo matches — and rides ParseResult.
+    expect(result.sessionRepo).toBe("/work/project");
 
     const turnStart: EventInput | undefined = result.events.find(
       (event: EventInput): boolean => event.type === "turn_start",
@@ -430,7 +441,7 @@ describe("CodexAdapter canonical parsing", (): void => {
     for (const event of result.events) {
       expect(validateEnvelope(event)).toEqual([]);
       expect(event.vendor).toBe("codex");
-      expect(event.adapter_version).toBe("0.1.0");
+      expect(event.adapter_version).toBe("0.2.0");
       expect(event.raw_ref).toMatch(
         new RegExp(`^codex:${SESSION_ID}#L\\d+$`),
       );

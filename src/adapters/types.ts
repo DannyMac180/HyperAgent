@@ -59,6 +59,15 @@ export interface ParseResult {
   skippedUnknown: number;
   /** Records that LOOKED like known types but failed to parse — the breakage signal. */
   parseFailures: number;
+  /**
+   * Best-evidence repo attribution for the whole session as of this pass
+   * (git root of the dominant working-directory/file-touch evidence — see
+   * `adapters/attribution.ts`). `null` means the adapter looked and no repo
+   * is honestly derivable; absent means the adapter does not attribute.
+   * The daemon persists the latest value and stamps it into the quiesce
+   * `session_end` payload so the sessions table stays an event projection.
+   */
+  sessionRepo?: string | null;
 }
 
 export type AdapterHealthStatus = "ok" | "needs_update" | "unavailable";

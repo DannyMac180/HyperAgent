@@ -1,8 +1,13 @@
 import { homedir } from "node:os";
-import { basename, join } from "node:path";
+import { basename, isAbsolute, join, resolve } from "node:path";
 import { open, readdir, stat } from "node:fs/promises";
 
 import { deterministicEventId } from "../../schema/ids.ts";
+import {
+  AttributionEvidence,
+  makeDefaultGitRootResolver,
+  type GitRootResolver,
+} from "../attribution.ts";
 import type { EventInput } from "../../schema/events.ts";
 import type {
   AdapterHealth,
@@ -42,6 +47,62 @@ interface ResumeState {
   lines: number;
   bytes: number;
   turns: number;
+}
+
+/** File tools whose input paths count as attribution evidence. */
+const ATTRIBUTION_FILE_TOOLS: ReadonlySet<string> = new Set([
+  "Read",
+  "Write",
+  "Edit",
+  "MultiEdit",
+  "NotebookEdit",
+]);
+
+/** The subset that mutates — a far stronger subject signal than a read. */
+const ATTRIBUTION_MUTATION_TOOLS: ReadonlySet<string> = new Set([
+  "Write",
+  "Edit",
+  "MultiEdit",
+  "NotebookEdit",
+]);
+
+/**
+ * Feed one transcript line into the session's repo-attribution evidence:
+ * the line's working directory, plus any file-tool input paths (resolved
+ * against that line's cwd — Claude Code records cwd per line and it moves
+ * mid-session, so resolution must use the cwd in force at touch time).
+ */
+function collectAttributionEvidence(
+  line: TranscriptLine,
+  evidence: AttributionEvidence,
+): void {
+  if (typeof line.cwd === "string") {
+    evidence.addCwd(line.cwd);
+  }
+  if (line.message === undefined) {
+    return;
+  }
+  for (const block of contentBlocks(line.message)) {
+    if (!isToolUseBlock(block)) {
+      continue;
+    }
+    if (!ATTRIBUTION_FILE_TOOLS.has(block.name)) {
+      continue;
+    }
+    const pathValue: unknown = block.input.file_path ?? block.input.path;
+    if (typeof pathValue !== "string" || pathValue === "") {
+      continue;
+    }
+    let absolute: string;
+    if (isAbsolute(pathValue)) {
+      absolute = pathValue;
+    } else if (typeof line.cwd === "string") {
+      absolute = resolve(line.cwd, pathValue);
+    } else {
+      continue;
+    }
+    evidence.addTouch(absolute, ATTRIBUTION_MUTATION_TOOLS.has(block.name));
+  }
 }
 
 interface PendingTool {
@@ -219,13 +280,23 @@ const parentIdFromLines = (
 
 export class ClaudeCodeAdapter implements ObserveAdapter {
   readonly vendor = "claude-code";
-  readonly adapterVersion = "0.1.0";
+  readonly adapterVersion = "0.2.0";
 
   private readonly projectsRoot: string;
+  private readonly gitRootResolver: GitRootResolver;
 
-  constructor(options?: { projectsRoot?: string }) {
+  constructor(options?: {
+    projectsRoot?: string;
+    /**
+     * Injected so tests and conformance stay byte-deterministic — the
+     * default walks the live filesystem looking for `.git`.
+     */
+    gitRootResolver?: GitRootResolver;
+  }) {
     this.projectsRoot =
       options?.projectsRoot ?? join(homedir(), ".claude", "projects");
+    this.gitRootResolver =
+      options?.gitRootResolver ?? makeDefaultGitRootResolver();
   }
 
   async detect(): Promise<AdapterHealth> {
@@ -390,6 +461,35 @@ export class ClaudeCodeAdapter implements ObserveAdapter {
     const bytes: Uint8Array = new Uint8Array(await file.arrayBuffer());
     const lines: CompleteLine[] = [];
 
+    // Attribution evidence covers the WHOLE artifact, not just the lines new
+    // to this pass: the resume token skips already-ingested lines below, so
+    // an incremental pass re-scans the prefix here for evidence only. The
+    // whole file is already in memory; this adds no I/O.
+    const evidence = new AttributionEvidence(this.gitRootResolver);
+    {
+      const decoder = new TextDecoder();
+      let scanCursor = 0;
+      while (scanCursor < initial.bytes) {
+        const newline: number = bytes.indexOf(10, scanCursor);
+        if (newline < 0 || newline >= initial.bytes) {
+          break;
+        }
+        const lineEnd: number =
+          newline > scanCursor && bytes[newline - 1] === 13
+            ? newline - 1
+            : newline;
+        const raw: string = decoder.decode(bytes.subarray(scanCursor, lineEnd));
+        scanCursor = newline + 1;
+        if (raw.trim() === "") {
+          continue;
+        }
+        const prefixLine: TranscriptLine | null = parseTranscriptLine(raw);
+        if (prefixLine !== null) {
+          collectAttributionEvidence(prefixLine, evidence);
+        }
+      }
+    }
+
     let cursor: number = initial.bytes;
     let physicalLine: number = initial.lines;
     while (cursor < bytes.length) {
@@ -496,6 +596,8 @@ export class ClaudeCodeAdapter implements ObserveAdapter {
         continue;
       }
 
+      collectAttributionEvidence(line, evidence);
+
       if (line.type === "system") {
         if (!isSystemErrorLine(line)) {
           skippedUnknown += 1;
@@ -556,7 +658,9 @@ export class ClaudeCodeAdapter implements ObserveAdapter {
           payload.harness_version = line.version;
         }
         if (typeof line.cwd === "string") {
-          payload.repo = line.cwd;
+          // `repo` is patched to the full-pass attribution after the loop
+          // (schema.md: git root, NOT the raw cwd — a home-directory launch
+          // is not a repo). `cwd` stays the raw recorded value.
           payload.cwd = line.cwd;
         }
         if (typeof line.gitBranch === "string") {
@@ -797,11 +901,27 @@ export class ClaudeCodeAdapter implements ObserveAdapter {
       left.ts.localeCompare(right.ts) || left.id.localeCompare(right.id),
     );
 
+    // The session_start line is parsed before the evidence exists, so its
+    // `repo` is stamped here with the full-pass attribution. When no repo is
+    // honestly derivable the field is omitted — "no repo" is a designed
+    // downstream state, never a home-directory path wearing a repo costume.
+    const sessionRepo: string | null = evidence.deriveRepo();
+    for (const event of finalEvents) {
+      if (event.type !== "session_start") {
+        continue;
+      }
+      const payload = event.payload as Record<string, unknown>;
+      if (sessionRepo !== null) {
+        payload.repo = sessionRepo;
+      }
+    }
+
     return {
       events: finalEvents,
       resumeToken: JSON.stringify(finalState),
       skippedUnknown,
       parseFailures,
+      sessionRepo,
     };
   }
 }

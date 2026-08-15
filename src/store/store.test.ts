@@ -258,6 +258,59 @@ describe("store contract", (): void => {
     expect(store.getSessions()).toEqual(before);
   });
 
+  test("a session_end carrying repo supersedes the start attribution; absent keeps it", (): void => {
+    const store = trackedStore();
+    // A live session's start was emitted from a thin first chunk with no
+    // derivable repo; the quiesce end carries the full-session attribution.
+    store.append(
+      makeEvent({
+        type: "session_start",
+        session_id: "attributed-at-end",
+        ts: "2026-01-05T10:00:00.000Z",
+        payload: { agent: "x" },
+      }),
+    );
+    expect(only(store.getSessions()).repo).toBeNull();
+
+    store.append(
+      makeEvent({
+        type: "session_end",
+        session_id: "attributed-at-end",
+        ts: "2026-01-05T11:00:00.000Z",
+        payload: { outcome: "completed", repo: "/home/u/dev/tool" },
+      }),
+    );
+    expect(only(store.getSessions()).repo).toBe("/home/u/dev/tool");
+
+    // An end WITHOUT repo never clears an existing attribution.
+    store.append(
+      makeEvent({
+        type: "session_start",
+        session_id: "kept-from-start",
+        ts: "2026-01-05T12:00:00.000Z",
+        payload: { repo: "/home/u/dev/other" },
+      }),
+    );
+    store.append(
+      makeEvent({
+        type: "session_end",
+        session_id: "kept-from-start",
+        ts: "2026-01-05T13:00:00.000Z",
+        payload: { outcome: "completed" },
+      }),
+    );
+    const kept = store
+      .getSessions()
+      .find((session): boolean => session.session_id === "kept-from-start");
+    expect(kept?.repo).toBe("/home/u/dev/other");
+
+    // rebuildSessions() replays the same rule from the event stream alone.
+    const before = store.getSessions();
+    store.db.run("DELETE FROM sessions");
+    expect(store.rebuildSessions()).toBe(2);
+    expect(store.getSessions()).toEqual(before);
+  });
+
   test("open sessions become closed when a session end arrives", (): void => {
     const store = trackedStore();
     const start = makeEvent({

@@ -95,11 +95,27 @@ async function bounded<T>(
 }
 
 /**
+ * Fixture transcripts name /home/user/project, which does not exist on the
+ * machine running conformance — git-root resolution is stubbed so parses stay
+ * byte-deterministic everywhere (the golden must never depend on the live
+ * filesystem). The fixture project directory IS its git root.
+ */
+const FIXTURE_GIT_ROOT = "/home/user/project";
+const fixtureGitRootResolver = (dir: string): string | null =>
+  dir === FIXTURE_GIT_ROOT || dir.startsWith(`${FIXTURE_GIT_ROOT}/`)
+    ? FIXTURE_GIT_ROOT
+    : null;
+
+/**
  * The vendor-blind runner cannot cancel arbitrary adapter I/O. This subclass
  * keeps every real-adapter call bounded while preserving the production
  * ClaudeCodeAdapter implementation under test.
  */
 class BoundedClaudeCodeAdapter extends ClaudeCodeAdapter {
+  constructor(options: { projectsRoot: string }) {
+    super({ ...options, gitRootResolver: fixtureGitRootResolver });
+  }
+
   override async discoverSessions(): Promise<DiscoveredSession[]> {
     return bounded(
       "Claude Code fixture discovery",

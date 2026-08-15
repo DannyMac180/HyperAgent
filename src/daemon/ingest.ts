@@ -124,6 +124,12 @@ export interface SessionState {
   lastTs?: string;
   turnCount: number;
   toolCallCount: number;
+  /**
+   * Latest adapter-derived repo attribution (ParseResult.sessionRepo).
+   * Absent when the adapter does not attribute or honestly derived nothing;
+   * stamped into the quiesce session_end payload as `repo`.
+   */
+  derivedRepo?: string;
 }
 
 const emptyState = (): IngestState => ({ v: 1, sessions: {} });
@@ -148,7 +154,8 @@ const isSessionState = (value: unknown): value is SessionState => {
     (value.firstTs === undefined || typeof value.firstTs === "string") &&
     (value.lastTs === undefined || typeof value.lastTs === "string") &&
     typeof value.turnCount === "number" &&
-    typeof value.toolCallCount === "number"
+    typeof value.toolCallCount === "number" &&
+    (value.derivedRepo === undefined || typeof value.derivedRepo === "string")
   );
 };
 
@@ -484,6 +491,13 @@ export async function runIngestOnce(
                 toolCallCount += 1;
               }
             }
+            // Each pass recomputes attribution over the whole artifact, so
+            // a present value (even a downgrade to null) supersedes the
+            // prior; only an absent field carries the prior forward.
+            const derivedRepo: string | undefined =
+              result.sessionRepo === undefined
+                ? prior?.derivedRepo
+                : (result.sessionRepo ?? undefined);
             state.sessions[session.sessionId] = {
               path: session.path,
               mtimeMs: session.mtimeMs,
@@ -495,6 +509,7 @@ export async function runIngestOnce(
               ...(lastTs === undefined ? {} : { lastTs }),
               turnCount,
               toolCallCount,
+              ...(derivedRepo === undefined ? {} : { derivedRepo }),
             };
           } catch (error: unknown) {
             stats.parseFailures += 1;
@@ -590,6 +605,14 @@ export async function runIngestOnce(
           ...(durationMs === undefined ? {} : { duration_ms: durationMs }),
           turn_count: session.turnCount,
           tool_call_count: session.toolCallCount,
+          // Full-session repo attribution, derived by the adapter over the
+          // whole artifact (adapters/attribution.ts). Carried on session_end
+          // so the sessions table — a pure projection of the event stream —
+          // picks up the final attribution even for sessions whose
+          // session_start was emitted from a thin first incremental chunk.
+          ...(session.derivedRepo === undefined
+            ? {}
+            : { repo: session.derivedRepo }),
         },
       };
       const inserted = store.append(event);

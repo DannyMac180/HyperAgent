@@ -1,5 +1,5 @@
 import { homedir } from "node:os";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import {
   open,
   readFile,
@@ -10,6 +10,11 @@ import type { FileHandle } from "node:fs/promises";
 import type { Dirent } from "node:fs";
 
 import { deterministicEventId } from "../../schema/ids.ts";
+import {
+  AttributionEvidence,
+  makeDefaultGitRootResolver,
+  type GitRootResolver,
+} from "../attribution.ts";
 import type { EventInput } from "../../schema/events.ts";
 import type {
   AdapterHealth,
@@ -67,7 +72,7 @@ import type {
 export const CODEX_DIALECT_VERSION =
   "codex-rollout-jsonl-2026-07-27-v1";
 
-const ADAPTER_VERSION = "0.1.0";
+const ADAPTER_VERSION = "0.2.0";
 const OPERATION_TIMEOUT_MS = 10_000;
 const FIRST_LINE_CHUNK_BYTES = 64 * 1024;
 const MAX_FIRST_LINE_BYTES = 1024 * 1024;
@@ -239,10 +244,20 @@ export class CodexAdapter implements ObserveAdapter {
   readonly dialectVersion = CODEX_DIALECT_VERSION;
 
   private readonly sessionsRoot: string;
+  private readonly gitRootResolver: GitRootResolver;
 
-  constructor(options?: { sessionsRoot?: string }) {
+  constructor(options?: {
+    sessionsRoot?: string;
+    /**
+     * Injected so tests and conformance stay byte-deterministic — the
+     * default walks the live filesystem looking for `.git`.
+     */
+    gitRootResolver?: GitRootResolver;
+  }) {
     this.sessionsRoot =
       options?.sessionsRoot ?? join(homedir(), ".codex", "sessions");
+    this.gitRootResolver =
+      options?.gitRootResolver ?? makeDefaultGitRootResolver();
   }
 
   async detect(): Promise<AdapterHealth> {
@@ -489,11 +504,18 @@ export class CodexAdapter implements ObserveAdapter {
       return event;
     };
 
+    // Codex records one cwd for the whole rollout; file touches accumulate
+    // below as apply_patch records pair with their outputs. The derived repo
+    // is stamped into session_start at the tail of this pass.
+    const evidence = new AttributionEvidence(this.gitRootResolver);
+    evidence.addCwd(sessionMetadata.cwd);
+
     if (initialOffset === 0) {
       const payload: Record<string, unknown> = {
         agent: "codex",
         harness_version: sessionMetadata.cliVersion,
-        repo: sessionMetadata.cwd,
+        // `repo` is patched to the derived attribution after the loop
+        // (schema.md: git root, NOT the raw cwd). `cwd` stays raw.
         cwd: sessionMetadata.cwd,
         originator: sessionMetadata.originator,
         source: sessionMetadata.source,
@@ -866,6 +888,10 @@ export class CodexAdapter implements ObserveAdapter {
         );
         if (filesTouched.length > 0) {
           toolPayload.files_touched = filesTouched;
+          for (const touched of filesTouched) {
+            // apply_patch only writes, so every touch is a mutation.
+            evidence.addTouch(resolve(sessionMetadata.cwd, touched), true);
+          }
         }
         const toolCall: EventInput | null = emit(
           pending.timestamp,
@@ -974,11 +1000,26 @@ export class CodexAdapter implements ObserveAdapter {
     finalEvents.sort((left: EventInput, right: EventInput): number =>
       left.ts.localeCompare(right.ts) || left.id.localeCompare(right.id),
     );
+
+    // Stamp the full-pass attribution into session_start (schema.md: `repo`
+    // is a git root; omitted when none is honestly derivable).
+    const sessionRepo: string | null = evidence.deriveRepo();
+    for (const event of finalEvents) {
+      if (event.type !== "session_start") {
+        continue;
+      }
+      const payload = event.payload as Record<string, unknown>;
+      if (sessionRepo !== null) {
+        payload.repo = sessionRepo;
+      }
+    }
+
     return {
       events: finalEvents,
       resumeToken: String(finalOffset),
       skippedUnknown,
       parseFailures,
+      sessionRepo,
     };
   }
 }

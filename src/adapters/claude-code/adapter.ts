@@ -284,6 +284,7 @@ export class ClaudeCodeAdapter implements ObserveAdapter {
 
   private readonly projectsRoot: string;
   private readonly gitRootResolver: GitRootResolver;
+  private readonly attributionExclusions: readonly string[];
 
   constructor(options?: {
     projectsRoot?: string;
@@ -292,11 +293,21 @@ export class ClaudeCodeAdapter implements ObserveAdapter {
      * default walks the live filesystem looking for `.git`.
      */
     gitRootResolver?: GitRootResolver;
+    /**
+     * Paths whose touches are instrument noise rather than session subject
+     * (defaults to the harness's own state directory and the suit's data
+     * dir). Every session writes there regardless of what it was about.
+     */
+    attributionExclusions?: readonly string[];
   }) {
     this.projectsRoot =
       options?.projectsRoot ?? join(homedir(), ".claude", "projects");
     this.gitRootResolver =
       options?.gitRootResolver ?? makeDefaultGitRootResolver();
+    this.attributionExclusions = options?.attributionExclusions ?? [
+      join(homedir(), ".claude"),
+      join(homedir(), ".hyperagent"),
+    ];
   }
 
   async detect(): Promise<AdapterHealth> {
@@ -465,7 +476,10 @@ export class ClaudeCodeAdapter implements ObserveAdapter {
     // to this pass: the resume token skips already-ingested lines below, so
     // an incremental pass re-scans the prefix here for evidence only. The
     // whole file is already in memory; this adds no I/O.
-    const evidence = new AttributionEvidence(this.gitRootResolver);
+    const evidence = new AttributionEvidence(
+      this.gitRootResolver,
+      this.attributionExclusions,
+    );
     {
       const decoder = new TextDecoder();
       let scanCursor = 0;

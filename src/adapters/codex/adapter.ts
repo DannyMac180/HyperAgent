@@ -245,6 +245,7 @@ export class CodexAdapter implements ObserveAdapter {
 
   private readonly sessionsRoot: string;
   private readonly gitRootResolver: GitRootResolver;
+  private readonly attributionExclusions: readonly string[];
 
   constructor(options?: {
     sessionsRoot?: string;
@@ -253,11 +254,21 @@ export class CodexAdapter implements ObserveAdapter {
      * default walks the live filesystem looking for `.git`.
      */
     gitRootResolver?: GitRootResolver;
+    /**
+     * Paths whose touches are instrument noise rather than session subject
+     * (defaults to the harness's own state directory and the suit's data
+     * dir). Every session writes there regardless of what it was about.
+     */
+    attributionExclusions?: readonly string[];
   }) {
     this.sessionsRoot =
       options?.sessionsRoot ?? join(homedir(), ".codex", "sessions");
     this.gitRootResolver =
       options?.gitRootResolver ?? makeDefaultGitRootResolver();
+    this.attributionExclusions = options?.attributionExclusions ?? [
+      join(homedir(), ".codex"),
+      join(homedir(), ".hyperagent"),
+    ];
   }
 
   async detect(): Promise<AdapterHealth> {
@@ -507,7 +518,10 @@ export class CodexAdapter implements ObserveAdapter {
     // Codex records one cwd for the whole rollout; file touches accumulate
     // below as apply_patch records pair with their outputs. The derived repo
     // is stamped into session_start at the tail of this pass.
-    const evidence = new AttributionEvidence(this.gitRootResolver);
+    const evidence = new AttributionEvidence(
+      this.gitRootResolver,
+      this.attributionExclusions,
+    );
     evidence.addCwd(sessionMetadata.cwd);
 
     if (initialOffset === 0) {

@@ -29,13 +29,38 @@ export const UNVERIFIED_HARNESSES: readonly UnverifiedHarness[] = [
 const REGENERATION_COMMAND =
   "bun src/daemon/cli.ts conformance matrix --write";
 
+/**
+ * Correction detection (DAN-224) is a per-vendor signal inside the observe
+ * capability. It gets its own honest column because a harness can be fully
+ * observable yet unable to support adapter-time correction detection — that
+ * reads "not applicable", never a silent pass.
+ */
+function correctionCell(report: ConformanceReport): string {
+  const check = report.checks.find(
+    ({ id }): boolean => id === "observe.correction",
+  );
+  if (check === undefined) {
+    return "not measured";
+  }
+  switch (check.status) {
+    case "pass":
+      return "verified";
+    case "not-applicable":
+      return "not applicable";
+    case "skipped":
+      return "not claimed";
+    default:
+      return "failing";
+  }
+}
+
 function verifiedRow(report: ConformanceReport): string {
   if (!report.passed) {
-    return `| ${report.vendor} | unverified (conformance failing) | unverified (conformance failing) | unverified (conformance failing) | unverified (conformance failing) | adapter v${report.adapterVersion} / dialect v${report.dialectVersion} |`;
+    return `| ${report.vendor} | unverified (conformance failing) | unverified (conformance failing) | unverified (conformance failing) | unverified (conformance failing) | unverified (conformance failing) | adapter v${report.adapterVersion} / dialect v${report.dialectVersion} |`;
   }
   const capability = (name: "observe" | "inject" | "gate"): string =>
     report.verifiedCapabilities.includes(name) ? "verified" : "not claimed";
-  return `| ${report.vendor} | ${capability("observe")} | ${capability("inject")} | ${capability("gate")} | ${String(report.tier)} | verified as of adapter v${report.adapterVersion} / dialect ${report.dialectVersion} |`;
+  return `| ${report.vendor} | ${capability("observe")} | ${capability("inject")} | ${capability("gate")} | ${correctionCell(report)} | ${String(report.tier)} | verified as of adapter v${report.adapterVersion} / dialect ${report.dialectVersion} |`;
 }
 
 /**
@@ -72,8 +97,8 @@ export function renderCapabilityMatrix(
     "",
     "Every row below is the output of a conformance run against a registered adapter. This is the authority on what HyperAgent can actually do.",
     "",
-    "| Harness | Observe | Inject | Gate | Tier | Evidence |",
-    "|---|---|---|---|---|---|",
+    "| Harness | Observe | Inject | Gate | Correction detection | Tier | Evidence |",
+    "|---|---|---|---|---|---|---|",
     ...reportRows,
     "",
     "## Not yet measured",

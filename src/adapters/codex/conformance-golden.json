@@ -1,110 +1,110 @@
 [
   {
+    "adapter_version": "0.2.0",
     "id": "01KYHQ4EG0P9R4X0Z161ZSYHP2",
-    "ts": "2026-07-27T12:00:00.000Z",
-    "type": "session_start",
-    "session_id": "codex:11111111-1111-4111-8111-111111111111",
-    "vendor": "codex",
-    "adapter_version": "0.1.0",
-    "raw_ref": "codex:11111111-1111-4111-8111-111111111111#L1",
     "payload": {
       "agent": "codex",
-      "harness_version": "0.144.2",
-      "repo": "/synthetic/project",
       "cwd": "/synthetic/project",
-      "originator": "Codex Conformance Fixture",
-      "source": "exec",
-      "model_provider": "openai",
-      "thread_source": "user",
+      "dialect": "codex-rollout-jsonl-2026-07-27-v1",
       "git_branch": "fixture-branch",
-      "dialect": "codex-rollout-jsonl-2026-07-27-v1"
-    }
+      "harness_version": "0.144.2",
+      "model_provider": "openai",
+      "originator": "Codex Conformance Fixture",
+      "repo": "/synthetic/project",
+      "source": "exec",
+      "thread_source": "user"
+    },
+    "raw_ref": "codex:11111111-1111-4111-8111-111111111111#L1",
+    "session_id": "codex:11111111-1111-4111-8111-111111111111",
+    "ts": "2026-07-27T12:00:00.000Z",
+    "type": "session_start",
+    "vendor": "codex"
   },
   {
+    "adapter_version": "0.2.0",
     "id": "01KYHQ4EP8V7DHQWM9H78Y12SE",
+    "payload": {
+      "dialect": "codex-rollout-jsonl-2026-07-27-v1",
+      "is_correction": false,
+      "role": "user",
+      "text_chars": 25,
+      "text_digest": "0974831e9c4a74e52c6329b7afadb33c06f409f44cd8adb9224ce46f48278904",
+      "turn_index": 0
+    },
+    "raw_ref": "codex:11111111-1111-4111-8111-111111111111#L3",
+    "session_id": "codex:11111111-1111-4111-8111-111111111111",
     "ts": "2026-07-27T12:00:00.200Z",
     "type": "turn_start",
-    "session_id": "codex:11111111-1111-4111-8111-111111111111",
-    "vendor": "codex",
-    "adapter_version": "0.1.0",
-    "raw_ref": "codex:11111111-1111-4111-8111-111111111111#L3",
-    "payload": {
-      "turn_index": 0,
-      "role": "user",
-      "text_digest": "0974831e9c4a74e52c6329b7afadb33c06f409f44cd8adb9224ce46f48278904",
-      "text_chars": 25,
-      "is_correction": null,
-      "dialect": "codex-rollout-jsonl-2026-07-27-v1"
-    }
+    "vendor": "codex"
   },
   {
+    "adapter_version": "0.2.0",
     "id": "01KYHQ4FF88P3Q1VGMYWD6P1PP",
-    "ts": "2026-07-27T12:00:01.000Z",
-    "type": "tool_call",
-    "session_id": "codex:11111111-1111-4111-8111-111111111111",
-    "vendor": "codex",
-    "adapter_version": "0.1.0",
-    "raw_ref": "codex:11111111-1111-4111-8111-111111111111#L4",
     "payload": {
-      "name": "exec_command",
+      "dialect": "codex-rollout-jsonl-2026-07-27-v1",
+      "duration_ms": 1000,
       "input_digest": "93f63416c26aece4f0f590bbc119e9cde5a9f4ffa56a84b7ea62906ff8b8c7d9",
       "input_summary": "{\"cmd\":\"bun test\",\"workdir\":\"/synthetic/project\"}",
+      "name": "exec_command",
       "output_digest": "06b8c646f4d553846ae4adfa88577516aaf8d1000aeee0f9094ac29bd76a7bca",
       "output_summary": "Process exited with code 0 All synthetic tests passed.",
       "status": "ok",
-      "turn_index": 0,
-      "duration_ms": 1000,
-      "dialect": "codex-rollout-jsonl-2026-07-27-v1"
-    }
+      "turn_index": 0
+    },
+    "raw_ref": "codex:11111111-1111-4111-8111-111111111111#L4",
+    "session_id": "codex:11111111-1111-4111-8111-111111111111",
+    "ts": "2026-07-27T12:00:01.000Z",
+    "type": "tool_call",
+    "vendor": "codex"
   },
   {
+    "adapter_version": "0.2.0",
     "id": "01KYHQ4FF8J57181GGMNNVV2NP",
-    "ts": "2026-07-27T12:00:01.000Z",
-    "type": "verification_event",
-    "session_id": "codex:11111111-1111-4111-8111-111111111111",
-    "vendor": "codex",
-    "adapter_version": "0.1.0",
-    "raw_ref": "codex:11111111-1111-4111-8111-111111111111#L4",
     "payload": {
-      "kind": "test",
       "command_digest": "d8c272072687a75fab62bf32f66fc8948c86222dad85719db412b4d8bf0e50c7",
       "command_summary": "bun test",
-      "result": "pass",
-      "turn_index": 0,
+      "dialect": "codex-rollout-jsonl-2026-07-27-v1",
       "initiated_by": "agent",
-      "dialect": "codex-rollout-jsonl-2026-07-27-v1"
-    }
+      "kind": "test",
+      "result": "pass",
+      "turn_index": 0
+    },
+    "raw_ref": "codex:11111111-1111-4111-8111-111111111111#L4",
+    "session_id": "codex:11111111-1111-4111-8111-111111111111",
+    "ts": "2026-07-27T12:00:01.000Z",
+    "type": "verification_event",
+    "vendor": "codex"
   },
   {
+    "adapter_version": "0.2.0",
     "id": "01KYHQ4HDR43V326XDKE0BFZDN",
+    "payload": {
+      "dialect": "codex-rollout-jsonl-2026-07-27-v1",
+      "role": "agent",
+      "stop_reason": "final_answer",
+      "text_chars": 27,
+      "text_digest": "9574fe55805995e23d61fe5b666ecd2d9bd8bdb179cfce1b5977cd4769f9c241",
+      "turn_index": 0
+    },
+    "raw_ref": "codex:11111111-1111-4111-8111-111111111111#L6",
+    "session_id": "codex:11111111-1111-4111-8111-111111111111",
     "ts": "2026-07-27T12:00:03.000Z",
     "type": "turn_end",
-    "session_id": "codex:11111111-1111-4111-8111-111111111111",
-    "vendor": "codex",
-    "adapter_version": "0.1.0",
-    "raw_ref": "codex:11111111-1111-4111-8111-111111111111#L6",
-    "payload": {
-      "turn_index": 0,
-      "role": "agent",
-      "text_digest": "9574fe55805995e23d61fe5b666ecd2d9bd8bdb179cfce1b5977cd4769f9c241",
-      "text_chars": 27,
-      "stop_reason": "final_answer",
-      "dialect": "codex-rollout-jsonl-2026-07-27-v1"
-    }
+    "vendor": "codex"
   },
   {
+    "adapter_version": "0.2.0",
     "id": "01KYHQ4HGWB9TXVWTBTSY1WXFX",
+    "payload": {
+      "claim_kind": "fixed",
+      "claim_text": "Fixed the synthetic parser.",
+      "dialect": "codex-rollout-jsonl-2026-07-27-v1",
+      "turn_index": 0
+    },
+    "raw_ref": "codex:11111111-1111-4111-8111-111111111111#L7",
+    "session_id": "codex:11111111-1111-4111-8111-111111111111",
     "ts": "2026-07-27T12:00:03.100Z",
     "type": "completion_claim",
-    "session_id": "codex:11111111-1111-4111-8111-111111111111",
-    "vendor": "codex",
-    "adapter_version": "0.1.0",
-    "raw_ref": "codex:11111111-1111-4111-8111-111111111111#L7",
-    "payload": {
-      "claim_text": "Fixed the synthetic parser.",
-      "claim_kind": "fixed",
-      "turn_index": 0,
-      "dialect": "codex-rollout-jsonl-2026-07-27-v1"
-    }
+    "vendor": "codex"
   }
 ]

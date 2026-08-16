@@ -279,6 +279,16 @@ async function createObserveFixtures(
     "truncated.jsonl",
     { stripTrailingNewline: true },
   );
+  const correctionPositive: VariantArtifact = await createVariant(
+    tempRoot,
+    "correction-positive",
+    "correction.jsonl",
+  );
+  const correctionNegative: VariantArtifact = await createVariant(
+    tempRoot,
+    "correction-negative",
+    "correction-negative.jsonl",
+  );
 
   const unknownRecord: ObserveVariant = {
     adapter: unknown.adapter,
@@ -331,6 +341,16 @@ async function createObserveFixtures(
     corrupted: corruptedVariant,
     resume,
     truncation,
+    correction: {
+      positive: {
+        adapter: correctionPositive.adapter,
+        label: "Codex correction fixture",
+      },
+      negative: {
+        adapter: correctionNegative.adapter,
+        label: "Codex correction negative control",
+      },
+    },
   };
 }
 

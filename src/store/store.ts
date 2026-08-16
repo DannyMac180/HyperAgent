@@ -267,11 +267,16 @@ export function openStore(storePath?: string): Store {
     `);
     const upsertSessionEnd = db.query(`
       INSERT INTO sessions (
-        session_id, vendor, started_at, ended_at, outcome
-      ) VALUES (?, ?, ?, ?, ?)
+        session_id, vendor, started_at, ended_at, outcome, repo
+      ) VALUES (?, ?, ?, ?, ?, ?)
       ON CONFLICT(session_id) DO UPDATE SET
         ended_at = excluded.ended_at,
-        outcome = excluded.outcome
+        outcome = excluded.outcome,
+        -- session_end carries the adapter's full-session repo attribution
+        -- (DAN-225); it supersedes the session_start value, which may have
+        -- been derived from a thin first incremental chunk. Absent on the
+        -- end event → keep whatever the start recorded.
+        repo = COALESCE(excluded.repo, repo)
     `);
 
     function applySessionEvent(event: SessionIndexEvent): void {
@@ -295,6 +300,7 @@ export function openStore(storePath?: string): Store {
         event.ts,
         event.ts,
         optionalPayloadString(event.payload, "outcome"),
+        optionalPayloadString(event.payload, "repo"),
       );
     }
 

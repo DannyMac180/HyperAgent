@@ -96,7 +96,23 @@ async function bounded<T>(
   }
 }
 
+/**
+ * Fixture rollouts name /synthetic/project, which does not exist on the
+ * machine running conformance — git-root resolution is stubbed so parses stay
+ * byte-deterministic everywhere (the golden must never depend on the live
+ * filesystem). The fixture project directory IS its git root.
+ */
+const FIXTURE_GIT_ROOT = "/synthetic/project";
+const fixtureGitRootResolver = (dir: string): string | null =>
+  dir === FIXTURE_GIT_ROOT || dir.startsWith(`${FIXTURE_GIT_ROOT}/`)
+    ? FIXTURE_GIT_ROOT
+    : null;
+
 class BoundedCodexAdapter extends CodexAdapter {
+  constructor(options: { sessionsRoot: string }) {
+    super({ ...options, gitRootResolver: fixtureGitRootResolver });
+  }
+
   override async discoverSessions(): Promise<DiscoveredSession[]> {
     return bounded(
       "Codex fixture discovery",

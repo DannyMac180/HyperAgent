@@ -176,6 +176,7 @@ function healthyAdapter(options?: {
   events?: EventInput[];
   skippedUnknown?: number;
   parseFailures?: number;
+  sessionRepo?: string | null;
 }): ObserveAdapter {
   const vendor = options?.vendor ?? "healthy";
   const adapterVersion = "1.0.0";
@@ -214,6 +215,9 @@ function healthyAdapter(options?: {
         resumeToken: "done",
         skippedUnknown: options?.skippedUnknown ?? 0,
         parseFailures: options?.parseFailures ?? 0,
+        ...(options?.sessionRepo === undefined
+          ? {}
+          : { sessionRepo: options.sessionRepo }),
       };
     },
   };
@@ -407,6 +411,53 @@ describe("runIngestOnce", () => {
     expect(second.eventsAppended).toBe(0);
     expect(second.sessionsClosed).toBe(0);
     expect(endingsAfterSecondRun).toHaveLength(1);
+  });
+
+  test("quiesce session_end carries the adapter's derived repo into the sessions row", async () => {
+    const dataDir = temporaryDataDir();
+    const nowMs = Date.UTC(2026, 0, 2);
+    const sessionId = "fake:attributed";
+    const path = "/tmp/attributed.jsonl";
+    // The session_start deliberately carries NO repo — the shape of a live
+    // session whose first chunk had no derivable evidence yet. The adapter's
+    // full-artifact derivation (ParseResult.sessionRepo) must reach the
+    // sessions row through the quiesce session_end.
+    const adapter = healthyAdapter({
+      vendor: "fake",
+      sessionId,
+      path,
+      mtimeMs: nowMs - 60 * 60 * 1000,
+      sessionRepo: "/home/u/dev/tool",
+      events: [
+        event(
+          sessionId,
+          "fake",
+          "1.0.0",
+          "session_start",
+          "2026-01-01T00:00:00.000Z",
+          `${path}#1`,
+          { agent: "fake" },
+        ),
+      ],
+    });
+
+    await runIngestOnce({
+      dataDir,
+      adapters: [adapter],
+      quiesceMs: 1_000,
+      now: () => nowMs,
+    });
+    const store = openStore(join(dataDir, "hyperagent.db"));
+    const ending = store
+      .getEvents(sessionId)
+      .find((storedEvent) => storedEvent.type === "session_end");
+    const session = store
+      .getSessions()
+      .find((row) => row.session_id === sessionId);
+    store.close();
+
+    expect(ending?.payload?.repo).toBe("/home/u/dev/tool");
+    expect(session?.repo).toBe("/home/u/dev/tool");
   });
 
   test("skips an unavailable adapter without discovering sessions", async () => {

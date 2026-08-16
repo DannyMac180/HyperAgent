@@ -2,6 +2,7 @@ import { afterAll, describe, expect, test } from "bun:test";
 import {
   appendFileSync,
   copyFileSync,
+  mkdirSync,
   mkdtempSync,
   rmSync,
   statSync,
@@ -29,7 +30,18 @@ const FIXTURE_UUIDS = [
 ] as const;
 const PROJECTS_ROOT = join(import.meta.dir, "fixtures", "projects");
 const PROJECT_ROOT = join(PROJECTS_ROOT, "-home-user-project");
-const adapter = new ClaudeCodeAdapter({ projectsRoot: PROJECTS_ROOT });
+// Fixture transcripts name directories that don't exist on the test machine,
+// so git-root resolution is stubbed: the fixture project IS a git root. This
+// exercises the attribution path (repo = git root of the evidence) while
+// keeping parses byte-deterministic on any machine.
+const stubGitRootResolver = (dir: string): string | null =>
+  dir === "/home/user/project" || dir.startsWith("/home/user/project/")
+    ? "/home/user/project"
+    : null;
+const adapter = new ClaudeCodeAdapter({
+  projectsRoot: PROJECTS_ROOT,
+  gitRootResolver: stubGitRootResolver,
+});
 const tempDirectories: string[] = [];
 
 function payloadOf(event: EventInput): Record<string, unknown> {
@@ -438,6 +450,147 @@ describe("ClaudeCodeAdapter", (): void => {
   });
 });
 
+describe("ClaudeCodeAdapter repo attribution (DAN-225)", (): void => {
+  const HOME = "/home/user";
+  const TOOL_REPO = "/home/user/dev/tool";
+  const attributionAdapter = (projectsRoot: string): ClaudeCodeAdapter =>
+    new ClaudeCodeAdapter({
+      projectsRoot,
+      gitRootResolver: (dir: string): string | null =>
+        dir === TOOL_REPO || dir.startsWith(`${TOOL_REPO}/`)
+          ? TOOL_REPO
+          : null,
+    });
+
+  const UUID = "66666666-6666-4666-8666-666666666666";
+
+  function transcriptLine(
+    index: number,
+    body: Record<string, unknown>,
+  ): string {
+    return JSON.stringify({
+      uuid: `60000000-0000-4000-8000-00000000000${index}`,
+      parentUuid: null,
+      sessionId: UUID,
+      timestamp: `2026-08-15T12:00:0${index}.000Z`,
+      cwd: HOME,
+      gitBranch: "main",
+      version: "1.0.42",
+      isSidechain: false,
+      ...body,
+    });
+  }
+
+  function writeSession(lines: string[]): DiscoveredSession {
+    const directory = mkdtempSync(join(tmpdir(), "claude-attribution-"));
+    tempDirectories.push(directory);
+    const projectsRoot = join(directory, "projects");
+    const projectPath = join(projectsRoot, "-home-user");
+    mkdirSync(projectPath, { recursive: true });
+    const path = join(projectPath, `${UUID}.jsonl`);
+    writeFileSync(path, `${lines.join("\n")}\n`, "utf8");
+    const metadata = statSync(path);
+    return {
+      sessionId: `claude-code:${UUID}`,
+      path,
+      mtimeMs: metadata.mtimeMs,
+      sizeBytes: metadata.size,
+    };
+  }
+
+  const editLine = (index: number, filePath: string): string =>
+    transcriptLine(index, {
+      type: "assistant",
+      message: {
+        model: "claude-opus-4",
+        content: [
+          {
+            type: "tool_use",
+            id: `toolu_attr_${index}`,
+            name: "Edit",
+            input: { file_path: filePath, old_string: "a", new_string: "b" },
+          },
+        ],
+        stop_reason: null,
+      },
+    });
+
+  test("home-launched session attributes to the dominant mutation root", async (): Promise<void> => {
+    const session = writeSession([
+      transcriptLine(1, {
+        type: "user",
+        message: { role: "user", content: "upgrade the tool" },
+      }),
+      editLine(2, `${TOOL_REPO}/src/a.ts`),
+      editLine(3, `${TOOL_REPO}/src/b.ts`),
+    ]);
+    const adapter = attributionAdapter(
+      join(session.path, "..", "..", ".."),
+    );
+    const result = await adapter.parseSession(session, "");
+    expect(result.sessionRepo).toBe(TOOL_REPO);
+    const start = result.events.find(
+      (event): boolean => event.type === "session_start",
+    );
+    expect(start).toBeDefined();
+    expect(payloadOf(start!).repo).toBe(TOOL_REPO);
+    expect(payloadOf(start!).cwd).toBe(HOME);
+  });
+
+  test("session with no derivable repo omits repo and reports null", async (): Promise<void> => {
+    const session = writeSession([
+      transcriptLine(1, {
+        type: "user",
+        message: { role: "user", content: "just a chat" },
+      }),
+    ]);
+    const adapter = attributionAdapter(
+      join(session.path, "..", "..", ".."),
+    );
+    const result = await adapter.parseSession(session, "");
+    expect(result.sessionRepo).toBeNull();
+    const start = result.events.find(
+      (event): boolean => event.type === "session_start",
+    );
+    expect(start).toBeDefined();
+    expect("repo" in payloadOf(start!)).toBe(false);
+    expect(payloadOf(start!).cwd).toBe(HOME);
+  });
+
+  test("two-chunk incremental parse derives the same repo as one chunk", async (): Promise<void> => {
+    const firstChunk = [
+      transcriptLine(1, {
+        type: "user",
+        message: { role: "user", content: "upgrade the tool" },
+      }),
+    ];
+    const laterLines = [
+      editLine(2, `${TOOL_REPO}/src/a.ts`),
+      editLine(3, `${TOOL_REPO}/src/b.ts`),
+    ];
+    const session = writeSession(firstChunk);
+    const adapter = attributionAdapter(
+      join(session.path, "..", "..", ".."),
+    );
+
+    const first = await adapter.parseSession(session, "");
+    expect(first.sessionRepo).toBeNull();
+
+    appendFileSync(session.path, `${laterLines.join("\n")}\n`);
+    const metadata = statSync(session.path);
+    const grown: DiscoveredSession = {
+      ...session,
+      mtimeMs: metadata.mtimeMs,
+      sizeBytes: metadata.size,
+    };
+    const second = await adapter.parseSession(grown, first.resumeToken);
+    expect(second.sessionRepo).toBe(TOOL_REPO);
+
+    const full = await adapter.parseSession(grown, "");
+    expect(full.sessionRepo).toBe(TOOL_REPO);
+  });
+});
+
 describe("ClaudeCodeAdapter correction detection", (): void => {
   const CORRECTION_UUID = "66666666-6666-4666-8666-666666666666";
 
@@ -460,7 +613,7 @@ describe("ClaudeCodeAdapter correction detection", (): void => {
       version: "1.0.42",
       isSidechain,
       message,
-    })}\n`;
+   })}\n`;
   }
 
   const userLine = (
@@ -558,8 +711,6 @@ describe("ClaudeCodeAdapter correction detection", (): void => {
       is_correction: true,
       correction_basis: ["interrupt"],
     });
-    // The synthetic marker line must not strip after_completion_claim from
-    // the pilot's real follow-up (vendor parity with codex).
     expect(turns[2]).toMatchObject({
       is_correction: true,
       correction_basis: ["after_completion_claim"],
@@ -579,8 +730,6 @@ describe("ClaudeCodeAdapter correction detection", (): void => {
 
     const v1Token = JSON.stringify({ v: 1, lines: 2, bytes: 0, turns: 1 });
     const result = await adapter.parseSession(correctionSession(path), v1Token);
-    // A v1 token cannot carry the claim flag, so it is rejected and the whole
-    // session re-parses — the after-claim correction is still detected.
     const turns = userTurnStarts(result);
     expect(turns).toHaveLength(2);
     expect(turns[1]).toMatchObject({
@@ -616,7 +765,6 @@ describe("ClaudeCodeAdapter correction detection", (): void => {
       correction_basis: ["after_completion_claim"],
     });
 
-    // Resumed parse must agree with a cold full parse (determinism).
     const full = await adapter.parseSession(correctionSession(path), "");
     const fullTurns = userTurnStarts(full);
     expect(fullTurns[1]).toMatchObject({

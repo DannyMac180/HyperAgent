@@ -574,7 +574,6 @@ describe("ClaudeCodeAdapter repo attribution (DAN-225)", (): void => {
     );
 
     const first = await adapter.parseSession(session, "");
-    // Evidence so far is the home cwd alone — honestly nothing.
     expect(first.sessionRepo).toBeNull();
 
     appendFileSync(session.path, `${laterLines.join("\n")}\n`);
@@ -585,10 +584,192 @@ describe("ClaudeCodeAdapter repo attribution (DAN-225)", (): void => {
       sizeBytes: metadata.size,
     };
     const second = await adapter.parseSession(grown, first.resumeToken);
-    // The prefix re-scan makes the incremental result equal the full parse.
     expect(second.sessionRepo).toBe(TOOL_REPO);
 
     const full = await adapter.parseSession(grown, "");
     expect(full.sessionRepo).toBe(TOOL_REPO);
+  });
+});
+
+describe("ClaudeCodeAdapter correction detection", (): void => {
+  const CORRECTION_UUID = "66666666-6666-4666-8666-666666666666";
+
+  function transcriptLine(
+    index: number,
+    type: "user" | "assistant",
+    message: Record<string, unknown>,
+    isSidechain = false,
+  ): string {
+    return `${JSON.stringify({
+      type,
+      uuid: `60000000-0000-4000-8000-00000000000${index}`,
+      parentUuid: index === 1
+        ? null
+        : `60000000-0000-4000-8000-00000000000${index - 1}`,
+      sessionId: CORRECTION_UUID,
+      timestamp: `2026-08-15T12:00:0${index}.000Z`,
+      cwd: "/home/user/project",
+      gitBranch: "main",
+      version: "1.0.42",
+      isSidechain,
+      message,
+   })}\n`;
+  }
+
+  const userLine = (
+    index: number,
+    content: string,
+    isSidechain = false,
+  ): string =>
+    transcriptLine(index, "user", { role: "user", content }, isSidechain);
+  const assistantLine = (index: number, text: string): string =>
+    transcriptLine(index, "assistant", {
+      model: "claude-opus-4",
+      content: [{ type: "text", text }],
+      stop_reason: "end_turn",
+    });
+
+  function correctionSession(path: string): DiscoveredSession {
+    const metadata = statSync(path);
+    return {
+      sessionId: `claude-code:${CORRECTION_UUID}`,
+      path,
+      mtimeMs: metadata.mtimeMs,
+      sizeBytes: metadata.size,
+    };
+  }
+
+  function userTurnStarts(result: ParseResult): Record<string, unknown>[] {
+    return result.events
+      .filter(
+        (event: EventInput): boolean =>
+          event.type === "turn_start"
+          && payloadOf(event).role === "user"
+          && payloadOf(event).is_sidechain !== true,
+      )
+      .map(payloadOf);
+  }
+
+  test("flags corrections with recorded basis and leaves sidechain null", async (): Promise<void> => {
+    const directory = mkdtempSync(join(tmpdir(), "claude-correction-"));
+    tempDirectories.push(directory);
+    const path = join(directory, `${CORRECTION_UUID}.jsonl`);
+    writeFileSync(
+      path,
+      userLine(1, "Please add a retry to the fetch helper.")
+        + assistantLine(2, "Retry added. All tests pass and the change is done.")
+        + userLine(3, "Hmm, I am still seeing the same error when it runs.")
+        + assistantLine(4, "Let me take another look at the helper.")
+        + userLine(5, "[Request interrupted by user]")
+        + userLine(6, "No, that's wrong — revert that change.")
+        + userLine(7, "Explore the repo and report the callers.", true),
+    );
+
+    const result = await adapter.parseSession(correctionSession(path), "");
+    const turns = userTurnStarts(result);
+    expect(turns).toHaveLength(4);
+    expect(turns[0]).toMatchObject({ is_correction: false });
+    expect(turns[0]!.correction_basis).toBeUndefined();
+    expect(turns[1]).toMatchObject({
+      is_correction: true,
+      correction_basis: ["after_completion_claim"],
+    });
+    expect(turns[2]).toMatchObject({
+      is_correction: true,
+      correction_basis: ["interrupt"],
+    });
+    expect(turns[3]).toMatchObject({
+      is_correction: true,
+      correction_basis: ["explicit_phrase"],
+    });
+
+    const sidechainTurn = result.events.find(
+      (event: EventInput): boolean =>
+        event.type === "turn_start"
+        && payloadOf(event).is_sidechain === true,
+    );
+    expect(sidechainTurn).toBeDefined();
+    expect(payloadOf(sidechainTurn!).is_correction).toBeNull();
+  });
+
+  test("an interrupt marker does not consume the completion-claim context", async (): Promise<void> => {
+    const directory = mkdtempSync(join(tmpdir(), "claude-correction-carry-"));
+    tempDirectories.push(directory);
+    const path = join(directory, `${CORRECTION_UUID}.jsonl`);
+    writeFileSync(
+      path,
+      userLine(1, "Please add a retry to the fetch helper.")
+        + assistantLine(2, "Retry added. All tests pass and the change is done.")
+        + userLine(3, "[Request interrupted by user]")
+        + userLine(4, "not quite, the timeout case is unhandled"),
+    );
+
+    const result = await adapter.parseSession(correctionSession(path), "");
+    const turns = userTurnStarts(result);
+    expect(turns).toHaveLength(3);
+    expect(turns[1]).toMatchObject({
+      is_correction: true,
+      correction_basis: ["interrupt"],
+    });
+    expect(turns[2]).toMatchObject({
+      is_correction: true,
+      correction_basis: ["after_completion_claim"],
+    });
+  });
+
+  test("rejects pre-0.2.0 resume tokens and re-parses from the start", async (): Promise<void> => {
+    const directory = mkdtempSync(join(tmpdir(), "claude-correction-token-"));
+    tempDirectories.push(directory);
+    const path = join(directory, `${CORRECTION_UUID}.jsonl`);
+    writeFileSync(
+      path,
+      userLine(1, "Please add a retry to the fetch helper.")
+        + assistantLine(2, "Retry added. All tests pass and the change is done.")
+        + userLine(3, "Hmm, I am still seeing the same error when it runs."),
+    );
+
+    const v1Token = JSON.stringify({ v: 1, lines: 2, bytes: 0, turns: 1 });
+    const result = await adapter.parseSession(correctionSession(path), v1Token);
+    const turns = userTurnStarts(result);
+    expect(turns).toHaveLength(2);
+    expect(turns[1]).toMatchObject({
+      is_correction: true,
+      correction_basis: ["after_completion_claim"],
+    });
+    expect(result.resumeToken).toContain('"v":2');
+  });
+
+  test("carries completion-claim context across a resume boundary", async (): Promise<void> => {
+    const directory = mkdtempSync(join(tmpdir(), "claude-correction-resume-"));
+    tempDirectories.push(directory);
+    const path = join(directory, `${CORRECTION_UUID}.jsonl`);
+    const prefix: string =
+      userLine(1, "Please add a retry to the fetch helper.")
+      + assistantLine(2, "Retry added. All tests pass and the change is done.");
+    const remainder: string =
+      userLine(3, "Hmm, I am still seeing the same error when it runs.");
+
+    writeFileSync(path, prefix);
+    const first = await adapter.parseSession(correctionSession(path), "");
+    expect(first.resumeToken).toContain('"claim":true');
+
+    appendFileSync(path, remainder);
+    const resumed = await adapter.parseSession(
+      correctionSession(path),
+      first.resumeToken,
+    );
+    const resumedTurns = userTurnStarts(resumed);
+    expect(resumedTurns).toHaveLength(1);
+    expect(resumedTurns[0]).toMatchObject({
+      is_correction: true,
+      correction_basis: ["after_completion_claim"],
+    });
+
+    const full = await adapter.parseSession(correctionSession(path), "");
+    const fullTurns = userTurnStarts(full);
+    expect(fullTurns[1]).toMatchObject({
+      is_correction: true,
+      correction_basis: ["after_completion_claim"],
+    });
   });
 });

@@ -864,4 +864,61 @@ describe("CodexAdapter robustness and replay", (): void => {
       "session_start",
     ]);
   });
+
+  test("flags corrections after completion claims and aborted turns", async (): Promise<void> => {
+    const root: string = makeTempDirectory();
+    const contents: string = [
+      sessionMeta(),
+      line("2026-07-27T20:00:00.200Z", "event_msg", {
+        type: "user_message",
+        message: "Add a retry to the fetch helper.",
+        images: [],
+        local_images: [],
+        text_elements: [],
+      }),
+      line("2026-07-27T20:00:01.000Z", "event_msg", {
+        type: "task_complete",
+        turn_id: "turn-1",
+        last_agent_message: "Retry added. All tests pass and the change is done.",
+      }),
+      line("2026-07-27T20:00:02.000Z", "event_msg", {
+        type: "user_message",
+        message: "I am still seeing the same error when it runs.",
+        images: [],
+        local_images: [],
+        text_elements: [],
+      }),
+      line("2026-07-27T20:00:03.000Z", "event_msg", {
+        type: "turn_aborted",
+        turn_id: "turn-2",
+        reason: "interrupted",
+      }),
+      line("2026-07-27T20:00:04.000Z", "event_msg", {
+        type: "user_message",
+        message: "Use the queue approach for the helper.",
+        images: [],
+        local_images: [],
+        text_elements: [],
+      }),
+    ].join("\n") + "\n";
+    const path: string = writeRollout(root, SESSION_ID, contents);
+    const result: ParseResult = await new CodexAdapter({
+      sessionsRoot: root,
+    }).parseSession(discoveredFor(path), "");
+
+    const turns: Record<string, unknown>[] = result.events
+      .filter((event: EventInput): boolean => event.type === "turn_start")
+      .map(payloadOf);
+    expect(turns).toHaveLength(3);
+    expect(turns[0]).toMatchObject({ is_correction: false });
+    expect(turns[0]!.correction_basis).toBeUndefined();
+    expect(turns[1]).toMatchObject({
+      is_correction: true,
+      correction_basis: ["after_completion_claim"],
+    });
+    expect(turns[2]).toMatchObject({
+      is_correction: true,
+      correction_basis: ["interrupt"],
+    });
+  });
 });

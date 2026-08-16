@@ -39,6 +39,7 @@ const NON_CLEAN_MUTATIONS = [
   "truncation",
   "breakage-signal",
   "envelope",
+  "correction",
 ] as const satisfies readonly ObserveMutant[];
 
 const MUTANT_MATRIX = {
@@ -51,6 +52,7 @@ const MUTANT_MATRIX = {
   "truncation": ["observe.truncation"],
   "breakage-signal": ["observe.breakage-signal"],
   "envelope": ["observe.envelope"],
+  "correction": ["observe.correction"],
 } as const satisfies Record<
   ObserveMutant,
   readonly ObserveCheckId[]
@@ -124,6 +126,6 @@ describe("observe check negative controls", (): void => {
     expect(Object.keys(MUTANT_MATRIX).sort()).toEqual(
       [...NON_CLEAN_MUTATIONS].sort(),
     );
-    expect(NON_CLEAN_MUTATIONS).toHaveLength(9);
+    expect(NON_CLEAN_MUTATIONS).toHaveLength(10);
   });
 });

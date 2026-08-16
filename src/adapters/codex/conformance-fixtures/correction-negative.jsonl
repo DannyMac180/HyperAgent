@@ -1,0 +1,9 @@
+{"timestamp":"2026-08-15T13:00:00.000Z","type":"session_meta","payload":{"session_id":"33333333-3333-4333-8333-333333333333","id":"33333333-3333-4333-8333-333333333333","timestamp":"2026-08-15T13:00:00.000Z","cwd":"/synthetic/project","originator":"Codex Conformance Fixture","cli_version":"0.144.2","source":"exec","thread_source":"user","model_provider":"openai","git":{"branch":"fixture-branch"},"base_instructions":{"text":"Synthetic conformance instructions."}}}
+{"timestamp":"2026-08-15T13:00:00.100Z","type":"event_msg","payload":{"type":"task_started","turn_id":"turn-1","model_context_window":200000}}
+{"timestamp":"2026-08-15T13:00:00.200Z","type":"event_msg","payload":{"type":"user_message","message":"Add a retry to the fetch helper.","images":[],"local_images":[],"text_elements":[]}}
+{"timestamp":"2026-08-15T13:00:01.000Z","type":"event_msg","payload":{"type":"agent_message","message":"Retry added. All tests pass and the change is done.","phase":"final_answer"}}
+{"timestamp":"2026-08-15T13:00:01.100Z","type":"event_msg","payload":{"type":"task_complete","turn_id":"turn-1","last_agent_message":"Retry added. All tests pass and the change is done."}}
+{"timestamp":"2026-08-15T13:00:02.000Z","type":"event_msg","payload":{"type":"task_started","turn_id":"turn-2","model_context_window":200000}}
+{"timestamp":"2026-08-15T13:00:02.100Z","type":"event_msg","payload":{"type":"user_message","message":"Great, now add dark mode support to the settings page too.","images":[],"local_images":[],"text_elements":[]}}
+{"timestamp":"2026-08-15T13:00:03.000Z","type":"event_msg","payload":{"type":"agent_message","message":"Dark mode support is in place across the settings page.","phase":"final_answer"}}
+{"timestamp":"2026-08-15T13:00:03.100Z","type":"event_msg","payload":{"type":"task_complete","turn_id":"turn-2","last_agent_message":"Dark mode support is in place across the settings page."}}

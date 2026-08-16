@@ -16,6 +16,8 @@ import {
   type GitRootResolver,
 } from "../attribution.ts";
 import type { EventInput } from "../../schema/events.ts";
+import { detectCorrection } from "../correction.ts";
+import type { CorrectionResult } from "../correction.ts";
 import type {
   AdapterHealth,
   DiscoveredSession,
@@ -463,6 +465,11 @@ export class CodexAdapter implements ObserveAdapter {
     let skippedUnknown = 0;
     let parseFailures = 0;
     let turns = 0;
+    // Correction-detection context (DAN-224). Rebuilt on every pass because
+    // this parser always walks the full artifact and filters emission by
+    // offset — no resume-token state needed.
+    let pendingClaim = false;
+    let interruptedPending = false;
 
     const countable = (line: CompleteLine): boolean =>
       line.byteOffset >= initialOffset;
@@ -611,18 +618,31 @@ export class CodexAdapter implements ObserveAdapter {
             failed(line);
             continue;
           }
+          const correction: CorrectionResult = detectCorrection(
+            message.message,
+            {
+              afterCompletionClaim: pendingClaim,
+              interrupted: interruptedPending,
+            },
+          );
+          const turnStartPayload: Record<string, unknown> = {
+            turn_index: turns,
+            role: "user",
+            text_digest: sha256Hex(message.message),
+            text_chars: message.message.length,
+            is_correction: correction.isCorrection,
+          };
+          if (correction.isCorrection) {
+            turnStartPayload.correction_basis = correction.basis;
+          }
+          pendingClaim = false;
+          interruptedPending = false;
           emit(
             timestamp,
             "turn_start",
             line.lineNumber,
             line.byteOffset,
-            {
-              turn_index: turns,
-              role: "user",
-              text_digest: sha256Hex(message.message),
-              text_chars: message.message.length,
-              is_correction: null,
-            },
+            turnStartPayload,
             "user_message",
           );
           turns += 1;
@@ -676,6 +696,9 @@ export class CodexAdapter implements ObserveAdapter {
             continue;
           }
           const claims = findCompletionClaims(message);
+          if (claims.length > 0) {
+            pendingClaim = true;
+          }
           if (claims.length === 0) {
             // agent_message already supplies turn_end. task_complete adds only
             // claim evidence that the closed schema can represent.
@@ -756,6 +779,14 @@ export class CodexAdapter implements ObserveAdapter {
           if (aborted === null) {
             failed(line);
             continue;
+          }
+          // The pilot stopped the agent mid-turn: the next user turn is an
+          // intervention by harness evidence, whatever its wording (DAN-224).
+          // Gated on the only reason observed in the wild ("interrupted",
+          // 144/144 in a 497-rollout corpus, 2026-08-15) so a future
+          // system-side abort reason cannot masquerade as a pilot action.
+          if (aborted.reason === "interrupted") {
+            interruptedPending = true;
           }
           emit(
             timestamp,

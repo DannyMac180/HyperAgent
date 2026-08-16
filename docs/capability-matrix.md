@@ -8,10 +8,10 @@ Regenerate with `bun src/daemon/cli.ts conformance matrix --write`. Generation r
 
 Every row below is the output of a conformance run against a registered adapter. This is the authority on what HyperAgent can actually do.
 
-| Harness | Observe | Inject | Gate | Tier | Evidence |
-|---|---|---|---|---|---|
-| claude-code | verified | verified | verified | 1 | verified as of adapter v0.2.0 / dialect claude-code-jsonl-2026-07-26-v1 |
-| codex | verified | verified | not claimed | 2 | verified as of adapter v0.2.0 / dialect codex-rollout-jsonl-2026-07-27-v1 |
+| Harness | Observe | Inject | Gate | Correction detection | Tier | Evidence |
+|---|---|---|---|---|---|---|
+| claude-code | verified | verified | verified | verified | 1 | verified as of adapter v0.2.0 / dialect claude-code-jsonl-2026-07-26-v1 |
+| codex | verified | verified | not claimed | verified | 2 | verified as of adapter v0.2.0 / dialect codex-rollout-jsonl-2026-07-27-v1 |
 
 ## Not yet measured
 

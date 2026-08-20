@@ -2,7 +2,8 @@ import { existsSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 /**
- * Persisted read scope — which projects never enter the record.
+ * Persisted read scope — which projects and vendors never enter the record,
+ * and how far back reads go.
  *
  * Why a FILE and not just a caller-supplied option: the scope choice is made
  * once, interactively (the Cockpit's first-run flow), but it has to be honored
@@ -25,6 +26,22 @@ export interface ReadScope {
    */
   excludeProjects: string[];
   /**
+   * Canonical vendor ids whose sessions never enter the record — the whole
+   * harness is skipped before any of its artifacts are opened.
+   *
+   * This is the vendor-level sibling of `excludeProjects`, and it exists for
+   * the same reason the cut-off does: a UI can offer "which agents do you want
+   * recorded", but adapter selection happens in `ingest`/`watch`, which the
+   * launchd daemon runs with fixed arguments. Without a persisted answer the
+   * choice survives exactly one run and the next flagless pass reads the
+   * vendor back in — a scope control that silently expires is worse than no
+   * control, because the pilot believes it held.
+   *
+   * Prospective like the rest of scope: sessions a vendor already put in the
+   * record stay there until something deletes them.
+   */
+  excludeVendors: string[];
+  /**
    * Absolute cut-off in ms epoch — the record never goes back further than
    * this, on any later read.
    *
@@ -42,7 +59,11 @@ export interface ReadScope {
   sinceMs?: number;
 }
 
-export const emptyScope = (): ReadScope => ({ v: 1, excludeProjects: [] });
+export const emptyScope = (): ReadScope => ({
+  v: 1,
+  excludeProjects: [],
+  excludeVendors: [],
+});
 
 export const scopePath = (dataDir: string): string =>
   join(dataDir, "scope.json");
@@ -67,10 +88,26 @@ export function parseScope(value: unknown): ReadScope {
     .filter((name: unknown): name is string => typeof name === "string")
     .map((name: string): string => name.trim())
     .filter((name: string): boolean => name.length > 0);
+  // Absent is the backward-compatible case — every scope.json written before
+  // vendor exclusion existed lacks the key, and "absent" honestly means
+  // "nothing excluded". Present-but-malformed is treated like a malformed
+  // excludeProjects: structurally wrong, so fall back rather than guess.
+  const rawVendors = value.excludeVendors;
+  if (rawVendors !== undefined && !Array.isArray(rawVendors)) {
+    return emptyScope();
+  }
+  // Lower-cased because canonical vendor ids are lower-case: a `Codex` that
+  // silently matched nothing would widen the record while looking excluded.
+  // Typos are caught loudly at the CLI, which validates against known vendors.
+  const excludeVendors = (Array.isArray(rawVendors) ? rawVendors : [])
+    .filter((name: unknown): name is string => typeof name === "string")
+    .map((name: string): string => name.trim().toLowerCase())
+    .filter((name: string): boolean => name.length > 0);
   const sinceMs = value.sinceMs;
   return {
     v: 1,
     excludeProjects,
+    excludeVendors,
     ...(typeof sinceMs === "number" && Number.isFinite(sinceMs)
       ? { sinceMs }
       : {}),

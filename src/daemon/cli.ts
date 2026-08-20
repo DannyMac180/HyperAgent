@@ -8,6 +8,7 @@ import { fileURLToPath } from "node:url";
 import type {
   GateAdapter,
   GateInstallResult,
+  ObserveAdapter,
 } from "../adapters/types.ts";
 import {
   loadContract,
@@ -97,10 +98,10 @@ interface CommonOptions {
 }
 
 const usage = `Usage:
-  bun src/daemon/cli.ts ingest --once [--data-dir D] [--projects-root P] [--exclude-projects A,B] [--since 30d|2026-01-01]
-  bun src/daemon/cli.ts watch [--data-dir D] [--projects-root P] [--exclude-projects A,B]
+  bun src/daemon/cli.ts ingest --once [--data-dir D] [--projects-root P] [--exclude-projects A,B] [--exclude-vendors V,W] [--since 30d|2026-01-01]
+  bun src/daemon/cli.ts watch [--data-dir D] [--projects-root P] [--exclude-projects A,B] [--exclude-vendors V,W]
   bun src/daemon/cli.ts scope show [--data-dir D]
-  bun src/daemon/cli.ts scope set [--exclude-projects A,B] [--since 30d|2026-01-01] [--data-dir D]
+  bun src/daemon/cli.ts scope set [--exclude-projects A,B] [--exclude-vendors V,W] [--since 30d|2026-01-01] [--data-dir D]
   bun src/daemon/cli.ts status [--data-dir D]
   bun src/daemon/cli.ts memory list [--status S] [--scope S] [--stale --days N] [--data-dir D]
   bun src/daemon/cli.ts memory show <id> [--data-dir D]
@@ -188,6 +189,51 @@ function excludeProjectsOption(
   return projects.length > 0 ? projects : undefined;
 }
 
+function excludeVendorsOption(
+  options: Map<string, string | true>,
+): string[] | undefined {
+  const raw = stringOption(options, "--exclude-vendors");
+  if (raw === undefined) {
+    return undefined;
+  }
+  const vendors = raw
+    .split(",")
+    .map((name: string): string => name.trim().toLowerCase())
+    .filter((name: string): boolean => name.length > 0);
+  return vendors.length > 0 ? vendors : undefined;
+}
+
+/**
+ * Validated against the adapters this build actually has, because an
+ * unrecognized name excludes NOTHING: the typo would read on screen as a
+ * privacy choice while that vendor kept entering the record. Failing loudly at
+ * the moment a human types it is the only place this can be caught. An empty
+ * value clears the list, matching every other scope field.
+ */
+function parseExcludeVendorsArgument(raw: string): string[] {
+  const requested = raw
+    .split(",")
+    .map((name: string): string => name.trim().toLowerCase())
+    .filter((name: string): boolean => name.length > 0);
+  if (requested.length === 0) {
+    return [];
+  }
+  const known = builtinAdaptersForProjectsRoot(undefined).map(
+    (adapter: ObserveAdapter): string => adapter.vendor,
+  );
+  const unknown = requested.filter(
+    (vendor: string): boolean => !known.includes(vendor),
+  );
+  if (unknown.length > 0) {
+    throw new ArgumentError(
+      `scope set: unknown vendor(s) ${unknown.join(", ")}. ` +
+        `Known vendors: ${[...known].sort().join(", ")}. ` +
+        "Refusing, because an unknown name excludes nothing while looking like it did.",
+    );
+  }
+  return [...new Set(requested)].sort();
+}
+
 /**
  * `--since` accepts a relative window (`30d`, `12w`) or any date `Date.parse`
  * understands (`2026-01-01`). An unparseable value EXITS rather than falling
@@ -231,6 +277,50 @@ export function resolveExcludeProjects(
   }
   const stored = readScope(dataDir).excludeProjects;
   return stored.length > 0 ? stored : undefined;
+}
+
+/**
+ * Same override rule as project exclusions. Returns a list rather than
+ * `undefined`, because the caller filters an adapter list with it and an empty
+ * list is the honest "exclude nothing".
+ */
+export function resolveExcludeVendors(
+  dataDir: string,
+  flagValue: string[] | undefined,
+): string[] {
+  return flagValue ?? readScope(dataDir).excludeVendors;
+}
+
+/**
+ * The adapter list a read should actually use. Vendor exclusion happens HERE,
+ * at adapter selection, rather than as a filter further downstream: an excluded
+ * vendor's artifacts are never opened at all, so nothing about it reaches the
+ * store, the ingest state, or any derived table — the same guarantee
+ * `excludeProjects` gives, one level up.
+ *
+ * Excluding every known vendor is allowed (it is a coherent "record nothing"),
+ * but it is said out loud, because a daemon silently recording nothing looks
+ * identical to a daemon that is working.
+ */
+function adaptersForScope(
+  projectsRoot: string | undefined,
+  excludeVendors: string[],
+): ObserveAdapter[] {
+  const all = builtinAdaptersForProjectsRoot(projectsRoot);
+  if (excludeVendors.length === 0) {
+    return all;
+  }
+  const kept = all.filter(
+    (adapter: ObserveAdapter): boolean =>
+      !excludeVendors.includes(adapter.vendor),
+  );
+  if (kept.length === 0) {
+    console.error(
+      "Every known vendor is excluded by the read scope — this read records nothing. " +
+        "Clear it with: scope set --exclude-vendors \"\"",
+    );
+  }
+  return kept;
 }
 
 /**
@@ -279,6 +369,7 @@ async function ingestCommand(
       "--data-dir",
       "--projects-root",
       "--exclude-projects",
+      "--exclude-vendors",
       "--since",
     ]),
   );
@@ -292,9 +383,13 @@ async function ingestCommand(
     excludeProjectsOption(options),
   );
   const since = resolveSince(dataDir, sinceOption(options));
+  const excludeVendors = resolveExcludeVendors(
+    dataDir,
+    excludeVendorsOption(options),
+  );
   const result = await runIngestOnce({
     ...(common.dataDir === undefined ? {} : { dataDir: common.dataDir }),
-    adapters: builtinAdaptersForProjectsRoot(common.projectsRoot),
+    adapters: adaptersForScope(common.projectsRoot, excludeVendors),
     ...(excludeProjects === undefined ? {} : { excludeProjects }),
     ...(since === undefined ? {} : { since }),
     ...extraIngest,
@@ -314,7 +409,12 @@ async function scopeCommand(args: string[]): Promise<number> {
   const subcommand = args[0];
   const options = parseOptions(
     args.slice(1),
-    new Set(["--data-dir", "--exclude-projects", "--since"]),
+    new Set([
+      "--data-dir",
+      "--exclude-projects",
+      "--exclude-vendors",
+      "--since",
+    ]),
   );
   const dataDir =
     stringOption(options, "--data-dir") ?? join(homedir(), ".hyperagent");
@@ -330,6 +430,13 @@ async function scopeCommand(args: string[]): Promise<number> {
         console.log(`  ${project}`);
       }
     }
+    if (scope.excludeVendors.length === 0) {
+      console.log("excluded agents: none — every detected agent enters the record");
+    } else {
+      console.log(
+        `excluded agents (${scope.excludeVendors.length}): ${scope.excludeVendors.join(", ")}`,
+      );
+    }
     console.log(
       scope.sinceMs === undefined
         ? "cut-off: none — reads go back as far as the transcripts do"
@@ -343,10 +450,12 @@ async function scopeCommand(args: string[]): Promise<number> {
 
   if (subcommand === "set") {
     const raw = stringOption(options, "--exclude-projects");
+    const vendorRaw = stringOption(options, "--exclude-vendors");
     const sinceRaw = stringOption(options, "--since");
-    if (raw === undefined && sinceRaw === undefined) {
+    if (raw === undefined && vendorRaw === undefined && sinceRaw === undefined) {
       throw new ArgumentError(
-        "scope set: pass --exclude-projects and/or --since (an empty value clears either).",
+        "scope set: pass --exclude-projects, --exclude-vendors and/or --since " +
+          "(an empty value clears any of them).",
       );
     }
     await mkdir(dataDir, { recursive: true });
@@ -360,6 +469,10 @@ async function scopeCommand(args: string[]): Promise<number> {
             .split(",")
             .map((name: string): string => name.trim())
             .filter((name: string): boolean => name.length > 0);
+    const excludeVendors =
+      vendorRaw === undefined
+        ? current.excludeVendors
+        : parseExcludeVendorsArgument(vendorRaw);
     const sinceMs =
       sinceRaw === undefined
         ? current.sinceMs
@@ -369,12 +482,18 @@ async function scopeCommand(args: string[]): Promise<number> {
     writeScope(dataDir, {
       v: 1,
       excludeProjects,
+      excludeVendors,
       ...(sinceMs === undefined ? {} : { sinceMs }),
     });
     console.log(
       excludeProjects.length === 0
         ? "scope: every project enters the record"
         : `scope: ${excludeProjects.length} project(s) will not enter the record`,
+    );
+    console.log(
+      excludeVendors.length === 0
+        ? "scope: every detected agent enters the record"
+        : `scope: ${excludeVendors.join(", ")} will not enter the record`,
     );
     console.log(
       sinceMs === undefined
@@ -433,7 +552,12 @@ async function rebuildCommand(args: string[]): Promise<number> {
 
   const result = await runIngestOnce({
     ...(dataDir === undefined ? {} : { dataDir }),
-    adapters: builtinAdaptersForProjectsRoot(projectsRoot),
+    // Honors the stored vendor exclusion: a rebuild that re-read an excluded
+    // vendor would quietly undo the scope choice while restoring the record.
+    adapters: adaptersForScope(
+      projectsRoot,
+      resolveExcludeVendors(dataDir ?? join(homedir(), ".hyperagent"), undefined),
+    ),
   });
   console.log("");
   printRun(result);
@@ -526,7 +650,12 @@ async function watchCommand(
 ): Promise<number> {
   const options = parseOptions(
     args,
-    new Set(["--data-dir", "--projects-root", "--exclude-projects"]),
+    new Set([
+      "--data-dir",
+      "--projects-root",
+      "--exclude-projects",
+      "--exclude-vendors",
+    ]),
   );
   const dataDir =
     stringOption(options, "--data-dir") ?? join(homedir(), ".hyperagent");
@@ -535,8 +664,8 @@ async function watchCommand(
   // daemon outlives the choice, so a scope set while it is running has to take
   // effect on the next pass, not on the next reboot.
   const excludeProjectsFlag = excludeProjectsOption(options);
+  const excludeVendorsFlag = excludeVendorsOption(options);
   const onIdleInterval = plugins?.onIdleInterval;
-  const adapters = builtinAdaptersForProjectsRoot(projectsRoot);
   const watchers = new Map<string, FSWatcher>();
   let debounceTimer: ReturnType<typeof setTimeout> | undefined;
   let inFlight = false;
@@ -588,6 +717,14 @@ async function watchCommand(
             excludeProjectsFlag,
           );
           const since = resolveSince(dataDir, undefined);
+          // Rebuilt per pass for the same reason the exclusions are re-read:
+          // hoisting this would make a vendor exclusion take effect only on
+          // the next daemon reboot, which is exactly the silent expiry the
+          // persisted scope exists to prevent.
+          const adapters = adaptersForScope(
+            projectsRoot,
+            resolveExcludeVendors(dataDir, excludeVendorsFlag),
+          );
           printRun(
             await runIngestOnce({
               dataDir,

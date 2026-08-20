@@ -40,11 +40,13 @@ Every text summary — from adapters and from gate events alike — passes throu
 
 ## The redaction gap — named, owned, not yet closed
 
-**The event store is append-only, and there is currently no supported way to remove a secret that reaches it.** Append-only is what makes the record trustworthy; it is also what makes this hard. The store's triggers reject `UPDATE` and `DELETE`, by design and under test.
+**The event store is append-only, and there is still no supported way to remove an individual secret that reaches it.** Append-only is what makes the record trustworthy; it is also what makes this hard. The store's triggers reject `UPDATE` and `DELETE`, by design and under test.
 
-The planned remedy is a `redaction_tombstone` event type that supersedes a prior event by id, with readers required to treat a tombstoned payload as `{}` (`docs/schema.md` §8, minor version bump). It is **not built**. Until it is:
+Removal at the granularity of **one whole agent** is supported — `purge-vendor` (below) — and it is worth being precise about why that does not close this gap: it removes everything that agent ever recorded, which is the right shape for "I don't want this agent in my record" and much too blunt for "one API key leaked into one summary".
 
-- the blunt remedy is deleting `~/.hyperagent/hyperagent.db`, which costs the whole history;
+The planned remedy for the fine-grained case is a `redaction_tombstone` event type that supersedes a prior event by id, with readers required to treat a tombstoned payload as `{}` (`docs/schema.md` §8, minor version bump). It is **not built**. Until it is:
+
+- the blunt remedies are `purge-vendor <agent>`, which costs that agent's whole history, or deleting `~/.hyperagent/hyperagent.db`, which costs all of it;
 - the mitigations that do exist are structural — digests instead of raw text, and the shared redaction filter above on every summary that is stored;
 - there is **no automated preflight**. The v1 `redact-check` and `verify-mission` helpers belonged to the retired bash CLI and are gone; nothing replaced them.
 
@@ -53,6 +55,26 @@ Treat this as the honest state of the art here, not as a solved problem. Closing
 ## Your own copy is yours
 
 The store is a SQLite file and the memories are markdown. Both are readable with ordinary tools, both are yours to inspect, copy, or delete. Markdown stays inspectable ground truth on purpose: a record you cannot read is a record you cannot trust.
+
+### Removing an agent from the record
+
+Excluding an agent (`scope set --exclude-vendors codex`) is **prospective**: it stops future reads and leaves what is already recorded alone. To remove what is already there:
+
+```bash
+bun src/daemon/cli.ts purge-vendor codex             # preview — counts only, changes nothing
+bun src/daemon/cli.ts purge-vendor codex --apply
+```
+
+What it does, and what it deliberately does not:
+
+- **Removed:** that agent's events and sessions, and anything derived from those sessions — scores, policy violations, and any future table keyed the same way. Its ingest resume tokens go too, so re-attaching later reads the agent back in cleanly instead of leaving a permanent hole.
+- **Kept:** your lessons. They are your knowledge, they are vendor-neutral by design, and detaching an agent should not cost what you learned from it. A lesson whose evidence pointed only at purged sessions keeps its citation, and that citation stops resolving — the same state as a transcript deleted out from under the store.
+- **Archived, not destroyed:** the pre-purge database is written to `~/.hyperagent/archive/` first. Nothing is deleted from disk; if you change your mind, every row is still there.
+- **Append-only is not suspended.** No `DELETE` runs. A new database is written containing only the rows being kept, verified against the preview, and swapped in only if it matches — so a failure at any point leaves the live store exactly as it was. The triggers come back armed.
+
+It refuses to run on an agent you have not excluded first, because the daemon's next pass would read it straight back in and the purge would silently undo itself.
+
+**Do not use `rebuild` for this.** It discards the whole store and re-reads whatever transcripts are still on disk, so it also drops sessions belonging to agents you are *keeping* whenever a harness has rotated its transcripts away (Claude Code's `cleanupPeriodDays` defaults to 30 days) — and it cannot warn you, because since path-independent ids the orphan detector has no paths to check and reports zero by construction.
 
 ## For contributors
 

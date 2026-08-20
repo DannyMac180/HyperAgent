@@ -79,6 +79,20 @@ is already recorded alone. A flag overrides the stored scope for one run and
 never rewrites it; passing an empty value to `scope set` is how you clear a
 half, because omission must never widen what gets recorded.
 
+To remove what an agent already recorded, rather than only stopping future
+reads:
+
+```bash
+# Preview first — counts only, changes nothing.
+bun src/daemon/cli.ts purge-vendor codex
+bun src/daemon/cli.ts purge-vendor codex --apply
+```
+
+Your lessons are kept; the pre-purge database is archived rather than deleted;
+and append-only is honoured literally — no `DELETE` runs, a filtered copy is
+verified and swapped in, and the triggers come back armed. Details and the
+reason not to use `rebuild` for this: `docs/evidence-policy.md`.
+
 To keep watching in the background:
 
 ```bash

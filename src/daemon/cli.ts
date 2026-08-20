@@ -71,6 +71,7 @@ import {
   planRebuild,
 } from "../store/rebuild.ts";
 import type { RebuildPlan } from "../store/rebuild.ts";
+import { planVendorPurge, purgeVendor } from "../store/purge.ts";
 import { openStore } from "../store/store.ts";
 import {
   readGateHealth,
@@ -102,6 +103,8 @@ const usage = `Usage:
   bun src/daemon/cli.ts watch [--data-dir D] [--projects-root P] [--exclude-projects A,B] [--exclude-vendors V,W]
   bun src/daemon/cli.ts scope show [--data-dir D]
   bun src/daemon/cli.ts scope set [--exclude-projects A,B] [--exclude-vendors V,W] [--since 30d|2026-01-01] [--data-dir D]
+  bun src/daemon/cli.ts purge-vendor <vendor> [--apply] [--force] [--data-dir D]
+  bun src/daemon/cli.ts rebuild [--apply] [--data-dir D] [--projects-root P]
   bun src/daemon/cli.ts status [--data-dir D]
   bun src/daemon/cli.ts memory list [--status S] [--scope S] [--stale --days N] [--data-dir D]
   bun src/daemon/cli.ts memory show <id> [--data-dir D]
@@ -580,6 +583,97 @@ async function rebuildCommand(args: string[]): Promise<number> {
   console.log("");
   console.log(`events after:       ${afterCounts || "(none)"}`);
   return 0;
+}
+
+/**
+ * Remove one vendor's records at the pilot's instruction.
+ *
+ * Dry run by default, like `rebuild`: a destructive command whose first
+ * invocation is destructive is a trap. The preview prints the exact counts the
+ * confirmation surface is expected to show.
+ */
+async function purgeVendorCommand(args: string[]): Promise<number> {
+  const vendorArgument = args[0];
+  if (vendorArgument === undefined || vendorArgument.startsWith("--")) {
+    throw new ArgumentError(
+      "purge-vendor: name the agent to remove, e.g. purge-vendor codex",
+    );
+  }
+  const options = parseOptions(
+    args.slice(1),
+    new Set(["--apply", "--force", "--data-dir"]),
+  );
+  const dataDir =
+    stringOption(options, "--data-dir") ?? join(homedir(), ".hyperagent");
+  const apply = options.has("--apply");
+  const force = options.has("--force");
+
+  const plan = planVendorPurge(vendorArgument, dataDir);
+  console.log(`store:              ${plan.dbPath}`);
+  console.log(`agent:              ${plan.vendor}`);
+
+  if (plan.empty) {
+    console.log("");
+    console.log(
+      `Nothing to remove — ${plan.vendor} has no records in this store.`,
+    );
+    return 0;
+  }
+
+  console.log("");
+  for (const table of plan.removed) {
+    console.log(`removing:           ${table.name} (${table.rows} row(s))`);
+  }
+  const surviving = Object.entries(plan.retainedByVendor)
+    .map(([vendor, n]: [string, number]): string => `${vendor}=${n}`)
+    .join(", ");
+  console.log(`events remaining:   ${surviving || "(none)"}`);
+  console.log(`resume tokens:      ${plan.ingestStateEntries} forgotten`);
+  console.log("");
+  console.log(
+    "Lessons are kept — they are yours, not the agent's. A lesson citing only",
+  );
+  console.log(
+    "these sessions keeps its citation, and that citation stops resolving.",
+  );
+
+  if (!apply) {
+    console.log("");
+    console.log("dry run — nothing changed. Re-run with --apply to remove.");
+    console.log(
+      "Stop the daemon first: launchctl bootout gui/$UID/com.hyperagent.hyperagentd",
+    );
+    return 0;
+  }
+
+  // Removing the records while the vendor is still in scope is a footgun with
+  // no honest use: the daemon's next pass re-reads the transcripts and the
+  // purge silently undoes itself, leaving the pilot believing data is gone.
+  const scope = readScope(dataDir);
+  if (!scope.excludeVendors.includes(plan.vendor) && !force) {
+    console.error(
+      `Refusing: ${plan.vendor} is not excluded from future reads, so the next ` +
+        `daemon pass would read it straight back in and this would undo itself.\n` +
+        `  Exclude it first: scope set --exclude-vendors ${plan.vendor}\n` +
+        `  Or pass --force if you really do intend to re-record it.`,
+    );
+    return 2;
+  }
+
+  const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+  const paths = await purgeVendor(plan, stamp, dataDir);
+  console.log("");
+  console.log(`archived db:        ${paths.archivedDb}`);
+  console.log(`archived state:     ${paths.archivedState ?? "(none)"}`);
+
+  const after = planVendorPurge(plan.vendor, dataDir);
+  console.log("");
+  console.log(
+    after.empty
+      ? `${plan.vendor} is no longer in the record. The archive above still has it.`
+      : `WARNING: ${plan.vendor} still has rows after the purge — inspect the store.`,
+  );
+  return after.empty ? 0 : 1;
 }
 
 /**
@@ -1751,6 +1845,9 @@ export async function runCli(
   }
   if (command === "watch") {
     return watchCommand(rest, watchPlugins);
+  }
+  if (command === "purge-vendor") {
+    return purgeVendorCommand(rest);
   }
   if (command === "rebuild") {
     return rebuildCommand(rest);

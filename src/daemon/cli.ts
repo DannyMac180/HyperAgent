@@ -601,14 +601,25 @@ async function purgeVendorCommand(args: string[]): Promise<number> {
   }
   const options = parseOptions(
     args.slice(1),
-    new Set(["--apply", "--force", "--data-dir"]),
+    new Set(["--apply", "--force", "--json", "--data-dir"]),
   );
   const dataDir =
     stringOption(options, "--data-dir") ?? join(homedir(), ".hyperagent");
   const apply = options.has("--apply");
   const force = options.has("--force");
+  const asJson = options.has("--json");
 
   const plan = planVendorPurge(vendorArgument, dataDir);
+
+  // The confirmation surface has to show real counts — a destructive action
+  // whose size the pilot cannot see is not consented to — and parsing them back
+  // out of prose would break the first time the prose is reworded.
+  if (asJson && !apply) {
+    const { sessionIds: _ids, ...rest } = plan;
+    console.log(JSON.stringify(rest, null, 2));
+    return 0;
+  }
+
   console.log(`store:              ${plan.dbPath}`);
   console.log(`agent:              ${plan.vendor}`);
 

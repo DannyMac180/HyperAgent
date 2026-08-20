@@ -1,6 +1,7 @@
 import { afterAll, describe, expect, test } from "bun:test";
 import {
   copyFileSync,
+  existsSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
@@ -999,7 +1000,7 @@ describe("persisted read scope", () => {
   test("scope round-trips through write and read", () => {
     const dataDir = temporaryDataDir();
     expect(readScope(dataDir).excludeProjects).toEqual([]);
-    writeScope(dataDir, { v: 1, excludeProjects: ["-home-user-project", " b "] });
+    writeScope(dataDir, { v: 1, excludeProjects: ["-home-user-project", " b "], excludeVendors: [] });
     expect(readScope(dataDir).excludeProjects).toEqual([
       "-home-user-project",
       "b",
@@ -1008,7 +1009,7 @@ describe("persisted read scope", () => {
 
   test("ingest honors the scope file with no flag present", async () => {
     const dataDir = temporaryDataDir();
-    writeScope(dataDir, { v: 1, excludeProjects: ["-home-user-project"] });
+    writeScope(dataDir, { v: 1, excludeProjects: ["-home-user-project"], excludeVendors: [] });
     const ingest = await runCli([
       "ingest", "--once", "--data-dir", dataDir, "--projects-root", fixtureRoot,
     ]);
@@ -1023,7 +1024,7 @@ describe("persisted read scope", () => {
 
   test("an explicit flag overrides the file for that run", async () => {
     const dataDir = temporaryDataDir();
-    writeScope(dataDir, { v: 1, excludeProjects: ["-home-user-project"] });
+    writeScope(dataDir, { v: 1, excludeProjects: ["-home-user-project"], excludeVendors: [] });
     const ingest = await runCli([
       "ingest", "--once", "--data-dir", dataDir, "--projects-root", fixtureRoot,
       "--exclude-projects", "something-else",
@@ -1056,6 +1057,144 @@ describe("persisted read scope", () => {
     ]);
     expect(clear.exitCode).toBe(0);
     expect(readScope(dataDir).excludeProjects).toEqual([]);
+  });
+});
+
+describe("vendor read scope (excludeVendors)", () => {
+  const claudeCodeIds = (dataDir: string): string[] => {
+    // No adapters running means no state file at all, which is the same
+    // outcome as a state file with nothing claude-code in it.
+    const statePath = join(dataDir, "ingest-state.json");
+    if (!existsSync(statePath)) {
+      return [];
+    }
+    const state = JSON.parse(readFileSync(statePath, "utf8")) as {
+      sessions: Record<string, unknown>;
+    };
+    return Object.keys(state.sessions).filter((id: string): boolean =>
+      id.startsWith("claude-code:"),
+    );
+  };
+
+  test("a scope file written before vendor exclusion existed excludes nothing", () => {
+    // Every scope.json on disk today lacks the key. Absent must read as "no
+    // vendor excluded" and must not discard the exclusions sitting beside it.
+    const dataDir = temporaryDataDir();
+    mkdirSync(dataDir, { recursive: true });
+    writeFileSync(
+      join(dataDir, "scope.json"),
+      JSON.stringify({ v: 1, excludeProjects: ["-home-user-project"] }),
+      "utf8",
+    );
+    expect(readScope(dataDir).excludeVendors).toEqual([]);
+    expect(readScope(dataDir).excludeProjects).toEqual(["-home-user-project"]);
+  });
+
+  test("vendor names are normalized, so a cased name still excludes", () => {
+    const dataDir = temporaryDataDir();
+    mkdirSync(dataDir, { recursive: true });
+    writeFileSync(
+      join(dataDir, "scope.json"),
+      JSON.stringify({ v: 1, excludeProjects: [], excludeVendors: [" Claude-Code ", ""] }),
+      "utf8",
+    );
+    expect(readScope(dataDir).excludeVendors).toEqual(["claude-code"]);
+  });
+
+  test("scope set persists a vendor exclusion and scope show reports it", async () => {
+    const dataDir = temporaryDataDir();
+    const set = await runCli([
+      "scope", "set", "--data-dir", dataDir, "--exclude-vendors", "claude-code",
+    ]);
+    expect(set.exitCode).toBe(0);
+    expect(readScope(dataDir).excludeVendors).toEqual(["claude-code"]);
+
+    const show = await runCli(["scope", "show", "--data-dir", dataDir]);
+    expect(show.exitCode).toBe(0);
+    expect(show.stdout).toContain("claude-code");
+  });
+
+  test("scope set refuses an unknown vendor instead of excluding nothing", async () => {
+    // The failure this guards: a typo reads on screen as a privacy choice
+    // while that vendor keeps entering the record.
+    const dataDir = temporaryDataDir();
+    const set = await runCli([
+      "scope", "set", "--data-dir", dataDir, "--exclude-vendors", "claude-kode",
+    ]);
+    expect(set.exitCode).not.toBe(0);
+    expect(readScope(dataDir).excludeVendors).toEqual([]);
+  });
+
+  test("an empty value clears the vendor exclusion", async () => {
+    const dataDir = temporaryDataDir();
+    await runCli([
+      "scope", "set", "--data-dir", dataDir, "--exclude-vendors", "claude-code",
+    ]);
+    expect(readScope(dataDir).excludeVendors).toEqual(["claude-code"]);
+    const cleared = await runCli([
+      "scope", "set", "--data-dir", dataDir, "--exclude-vendors", "",
+    ]);
+    expect(cleared.exitCode).toBe(0);
+    expect(readScope(dataDir).excludeVendors).toEqual([]);
+  });
+
+  test("setting only vendors leaves the other scope halves alone", async () => {
+    const dataDir = temporaryDataDir();
+    await runCli([
+      "scope", "set", "--data-dir", dataDir, "--exclude-projects", "a,b",
+    ]);
+    await runCli([
+      "scope", "set", "--data-dir", dataDir, "--exclude-vendors", "codex",
+    ]);
+    expect(readScope(dataDir).excludeProjects).toEqual(["a", "b"]);
+    expect(readScope(dataDir).excludeVendors).toEqual(["codex"]);
+  });
+
+  test("a stored vendor exclusion holds on the SECOND flagless pass", async () => {
+    // The whole reason this lives in scope.json rather than in a flag. The
+    // daemon runs `watch`/`ingest` with fixed arguments, so a choice that only
+    // survives the run that made it is undone by the very next pass — the
+    // failure mode is invisible, because pass one looks correct.
+    const dataDir = temporaryDataDir();
+    writeScope(dataDir, {
+      v: 1,
+      excludeProjects: [],
+      excludeVendors: ["claude-code"],
+    });
+    for (const pass of [1, 2]) {
+      const ingest = await runCli([
+        "ingest", "--once", "--data-dir", dataDir, "--projects-root", fixtureRoot,
+      ]);
+      expect(ingest.exitCode, `pass ${pass} exit`).toBe(0);
+      expect(claudeCodeIds(dataDir), `pass ${pass} sessions`).toHaveLength(0);
+    }
+  });
+
+  test("without the exclusion the same fixture DOES land — negative control", async () => {
+    // Guards against the previous test passing for an unrelated reason (an
+    // empty fixture root would make "nothing landed" meaningless).
+    const dataDir = temporaryDataDir();
+    const ingest = await runCli([
+      "ingest", "--once", "--data-dir", dataDir, "--projects-root", fixtureRoot,
+    ]);
+    expect(ingest.exitCode).toBe(0);
+    expect(claudeCodeIds(dataDir)).not.toHaveLength(0);
+  });
+
+  test("a flag overrides the file for that run without rewriting the choice", async () => {
+    const dataDir = temporaryDataDir();
+    writeScope(dataDir, {
+      v: 1,
+      excludeProjects: [],
+      excludeVendors: ["claude-code"],
+    });
+    const ingest = await runCli([
+      "ingest", "--once", "--data-dir", dataDir, "--projects-root", fixtureRoot,
+      "--exclude-vendors", "codex",
+    ]);
+    expect(ingest.exitCode).toBe(0);
+    expect(claudeCodeIds(dataDir)).not.toHaveLength(0);
+    expect(readScope(dataDir).excludeVendors).toEqual(["claude-code"]);
   });
 });
 
@@ -1126,6 +1265,6 @@ describe("scope durability for the cut-off (advisor 2026-08-05)", () => {
   });
 
   test("an absent scope file is simply no scope", () => {
-    expect(readScope(temporaryDataDir())).toEqual({ v: 1, excludeProjects: [] });
+    expect(readScope(temporaryDataDir())).toEqual({ v: 1, excludeProjects: [], excludeVendors: [] });
   });
 });

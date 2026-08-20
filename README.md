@@ -55,6 +55,13 @@ bun src/daemon/cli.ts ingest --once --exclude-projects -Users-you-dev-private-re
 bun src/daemon/cli.ts scope set --exclude-projects -Users-you-dev-private-repo
 bun src/daemon/cli.ts scope show
 
+# Keep a whole agent out of the record. Its artifacts are never opened, so
+# nothing about it reaches the store. Recorded like the exclusions above, so
+# the daemon's next pass honours it too. An unknown vendor name is refused
+# rather than silently excluding nothing.
+bun src/daemon/cli.ts scope set --exclude-vendors codex
+bun src/daemon/cli.ts scope set --exclude-vendors ""     # clears it
+
 # Only go back so far. The cut-off is on each transcript's last-modified time,
 # so it means "sessions active since then" — a session resumed after the
 # cut-off is read whole, older turns included.

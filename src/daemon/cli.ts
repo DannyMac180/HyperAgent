@@ -86,6 +86,10 @@ import type {
 } from "./ingest.ts";
 import { syncMemoryTargets } from "./memory-sync.ts";
 import {
+  readConfigurationReport,
+  scanConfiguration,
+} from "../configuration/configuration.ts";
+import {
   builtinAdaptersForProjectsRoot,
   builtinGateAdapters,
   gateAdapterForHarness,
@@ -122,6 +126,8 @@ const usage = `Usage:
   bun src/daemon/cli.ts violations [--session S] [--days N] [--data-dir D]
   bun src/daemon/cli.ts conformance run [<vendor>|--adapter <vendor>]
   bun src/daemon/cli.ts conformance matrix [--write]
+  bun src/daemon/cli.ts configuration scan [--home H] [--repo R] [--data-dir D]
+  bun src/daemon/cli.ts configuration report [--data-dir D]
   bun src/daemon/cli.ts install-plist [--write]
 `;
 
@@ -1354,6 +1360,37 @@ async function conformanceCommand(args: string[]): Promise<number> {
   );
 }
 
+/**
+ * Configuration observation is deliberately explicit: no daemon lifecycle,
+ * status command, or report command reads home or repository configuration.
+ * These commands emit a redacted JSON record that the Cockpit can render
+ * without scraping human-oriented console text.
+ */
+async function configurationCommand(args: string[]): Promise<number> {
+  const subcommand = args[0];
+  const rest = args.slice(1);
+  if (subcommand === "scan") {
+    const options = parseOptions(rest, new Set(["--home", "--repo", "--data-dir"]));
+    const report = await scanConfiguration({
+      home: stringOption(options, "--home"),
+      repo: stringOption(options, "--repo"),
+      dataDir: stringOption(options, "--data-dir"),
+    });
+    process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
+    return 0;
+  }
+  if (subcommand === "report") {
+    const options = parseOptions(rest, new Set(["--data-dir"]));
+    process.stdout.write(`${JSON.stringify(readConfigurationReport({
+      dataDir: stringOption(options, "--data-dir"),
+    }), null, 2)}\n`);
+    return 0;
+  }
+  throw new ArgumentError(
+    `Unknown configuration subcommand: ${subcommand ?? "(missing)"}`,
+  );
+}
+
 function gateDataDir(
   options: Map<string, string | true>,
 ): string {
@@ -1772,6 +1809,9 @@ export async function runCli(
   }
   if (command === "conformance") {
     return conformanceCommand(rest);
+  }
+  if (command === "configuration") {
+    return configurationCommand(rest);
   }
   if (command === "install-plist") {
     return installPlistCommand(rest);

@@ -6,7 +6,7 @@ This repo is the **open data plane** of HyperAgent (MIT). `AGENTS.md` carries th
 
 **`docs/architecture-v2.md` is the rearchitecture rationale**; `docs/schema.md` wins on schema questions.
 
-The v1 self-reporting loop — mission records, the `codex-hyperagent` skill, `hyperagent/operating-prompt.md`, the `scripts/hyperagent.sh` CLI, and the v1 verify scripts — was **retired on 2026-08-03** and exists only in git history. Its documentation is in `docs/archive/`. If you find an instruction telling an agent to record its own work, it is a leftover and it is wrong.
+If you find an instruction telling an agent to record its own work, it is a v1 leftover and it is wrong. What v1 was and what was retired: `docs/archive/README.md`.
 
 ## What this is (one paragraph)
 
@@ -27,8 +27,9 @@ A meta-harness: a local observer daemon (`hyperagentd`) that watches agent harne
 - Tests: `bun test`. Typecheck: `bunx tsc --noEmit`. Both gate CI, alongside a privacy guard.
 - Layout: `src/schema`, `src/store`, `src/adapters`, `src/daemon`, `src/gate`, `src/memory`, `src/conformance`.
 - A capability-matrix row is earned by a passing conformance run, never by editing the table (`bun src/daemon/cli.ts conformance matrix --write`).
+- `missions/` is private and gitignored — never re-track it (`docs/evidence-policy.md`).
 
-## Open-core boundary (executed 2026-07-28)
+## Open-core boundary
 
 This repo is the **open data plane** ("the armor", MIT): schema, store, adapters, daemon, gates, `memory/store.ts` + `memory/inject.ts` + injection renderers, conformance, raw-inspection CLI. The **judgment plane** ("the cockpit", proprietary) lives in the private `hyperagent-cockpit` repo: scoring, missions, workshop, forge/decay audit, memory extraction/promotion/queue. See `docs/open-core.md`.
 
@@ -42,8 +43,3 @@ This repo is the **open data plane** ("the armor", MIT): schema, store, adapters
 ## Work tracking
 
 Planning happens in a private tracker, so it is not a reference you can follow from here. What matters in this repo is on disk: `docs/architecture-v2.md` §8 is the build order, `docs/capability-matrix.md` is the authority on what is actually verified, and each doc's own "not yet built" section is the honest list of gaps. If a task cannot be scoped from those, ask rather than inferring intent from a ticket ID in a commit message.
-
-## Known repo state (2026-08-03, post-v1-retirement)
-
-- `missions/` is untracked (`git rm --cached`, gitignored) and private by policy; records pushed before 2026-07-26 remain in git history and are treated as public (see `docs/evidence-policy.md`). Never re-track it.
-- The v1 surface (`scripts/`, `evals/`, `bin/`, `ui/`, `adapters/`, `templates/`, `hyperagent/`, `workshop/`, `forge/`, `skills/codex-hyperagent/`) was deleted on 2026-08-03 and lives in git history. `AGENTS.md` and `README.md` were rewritten around the data plane at the same time.

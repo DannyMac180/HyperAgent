@@ -48,6 +48,18 @@ full history.
 | `reviews/` | v1 Forge review records. |
 | `assets/` | Images referenced only by archived documents. |
 
+## Retired code (2026-08-03)
+
+The v1 self-reporting loop — mission records, the `codex-hyperagent` skill,
+`hyperagent/operating-prompt.md`, the `scripts/hyperagent.sh` CLI, and the v1 verify scripts — was
+retired on 2026-08-03 and exists only in git history. The whole v1 surface went with it:
+`scripts/`, `evals/`, `bin/`, `ui/`, `adapters/`, `templates/`, `hyperagent/`, `workshop/`,
+`forge/`, and `skills/codex-hyperagent/`. `AGENTS.md` and `README.md` were rewritten around the
+data plane at the same time.
+
+`missions/` was untracked (`git rm --cached`, gitignored) and is private by policy. Records pushed
+before 2026-07-26 remain in git history and are treated as public (`docs/evidence-policy.md`).
+
 ---
 
 These documents contain claims that are no longer true of HyperAgent. Read them as history.
